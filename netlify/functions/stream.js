@@ -1,3 +1,47 @@
+import CryptoJS from "crypto-js";
+
+function parseSingleToken(token) {
+  if (!token) return "";
+
+  if (token.startsWith("eyJ")) {
+    try {
+      const decoded = CryptoJS.enc.Base64
+        .parse(token)
+        .toString(CryptoJS.enc.Utf8);
+
+      const parsed = JSON.parse(decoded);
+
+      if (parsed && parsed.encrypt_data) {
+        const key = "123d6cedf626dy54233aa1w6";
+        const iv = CryptoJS.enc.Utf8.parse("wEiphTn!");
+
+        const decrypted = CryptoJS.TripleDES.decrypt(
+          parsed.encrypt_data,
+          CryptoJS.enc.Utf8.parse(key),
+          {
+            iv,
+            mode: CryptoJS.mode.CBC,
+            padding: CryptoJS.pad.Pkcs7
+          }
+        );
+
+        const result = JSON.parse(
+          decrypted.toString(CryptoJS.enc.Utf8)
+        );
+
+        if (result && result.uid) {
+          return String(result.uid);
+        }
+      }
+    } catch {
+      // Match the original provider:
+      // if decoding fails, use the original token.
+    }
+  }
+
+  return token;
+}
+
 export default async (req, context) => {
   const { type, id, config } = context.params;
 
@@ -8,13 +52,19 @@ export default async (req, context) => {
       .replace(/-/g, "+")
       .replace(/_/g, "/");
 
-    const json = atob(base64);
+    const padded = base64 + "=".repeat(
+      (4 - (base64.length % 4)) % 4
+    );
+
+    const json = atob(padded);
     const parsed = JSON.parse(json);
 
     uiToken = parsed.uiToken;
   } catch {
     return new Response(
-      JSON.stringify({ error: "Invalid addon configuration" }),
+      JSON.stringify({
+        error: "Invalid addon configuration"
+      }),
       {
         status: 400,
         headers: {
@@ -27,7 +77,9 @@ export default async (req, context) => {
 
   if (!uiToken) {
     return new Response(
-      JSON.stringify({ error: "No ShowBox UI token configured" }),
+      JSON.stringify({
+        error: "No ShowBox UI token configured"
+      }),
       {
         status: 400,
         headers: {
@@ -38,12 +90,15 @@ export default async (req, context) => {
     );
   }
 
+  const parsedToken = parseSingleToken(uiToken);
+
   const apiBase =
     "https://id-mapping-api-showbox-proxy.hf.space/api/media";
 
   const url =
-    `${apiBase}/movie/${encodeURIComponent(id)}` +
-    `?cookie=${encodeURIComponent(uiToken)}`;
+    type === "series"
+      ? `${apiBase}/tv/${encodeURIComponent(id)}?cookie=${encodeURIComponent(parsedToken)}`
+      : `${apiBase}/movie/${encodeURIComponent(id)}?cookie=${encodeURIComponent(parsedToken)}`;
 
   try {
     const response = await fetch(url, {
