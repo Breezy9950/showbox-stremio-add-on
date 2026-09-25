@@ -1,4 +1,4 @@
-export default async () => {
+export default async (req, context) => {
   return new Response(
     JSON.stringify({
       id: "com.showbox.stremio",
@@ -33,5 +33,8 @@ export default async () => {
 };
 
 export const config = {
-  path: "/manifest.json"
+  path: [
+    "/manifest.json",
+    "/:config/manifest.json"
+  ]
 };
