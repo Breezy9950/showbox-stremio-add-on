@@ -1,12 +1,12 @@
 export default async (req, context) => {
-  const { type, id } = context.params;
+  const { type, id, config } = context.params;
 
   return new Response(
     JSON.stringify({
       streams: [
         {
-          name: "ShowBox Test",
-          title: `Received ${type}: ${id}`,
+          name: "ShowBox Config Test",
+          title: `Config: ${config} | ${type}: ${id}`,
           url: "https://example.com/test"
         }
       ]
@@ -21,5 +21,5 @@ export default async (req, context) => {
 };
 
 export const config = {
-  path: "/stream/:type/:id.json"
+  path: "/:config/stream/:type/:id.json"
 };
