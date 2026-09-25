@@ -7,7 +7,21 @@ export default async () => {
       description: "ShowBox Stremio addon",
       resources: ["stream"],
       types: ["movie", "series"],
-      catalogs: []
+      catalogs: [],
+
+      behaviorHints: {
+        configurable: true,
+        configurationRequired: true
+      },
+
+      config: [
+        {
+          key: "uiToken",
+          type: "password",
+          title: "ShowBox UI Token",
+          required: true
+        }
+      ]
     }),
     {
       headers: {
@@ -16,4 +30,8 @@ export default async () => {
       }
     }
   );
+};
+
+export const config = {
+  path: "/manifest.json"
 };
