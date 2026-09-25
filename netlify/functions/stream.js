@@ -91,6 +91,7 @@ export default async (req, context) => {
   }
 
   const parsedToken = parseSingleToken(uiToken);
+  const tokenWasTransformed = parsedToken !== uiToken;
 
   const apiBase =
     "https://id-mapping-api-showbox-proxy.hf.space/api/media";
@@ -117,6 +118,8 @@ export default async (req, context) => {
         test: true,
         type,
         id,
+        tokenStartsWithEyJ: uiToken.startsWith("eyJ"),
+        tokenWasTransformed,
         apiStatus: response.status,
         success: data.success,
         showboxId: data.id || data.mid || null,
