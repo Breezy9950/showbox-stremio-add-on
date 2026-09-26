@@ -87,6 +87,12 @@ function homepageScript() {
   const qualityList =
     document.getElementById("qualityList");
 
+  const minSizeInput =
+    document.getElementById("minSize");
+
+  const maxSizeInput =
+    document.getElementById("maxSize");
+
   const manifestUrl =
     document.getElementById("manifestUrl");
 
@@ -126,6 +132,32 @@ function homepageScript() {
   }
 
 
+  function getFileSizeConfig() {
+
+    const minValue =
+      minSizeInput.value.trim();
+
+    const maxValue =
+      maxSizeInput.value.trim();
+
+
+    return {
+
+      minGb:
+        minValue === ""
+          ? null
+          : Number(minValue),
+
+      maxGb:
+        maxValue === ""
+          ? null
+          : Number(maxValue)
+
+    };
+
+  }
+
+
   function updateManifest() {
 
     if (!currentToken) {
@@ -151,8 +183,15 @@ function homepageScript() {
 
 
     const config = {
-      uiToken: currentToken,
+
+      uiToken:
+        currentToken,
+
+      fileSize:
+        getFileSizeConfig(),
+
       qualities
+
     };
 
 
@@ -245,6 +284,18 @@ function homepageScript() {
       updateManifest();
 
     }
+  );
+
+
+  minSizeInput.addEventListener(
+    "input",
+    updateManifest
+  );
+
+
+  maxSizeInput.addEventListener(
+    "input",
+    updateManifest
   );
 
 
@@ -578,18 +629,141 @@ label.title {
 
 #configuration {
   display: none;
+  margin-top: 42px;
+}
+
+
+/* -------------------------------------------------- */
+/* FILTERING */
+/* -------------------------------------------------- */
+
+.section-title {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+.section-description {
+  margin-top: 6px;
+  margin-bottom: 24px;
+  color: #85858d;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.filter-card {
+  padding: 16px;
+  border: 1px solid #202126;
+  border-radius: 20px;
+  background: #17181d;
+}
+
+.filter-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  color: #cfd0d7;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.filter-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #858995;
+  font-size: 22px;
+}
+
+.filter-option {
+  padding: 20px;
+  border: 1px solid #2c2e36;
+  border-radius: 16px;
+  background: #20222a;
+}
+
+.filter-option-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 18px;
+  color: #f0f0f3;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.help-button {
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #363942;
+  color: #d7d8dd;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.size-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.size-field label {
+  display: block;
+  margin-bottom: 8px;
+  color: #858995;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.size-input {
+  width: 100%;
+  height: 54px;
+  padding: 0 18px;
+  border: 1px solid #343742;
+  border-radius: 13px;
+  background: #292c35;
+  color: #fff;
+  font-size: 18px;
+  outline: none;
+}
+
+.size-input::placeholder {
+  color: #858995;
+}
+
+.size-input:focus {
+  border-color: #555a68;
+}
+
+
+/* -------------------------------------------------- */
+/* QUALITY SETTINGS */
+/* -------------------------------------------------- */
+
+.quality-section {
   margin-top: 38px;
 }
 
 .configuration-title {
-  margin-bottom: 8px;
-  font-size: 22px;
+  margin-bottom: 6px;
+  font-size: 24px;
   font-weight: 600;
 }
 
 .description {
   margin-bottom: 22px;
-  color: #999;
+  color: #85858d;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .quality-list {
@@ -642,6 +816,11 @@ label.title {
   opacity: .25;
   cursor: default;
 }
+
+
+/* -------------------------------------------------- */
+/* RESULT */
+/* -------------------------------------------------- */
 
 #result {
   margin-top: 36px;
@@ -705,6 +884,7 @@ label.title {
   margin-top: 16px;
   color: #777;
   line-height: 1.5;
+  font-size: 13px;
 }
 
 @media (max-width: 600px) {
@@ -715,6 +895,19 @@ label.title {
 
   h1 {
     font-size: 30px;
+  }
+
+  .size-fields {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .filter-option {
+    padding: 16px;
+  }
+
+  .size-input {
+    padding: 0 14px;
   }
 
   .result-row {
@@ -770,6 +963,95 @@ Generate
 
 <div id="configuration">
 
+<section>
+
+<div class="section-title">
+Filtering
+</div>
+
+<div class="section-description">
+Drop streams you never want to see.
+</div>
+
+<div class="filter-card">
+
+<div class="filter-heading">
+
+<span class="filter-icon">
+▽
+</span>
+
+<span>
+FILE SIZE
+</span>
+
+</div>
+
+<div class="filter-option">
+
+<div class="filter-option-title">
+
+<span>
+Keep streams between
+</span>
+
+<button
+  type="button"
+  class="help-button"
+  title="Leave either field empty for no limit."
+>
+?
+</button>
+
+</div>
+
+<div class="size-fields">
+
+<div class="size-field">
+
+<label for="minSize">
+Min (GB)
+</label>
+
+<input
+  id="minSize"
+  class="size-input"
+  type="number"
+  min="0"
+  step="0.1"
+  placeholder="No minimum"
+>
+
+</div>
+
+<div class="size-field">
+
+<label for="maxSize">
+Max (GB)
+</label>
+
+<input
+  id="maxSize"
+  class="size-input"
+  type="number"
+  min="0"
+  step="0.1"
+  placeholder="No maximum"
+>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+
+<section class="quality-section">
+
 <div class="configuration-title">
 Quality settings
 </div>
@@ -784,6 +1066,9 @@ Enable the qualities you want. Move them up or down to set their priority.
 >
 ${qualityRows()}
 </div>
+
+</section>
+
 
 <div id="result">
 
