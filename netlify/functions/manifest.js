@@ -89,6 +89,7 @@ export default async (req, context) => {
 
 export const config = {
   path: [
+    "/",
     "/manifest.json",
     "/:config/manifest.json"
   ]
