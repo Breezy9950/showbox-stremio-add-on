@@ -1,10 +1,20 @@
 const MIN_TOKEN_LENGTH = 101;
 
+function response(body) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 export default async function handler(req) {
   if (req.method !== "POST") {
     return new Response(
       JSON.stringify({
-        status: "invalid",
+        usable: false,
         message: "Method not allowed.",
       }),
       {
@@ -28,98 +38,55 @@ export default async function handler(req) {
         : "";
 
     if (!token) {
-      return new Response(
-        JSON.stringify({
-          status: "invalid",
-          message: "Cookie is required.",
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      return response({
+        usable: false,
+        message: "Cookie is required.",
+      });
     }
 
-    if (token.length <= MIN_TOKEN_LENGTH - 1) {
-      return new Response(
-        JSON.stringify({
-          status: "invalid",
-          message:
-            "Cookie is too short. Enter a valid ShowBox cookie.",
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+    // Cookie must be longer than 100 characters.
+    if (token.length < MIN_TOKEN_LENGTH) {
+      return response({
+        usable: false,
+        message:
+          "Cookie is too short. It must contain more than 100 characters.",
+      });
     }
 
-    // If it looks like a JWT, perform a basic structural check.
+    // ShowBox JWT-style tokens begin with "eyJ".
+    // If it looks like a JWT, make sure it has the
+    // basic three-part header.payload.signature structure.
     if (token.startsWith("eyJ")) {
       const parts = token.split(".");
 
       if (parts.length !== 3) {
-        return new Response(
-          JSON.stringify({
-            status: "invalid",
-            message: "Invalid JWT format.",
-          }),
-          {
-            status: 200,
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        return response({
+          usable: false,
+          message: "Invalid JWT format.",
+        });
       }
 
-      for (const part of parts) {
-        if (!part) {
-          return new Response(
-            JSON.stringify({
-              status: "invalid",
-              message: "Invalid JWT format.",
-            }),
-            {
-              status: 200,
-              headers: {
-                "Content-Type": "application/json",
-              },
-            }
-          );
-        }
+      if (
+        !parts[0] ||
+        !parts[1] ||
+        !parts[2]
+      ) {
+        return response({
+          usable: false,
+          message: "Invalid JWT format.",
+        });
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        status: "usable",
-        message: "Cookie format looks valid.",
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    return response({
+      usable: true,
+      message: "Cookie format looks valid.",
+    });
   } catch {
-    return new Response(
-      JSON.stringify({
-        status: "invalid",
-        message: "Invalid request.",
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    return response({
+      usable: false,
+      message: "Invalid request.",
+    });
   }
 }
 
