@@ -24,7 +24,6 @@ function encodeConfig(config) {
     .replace(/=+$/, "");
 }
 
-
 function qualityRows() {
   return DEFAULT_QUALITIES
     .map((quality, index) => `
@@ -66,7 +65,6 @@ function qualityRows() {
     .join("");
 }
 
-
 function homepageScript() {
 
   return `
@@ -77,8 +75,8 @@ function homepageScript() {
   const tokenInput =
     document.getElementById("tokenInput");
 
-  const testButton =
-    document.getElementById("testButton");
+  const generateButton =
+    document.getElementById("generateButton");
 
   const checkStatus =
     document.getElementById("checkStatus");
@@ -100,7 +98,6 @@ function homepageScript() {
 
 
   let currentToken = "";
-  let connectionValid = false;
 
 
   function getRows() {
@@ -131,7 +128,7 @@ function homepageScript() {
 
   function updateManifest() {
 
-    if (!connectionValid || !currentToken) {
+    if (!currentToken) {
       return;
     }
 
@@ -255,10 +252,10 @@ function homepageScript() {
     "input",
     function () {
 
-      connectionValid = false;
       currentToken = "";
 
-      configuration.style.display = "none";
+      configuration.style.display =
+        "none";
 
       manifestUrl.value = "";
 
@@ -274,22 +271,12 @@ function homepageScript() {
   );
 
 
-  testButton.addEventListener(
+  generateButton.addEventListener(
     "click",
-    async function () {
+    function () {
 
       const token =
         tokenInput.value.trim();
-
-
-      /* ------------------------------------------------ */
-      /* TEMPORARY DIAGNOSTIC                            */
-      /* ------------------------------------------------ */
-
-      alert(
-        "TOKEN LENGTH: " +
-        token.length
-      );
 
 
       if (!token) {
@@ -305,123 +292,34 @@ function homepageScript() {
       }
 
 
-      testButton.disabled = true;
-
-      connectionValid = false;
-      currentToken = "";
-
-      configuration.style.display =
-        "none";
-
-      installButton.classList.add(
-        "disabled"
-      );
-
-      installButton.href = "#";
-
-      checkStatus.textContent =
-        "Checking connection...";
-
-      checkStatus.className = "";
-
-
-      try {
-
-        const response =
-          await fetch(
-            "/check-token",
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
-
-              body:
-                JSON.stringify({
-                  token
-                })
-            }
-          );
-
-
-        const data =
-          await response.json();
-
-
-        if (data.status === "usable") {
-
-          connectionValid = true;
-          currentToken = token;
-
-          checkStatus.textContent =
-            "Cookie is working.";
-
-          checkStatus.className =
-            "success";
-
-          configuration.style.display =
-            "block";
-
-          updateManifest();
-
-          tokenInput.value = "";
-
-        }
-
-        else if (
-          data.status === "rate_limited"
-        ) {
-
-          checkStatus.textContent =
-            "Cookie is currently rate limited.";
-
-          checkStatus.className =
-            "error";
-
-        }
-
-        else if (
-          data.status === "invalid"
-        ) {
-
-          checkStatus.textContent =
-            "Cookie is not usable.";
-
-          checkStatus.className =
-            "error";
-
-        }
-
-        else {
-
-          checkStatus.textContent =
-            data.message ||
-            "Could not verify the cookie.";
-
-          checkStatus.className =
-            "error";
-
-        }
-
-      }
-
-      catch (error) {
+      if (token.length <= 100) {
 
         checkStatus.textContent =
-          "Could not contact the token checker.";
+          "Cookie must contain more than 100 characters.";
 
         checkStatus.className =
           "error";
 
-      }
-
-      finally {
-
-        testButton.disabled = false;
+        return;
 
       }
+
+
+      currentToken = token;
+
+
+      checkStatus.textContent =
+        "Manifest generated.";
+
+      checkStatus.className =
+        "success";
+
+
+      configuration.style.display =
+        "block";
+
+
+      updateManifest();
 
     }
   );
@@ -651,7 +549,7 @@ label.title {
   border-color: #777;
 }
 
-#testButton {
+#generateButton {
   width: 100%;
   margin-top: 16px;
   padding: 16px 20px;
@@ -662,11 +560,6 @@ label.title {
   font-size: 17px;
   font-weight: 600;
   cursor: pointer;
-}
-
-#testButton:disabled {
-  opacity: .55;
-  cursor: default;
 }
 
 #checkStatus {
@@ -847,7 +740,7 @@ ShowBox Stremio Addon
 </h1>
 
 <div class="subtitle">
-Enter your ShowBox UI token to test the connection and configure the addon.
+Enter your ShowBox UI token to generate the addon manifest.
 </div>
 
 <label
@@ -867,10 +760,10 @@ ShowBox UI Token
 >
 
 <button
-  id="testButton"
+  id="generateButton"
   type="button"
 >
-Test Connection
+Generate
 </button>
 
 <div id="checkStatus"></div>
