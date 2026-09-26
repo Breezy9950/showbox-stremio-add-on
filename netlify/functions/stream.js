@@ -766,7 +766,7 @@ async function findFebboxFiles(
 
 
   console.log(
-    "[ShowBox] Season folder:",
+    "[ShowBox] FebBox season folder:",
     {
       name:
         seasonFolder.file_name,
@@ -2091,6 +2091,10 @@ function buildFebboxStreams(
         item.url,
 
 
+      size:
+        item.size,
+
+
       behaviorHints: {
         bingeGroup:
           "showbox"
@@ -2274,6 +2278,10 @@ function extractShowBoxStreams(
 
         url:
           link.url,
+
+
+        size:
+          size,
 
 
         behaviorHints: {
@@ -2767,6 +2775,266 @@ function applyQualitySettings(
 
 
 // =========================================================
+// FILE SIZE CONFIGURATION
+// =========================================================
+
+
+// ---------------------------------------------------------
+// Parse file size into GB
+// ---------------------------------------------------------
+
+function parseSizeGb(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined
+  ) {
+
+    return null;
+
+  }
+
+
+  const text =
+    String(
+      value
+    )
+      .trim()
+      .replace(
+        /,/g,
+        ""
+      )
+      .toUpperCase();
+
+
+  if (!text) {
+    return null;
+  }
+
+
+  const match =
+    text.match(
+      /([\d.]+)\s*(TB|GB|MB|KB|B)\b/
+    );
+
+
+  if (!match) {
+    return null;
+  }
+
+
+  const number =
+    Number(
+      match[1]
+    );
+
+
+  if (
+    !Number.isFinite(
+      number
+    )
+  ) {
+
+    return null;
+
+  }
+
+
+  const unit =
+    match[2];
+
+
+  if (
+    unit === "TB"
+  ) {
+
+    return number * 1024;
+
+  }
+
+
+  if (
+    unit === "GB"
+  ) {
+
+    return number;
+
+  }
+
+
+  if (
+    unit === "MB"
+  ) {
+
+    return number / 1024;
+
+  }
+
+
+  if (
+    unit === "KB"
+  ) {
+
+    return number /
+      (1024 * 1024);
+
+  }
+
+
+  if (
+    unit === "B"
+  ) {
+
+    return number /
+      (1024 * 1024 * 1024);
+
+  }
+
+
+  return null;
+}
+
+
+// ---------------------------------------------------------
+// Apply file-size settings
+// ---------------------------------------------------------
+
+function applyFileSizeSettings(
+  streams,
+  config
+) {
+
+  const fileSize =
+    config?.fileSize;
+
+
+  /*
+   * No file-size configuration means
+   * preserve the existing behavior.
+   */
+
+  if (
+    !fileSize ||
+    (
+      fileSize.minGb === null &&
+      fileSize.maxGb === null
+    )
+  ) {
+
+    return streams;
+
+  }
+
+
+  const minGb =
+    Number.isFinite(
+      Number(
+        fileSize.minGb
+      )
+    )
+      ? Number(
+          fileSize.minGb
+        )
+      : null;
+
+
+  const maxGb =
+    Number.isFinite(
+      Number(
+        fileSize.maxGb
+      )
+    )
+      ? Number(
+          fileSize.maxGb
+        )
+      : null;
+
+
+  if (
+    minGb === null &&
+    maxGb === null
+  ) {
+
+    return streams;
+
+  }
+
+
+  const filtered =
+    streams.filter(
+      stream => {
+
+        const sizeGb =
+          parseSizeGb(
+            stream.size
+          );
+
+
+        /*
+         * If the size is unavailable or
+         * cannot be parsed, keep the stream.
+         */
+
+        if (
+          sizeGb === null
+        ) {
+
+          return true;
+
+        }
+
+
+        if (
+          minGb !== null &&
+          sizeGb < minGb
+        ) {
+
+          return false;
+
+        }
+
+
+        if (
+          maxGb !== null &&
+          sizeGb > maxGb
+        ) {
+
+          return false;
+
+        }
+
+
+        return true;
+
+      }
+    );
+
+
+  console.log(
+    "[ShowBox] File-size settings:",
+    {
+
+      minGb,
+
+      maxGb,
+
+      before:
+        streams.length,
+
+      after:
+        filtered.length
+
+    }
+  );
+
+
+  return filtered;
+}
+
+
+// =========================================================
 // Main handler
 // =========================================================
 
@@ -3194,9 +3462,20 @@ export default async (
     // Apply quality settings
     // -----------------------------------------------------
 
-    const configuredStreams =
+    const qualityFilteredStreams =
       applyQualitySettings(
         streams,
+        config
+      );
+
+
+    // -----------------------------------------------------
+    // Apply file-size settings
+    // -----------------------------------------------------
+
+    const configuredStreams =
+      applyFileSizeSettings(
+        qualityFilteredStreams,
         config
       );
 
@@ -3206,7 +3485,7 @@ export default async (
     ) {
 
       throw new Error(
-        "No streams remain after quality filtering"
+        "No streams remain after filtering"
       );
 
     }
