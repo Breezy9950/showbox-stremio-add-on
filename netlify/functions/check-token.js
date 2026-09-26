@@ -1,6 +1,6 @@
 import CryptoJS from "crypto-js";
 
-const TEST_TMDB_ID = "603"; // The Matrix (1999)
+const TEST_TMDB_ID = "603";
 
 const SHOWBOX_API =
   "https://id-mapping-api-showbox-proxy.hf.space/api/media";
@@ -22,25 +22,34 @@ function parseSingleToken(token) {
 
   try {
     const decoded = JSON.parse(
-      Buffer.from(token.split(".")[1] || "", "base64").toString("utf8")
+      Buffer.from(
+        token.split(".")[1] || "",
+        "base64"
+      ).toString("utf8")
     );
 
     if (!decoded || !decoded.encrypt_data) {
       return token;
     }
 
-    const key = CryptoJS.enc.Utf8.parse("123d6cedf626dy54233aa1w6");
-    const iv = CryptoJS.enc.Utf8.parse("wEiphTn!");
+    const key = CryptoJS.enc.Utf8.parse(
+      "123d6cedf626dy54233aa1w6"
+    );
 
-    const decrypted = CryptoJS.TripleDES.decrypt(
-      decoded.encrypt_data,
-      key,
-      {
-        iv,
-        mode: CryptoJS.mode.CBC,
-        padding: CryptoJS.pad.Pkcs7,
-      }
-    ).toString(CryptoJS.enc.Utf8);
+    const iv = CryptoJS.enc.Utf8.parse(
+      "wEiphTn!"
+    );
+
+    const decrypted =
+      CryptoJS.TripleDES.decrypt(
+        decoded.encrypt_data,
+        key,
+        {
+          iv,
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.Pkcs7,
+        }
+      ).toString(CryptoJS.enc.Utf8);
 
     const result = JSON.parse(decrypted);
 
@@ -55,11 +64,11 @@ function parseSingleToken(token) {
 }
 
 async function getShowBoxData(tmdbId, token) {
-  const url =
+  const requestUrl =
     `${SHOWBOX_API}/movie/${tmdbId}` +
     `?cookie=${encodeURIComponent(token)}`;
 
-  const response = await fetch(url, {
+  const response = await fetch(requestUrl, {
     headers: WORKING_HEADERS,
   });
 
@@ -68,7 +77,9 @@ async function getShowBoxData(tmdbId, token) {
   }
 
   if (!response.ok) {
-    throw new Error(`ShowBox HTTP ${response.status}`);
+    throw new Error(
+      `SHOWBOX_HTTP_${response.status}`
+    );
   }
 
   const text = await response.text();
@@ -78,25 +89,27 @@ async function getShowBoxData(tmdbId, token) {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error("Invalid ShowBox response");
-  }
-
-  if (!data) {
-    throw new Error("Empty ShowBox response");
+    throw new Error("SHOWBOX_INVALID_JSON");
   }
 
   return data;
 }
 
 async function febboxShare(showboxId) {
+  const boxType = 1;
+
   const url =
     `https://www.febbox.com/mbp/to_share_page` +
-    `?box_type=1&mid=${showboxId}&json=1`;
+    `?box_type=${boxType}` +
+    `&mid=${showboxId}` +
+    `&json=1`;
 
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`FebBox share HTTP ${response.status}`);
+    throw new Error(
+      `SHARE_HTTP_${response.status}`
+    );
   }
 
   const text = await response.text();
@@ -106,11 +119,14 @@ async function febboxShare(showboxId) {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error("Invalid FebBox share response");
+    throw new Error("SHARE_INVALID_JSON");
   }
 
-  if (data.code !== 1 || !data.data) {
-    throw new Error("FebBox share failed");
+  if (
+    data.code !== 1 ||
+    !data.data
+  ) {
+    throw new Error("SHARE_FAILED");
   }
 
   const shareLink =
@@ -118,13 +134,14 @@ async function febboxShare(showboxId) {
     data.data.share_link;
 
   if (!shareLink) {
-    throw new Error("FebBox share link missing");
+    throw new Error("SHARE_LINK_MISSING");
   }
 
-  const shareKey = shareLink.split("/").pop();
+  const shareKey =
+    shareLink.split("/").pop();
 
   if (!shareKey) {
-    throw new Error("FebBox share key missing");
+    throw new Error("SHARE_KEY_MISSING");
   }
 
   return shareKey;
@@ -133,7 +150,7 @@ async function febboxShare(showboxId) {
 async function febboxFileList(shareKey) {
   const url =
     `https://www.febbox.com/file/file_share_list` +
-    `?share_key=${encodeURIComponent(shareKey)}`;
+    `?share_key=${shareKey}`;
 
   const response = await fetch(url, {
     headers: {
@@ -142,7 +159,9 @@ async function febboxFileList(shareKey) {
   });
 
   if (!response.ok) {
-    throw new Error(`FebBox file list HTTP ${response.status}`);
+    throw new Error(
+      `FILELIST_HTTP_${response.status}`
+    );
   }
 
   const text = await response.text();
@@ -152,7 +171,7 @@ async function febboxFileList(shareKey) {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error("Invalid FebBox file list response");
+    throw new Error("FILELIST_INVALID_JSON");
   }
 
   const files =
@@ -167,7 +186,7 @@ async function febboxFileList(shareKey) {
     !data.data ||
     !Array.isArray(data.data.file_list)
   ) {
-    throw new Error("FebBox file list missing");
+    throw new Error("FILELIST_MISSING");
   }
 
   return files;
@@ -182,7 +201,7 @@ function findMovieFiles(rootFiles) {
   );
 
   if (!files.length) {
-    throw new Error("No movie files found");
+    throw new Error("NO_MOVIE_FILES");
   }
 
   return files;
@@ -226,7 +245,8 @@ function parseFebboxHtml(html, file) {
             .replace(/<[^>]+>/g, "")
             .trim()
         : "",
-      fileName: file.file_name || "",
+      fileName:
+        file.file_name || "",
     });
   }
 
@@ -246,23 +266,35 @@ async function febboxQualityList(
   const qualityUrl =
     `https://www.febbox.com/console/video_quality_list` +
     `?fid=${file.fid}` +
-    `&share_key=${encodeURIComponent(shareKey)}`;
+    `&share_key=${shareKey}`;
 
-  const response = await fetch(qualityUrl, {
-    headers: {
-      Cookie: cookieHeader,
-    },
-  });
+  const response = await fetch(
+    qualityUrl,
+    {
+      headers: {
+        Cookie: cookieHeader,
+      },
+    }
+  );
 
   if (!response.ok) {
     throw new Error(
-      `FebBox quality HTTP ${response.status}`
+      `QUALITY_HTTP_${response.status}`
     );
   }
 
-  const text = await response.text();
+  const contentType =
+    response.headers.get(
+      "content-type"
+    ) || "";
 
-  let data = null;
+  const finalUrl =
+    response.url;
+
+  const text =
+    await response.text();
+
+  let data;
 
   try {
     data = JSON.parse(text);
@@ -277,7 +309,9 @@ async function febboxQualityList(
     );
   }
 
-  if (text.includes("file_quality")) {
+  if (
+    text.includes("file_quality")
+  ) {
     return parseFebboxHtml(
       text,
       file
@@ -285,7 +319,7 @@ async function febboxQualityList(
   }
 
   throw new Error(
-    "FebBox quality response missing HTML"
+    "QUALITY_HTML_MISSING"
   );
 }
 
@@ -293,16 +327,20 @@ export default async function handler(req) {
   if (req.method !== "POST") {
     return new Response(
       JSON.stringify({
-        error: "Method not allowed",
+        status: "invalid",
+        stage: "method",
       }),
       {
         status: 405,
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":
+            "application/json",
         },
       }
     );
   }
+
+  let stage = "input";
 
   try {
     const body =
@@ -319,34 +357,46 @@ export default async function handler(req) {
       return new Response(
         JSON.stringify({
           status: "invalid",
-          message: "Token is required.",
+          stage: "input",
+          message:
+            "Token is required.",
         }),
         {
-          status: 400,
+          status: 200,
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
         }
       );
     }
 
+    stage = "token";
+
     const parsedToken =
-      parseSingleToken(originalToken);
+      parseSingleToken(
+        originalToken
+      );
 
     if (!parsedToken) {
       return new Response(
         JSON.stringify({
           status: "invalid",
-          message: "Invalid token.",
+          stage: "token",
+          message:
+            "Token could not be parsed.",
         }),
         {
           status: 200,
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
         }
       );
     }
+
+    stage = "showbox";
 
     const showboxData =
       await getShowBoxData(
@@ -363,28 +413,42 @@ export default async function handler(req) {
       return new Response(
         JSON.stringify({
           status: "invalid",
+          stage: "showbox",
           message:
-            "Token was not accepted by ShowBox.",
+            "ShowBox did not return a movie ID.",
         }),
         {
           status: 200,
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
         }
       );
     }
 
+    stage = "share";
+
     const shareKey =
-      await febboxShare(showboxId);
+      await febboxShare(
+        showboxId
+      );
+
+    stage = "filelist";
 
     const rootFiles =
-      await febboxFileList(shareKey);
+      await febboxFileList(
+        shareKey
+      );
 
     const files =
-      findMovieFiles(rootFiles);
+      findMovieFiles(
+        rootFiles
+      );
 
-    let usableStreams = 0;
+    stage = "quality";
+
+    let usable = false;
 
     for (const file of files) {
       try {
@@ -395,17 +459,17 @@ export default async function handler(req) {
             parsedToken
           );
 
-        for (const stream of streams) {
-          if (
-            stream &&
-            typeof stream.url === "string" &&
-            stream.url.trim()
-          ) {
-            usableStreams++;
-          }
-        }
-
-        if (usableStreams > 0) {
+        if (
+          Array.isArray(streams) &&
+          streams.some(
+            (stream) =>
+              stream &&
+              typeof stream.url ===
+                "string" &&
+              stream.url.trim()
+          )
+        ) {
+          usable = true;
           break;
         }
       } catch {
@@ -413,17 +477,19 @@ export default async function handler(req) {
       }
     }
 
-    if (usableStreams === 0) {
+    if (!usable) {
       return new Response(
         JSON.stringify({
           status: "invalid",
+          stage: "quality",
           message:
-            "Token could not access a usable stream.",
+            "Token reached FebBox but no usable stream was returned.",
         }),
         {
           status: 200,
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
         }
       );
@@ -432,30 +498,35 @@ export default async function handler(req) {
     return new Response(
       JSON.stringify({
         status: "usable",
-        message: "Token is working.",
+        stage: "quality",
+        message:
+          "Token is working.",
       }),
       {
         status: 200,
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":
+            "application/json",
         },
       }
     );
   } catch (error) {
     if (
-      error &&
-      error.message === "RATE_LIMITED"
+      error?.message ===
+      "RATE_LIMITED"
     ) {
       return new Response(
         JSON.stringify({
           status: "rate_limited",
+          stage,
           message:
-            "ShowBox is rate limiting the request. Try again later.",
+            "ShowBox is rate limiting the request.",
         }),
         {
           status: 429,
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
         }
       );
@@ -464,13 +535,15 @@ export default async function handler(req) {
     return new Response(
       JSON.stringify({
         status: "invalid",
+        stage,
         message:
-          "The token could not be verified.",
+          "Token verification failed.",
       }),
       {
         status: 200,
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":
+            "application/json",
         },
       }
     );
