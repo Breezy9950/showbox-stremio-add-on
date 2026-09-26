@@ -1,137 +1,88 @@
-import CryptoJS from "crypto-js";
+export const config = {
+  path: "/:config/stream/:type/:id.json"
+};
 
-function parseSingleToken(token) {
-  if (!token) return "";
+function decodeBase64Url(value) {
+  let s = value.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  return Buffer.from(s, "base64").toString("utf8");
+}
 
-  if (token.startsWith("eyJ")) {
-    try {
-      const decoded = CryptoJS.enc.Base64
-        .parse(token)
-        .toString(CryptoJS.enc.Utf8);
+async function imdbToTmdb(imdbId, type) {
+  const apiKey = process.env.TMDB_API_KEY;
 
-      const parsed = JSON.parse(decoded);
-
-      if (parsed && parsed.encrypt_data) {
-        const key = "123d6cedf626dy54233aa1w6";
-        const iv = CryptoJS.enc.Utf8.parse("wEiphTn!");
-
-        const decrypted = CryptoJS.TripleDES.decrypt(
-          parsed.encrypt_data,
-          CryptoJS.enc.Utf8.parse(key),
-          {
-            iv,
-            mode: CryptoJS.mode.CBC,
-            padding: CryptoJS.pad.Pkcs7
-          }
-        );
-
-        const result = JSON.parse(
-          decrypted.toString(CryptoJS.enc.Utf8)
-        );
-
-        if (result && result.uid) {
-          return String(result.uid);
-        }
-      }
-    } catch {
-      // Match the original provider:
-      // if decoding fails, use the original token.
-    }
+  if (!apiKey) {
+    throw new Error("TMDB_API_KEY is not configured");
   }
 
-  return token;
+  const url =
+    `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}` +
+    `?api_key=${encodeURIComponent(apiKey)}` +
+    `&external_source=imdb_id`;
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`TMDB returned HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (type === "movie") {
+    return data.movie_results?.[0]?.id ?? null;
+  }
+
+  return data.tv_results?.[0]?.id ?? null;
 }
 
 export default async (req, context) => {
-  const { type, id, config } = context.params;
-
-  console.log("[ShowBox] received request:", {
-   type,
-    id
-   });
-
-  let uiToken;
-
   try {
-    const base64 = config
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
+    const { type, id, config } = context.params;
 
-    const padded = base64 + "=".repeat(
-      (4 - (base64.length % 4)) % 4
-    );
+    // Decode the addon configuration
+    let configData = {};
 
-    const json = atob(padded);
-    const parsed = JSON.parse(json);
-
-    uiToken = parsed.uiToken;
-  } catch {
-    return new Response(
-      JSON.stringify({
-        error: "Invalid addon configuration"
-      }),
-      {
-        status: 400,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*"
-        }
+    if (config) {
+      try {
+        configData = JSON.parse(decodeBase64Url(config));
+      } catch {
+        // Configuration isn't relevant to this test
       }
-    );
-  }
+    }
 
-  if (!uiToken) {
-    return new Response(
-      JSON.stringify({
-        error: "No ShowBox UI token configured"
-      }),
-      {
-        status: 400,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*"
-        }
-      }
-    );
-  }
+    // Nuvio sends:
+    // movie:  tt12345678
+    // series: tt12345678:1:1
+    const decodedId = decodeURIComponent(id);
 
-  const parsedToken = parseSingleToken(uiToken);
-  const tokenWasTransformed = parsedToken !== uiToken;
+    let imdbId = decodedId;
+    let season = null;
+    let episode = null;
 
-  const apiBase =
-    "https://id-mapping-api-showbox-proxy.hf.space/api/media";
+    if (type === "series") {
+      const parts = decodedId.split(":");
 
-  const url =
-    type === "series"
-      ? `${apiBase}/tv/${encodeURIComponent(id)}?cookie=${encodeURIComponent(parsedToken)}`
-      : `${apiBase}/movie/${encodeURIComponent(id)}?cookie=${encodeURIComponent(parsedToken)}`;
+      imdbId = parts[0];
+      season = Number(parts[1]);
+      episode = Number(parts[2]);
+    }
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Content-Type": "application/json"
-      }
-    });
-
-    const data = await response.json();
+    const tmdbId = await imdbToTmdb(imdbId, type);
 
     return new Response(
       JSON.stringify({
         test: true,
-        type,
-        id,
-        tokenStartsWithEyJ: uiToken.startsWith("eyJ"),
-        tokenWasTransformed,
-        apiStatus: response.status,
-        success: data.success,
-        showboxId: data.id || data.mid || null,
-        versions: Array.isArray(data.versions)
-          ? data.versions.length
-          : 0
+        received: {
+          type,
+          id: decodedId
+        },
+        parsed: {
+          imdbId,
+          season,
+          episode
+        },
+        tmdbId,
+        hasConfig: Object.keys(configData).length > 0
       }),
       {
         headers: {
@@ -140,14 +91,15 @@ export default async (req, context) => {
         }
       }
     );
+
   } catch (error) {
     return new Response(
       JSON.stringify({
-        error: "ShowBox API request failed",
-        message: error.message
+        test: true,
+        error: error.message
       }),
       {
-        status: 502,
+        status: 500,
         headers: {
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*"
@@ -155,8 +107,4 @@ export default async (req, context) => {
       }
     );
   }
-};
-
-export const config = {
-  path: "/:config/stream/:type/:id.json"
 };
