@@ -120,17 +120,47 @@ function getConfigFromRequest(request) {
   const url =
     new URL(request.url);
 
-  const match =
-    url.pathname.match(
-      /^\/configure\/([^/]+)\/?$/
+  const pathname =
+    url.pathname.replace(/\/+$/, "");
+
+  let configValue = null;
+
+  /*
+   * Supported formats:
+   *
+   * /configure/<config>
+   *
+   * /<config>/configure
+   *
+   * The second format is used by Nuvio.
+   */
+
+  let match =
+    pathname.match(
+      /^\/configure\/([^/]+)$/
     );
 
-  if (!match) {
+  if (match) {
+    configValue = match[1];
+  }
+
+  if (!configValue) {
+    match =
+      pathname.match(
+        /^\/([^/]+)\/configure$/
+      );
+
+    if (match) {
+      configValue = match[1];
+    }
+  }
+
+  if (!configValue) {
     return null;
   }
 
   const config =
-    decodeConfig(match[1]);
+    decodeConfig(configValue);
 
   /*
    * Make sure we actually decoded
@@ -148,7 +178,10 @@ function getConfigFromRequest(request) {
 }
 
 export const config = {
-  path: "/configure/:config"
+  path: [
+    "/configure/:config",
+    "/:config/configure"
+  ]
 };
 
 export default async function handler(request) {
