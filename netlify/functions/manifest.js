@@ -740,7 +740,7 @@ ShowBox Stremio Addon
 </h1>
 
 <div class="subtitle">
-Enter your ShowBox UI token to generate the addon manifest.
+Enter your FebBox UI token to generate your addon.
 </div>
 
 <label
