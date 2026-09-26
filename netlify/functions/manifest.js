@@ -540,92 +540,214 @@ export default async (request) => {
       content="width=device-width, initial-scale=1">
 
 <meta name="theme-color"
-      content="#111111">
+      content="#0d0e11">
 
 <title>ShowBox Stremio Addon</title>
 
 <style>
 
+:root {
+  color-scheme: dark;
+
+  --bg: #0d0e11;
+  --surface: #15161b;
+  --surface-2: #1d1f25;
+  --surface-3: #252831;
+
+  --border: #292c34;
+  --border-light: #343740;
+
+  --text: #f1f1f3;
+  --text-soft: #c9cad0;
+  --muted: #858892;
+  --muted-2: #696c75;
+
+  --white: #f4f4f5;
+  --black: #101115;
+
+  --success: #a7e3b1;
+  --error: #ff9b9b;
+
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 13px;
+}
+
 * {
   box-sizing: border-box;
 }
 
+html {
+  background: var(--bg);
+}
+
 body {
   margin: 0;
-  padding: 40px 20px;
-  background: #111;
-  color: #eee;
+  min-height: 100vh;
+
+  background:
+    radial-gradient(
+      circle at 50% -15%,
+      rgba(255,255,255,.055),
+      transparent 38%
+    ),
+    var(--bg);
+
+  color: var(--text);
+
   font-family:
     -apple-system,
     BlinkMacSystemFont,
+    "SF Pro Display",
+    "SF Pro Text",
     "Segoe UI",
     sans-serif;
+
+  -webkit-font-smoothing: antialiased;
 }
 
 .container {
-  width: 100%;
-  max-width: 760px;
+  width: min(680px, calc(100% - 28px));
   margin: auto;
+  padding: 48px 0 70px;
 }
 
+
+/* -------------------------------------------------- */
+/* HERO */
+/* -------------------------------------------------- */
+
 h1 {
-  margin: 0 0 12px;
-  font-size: 38px;
+  margin: 0;
+
+  font-size: clamp(36px, 8vw, 48px);
+  line-height: 1;
+  font-weight: 750;
+  letter-spacing: -1.8px;
 }
 
 .subtitle {
-  margin-bottom: 42px;
-  color: #999;
-  font-size: 18px;
+  max-width: 520px;
+
+  margin:
+    14px 0 0;
+
+  color: var(--muted);
+
+  font-size: 14px;
+  line-height: 1.55;
 }
 
-label.title {
+
+/* -------------------------------------------------- */
+/* TOKEN */
+/* -------------------------------------------------- */
+
+.title {
   display: block;
-  margin-bottom: 10px;
-  font-size: 17px;
+
+  margin:
+    38px 0 9px;
+
+  color: var(--muted-2);
+
+  font-size: 11px;
+  font-weight: 700;
+
+  letter-spacing: .12em;
+  text-transform: uppercase;
 }
 
 #tokenInput {
   width: 100%;
-  padding: 17px 18px;
-  border: 1px solid #333;
-  border-radius: 14px;
-  background: #1b1b1b;
-  color: #fff;
-  font-size: 17px;
+  height: 54px;
+
+  padding:
+    0 16px;
+
+  border:
+    1px solid var(--border-light);
+
+  border-radius:
+    var(--radius-sm);
+
   outline: none;
+
+  background:
+    var(--surface-2);
+
+  color: var(--text);
+
+  font-size: 14px;
+
+  transition:
+    border-color .15s ease,
+    background .15s ease;
+}
+
+#tokenInput::placeholder {
+  color: var(--muted-2);
 }
 
 #tokenInput:focus {
-  border-color: #777;
+  border-color: #50545f;
+  background: var(--surface-3);
 }
 
 #generateButton {
   width: 100%;
-  margin-top: 16px;
-  padding: 16px 20px;
-  border: 1px solid #444;
+  height: 50px;
+
+  margin-top: 12px;
+
+  padding: 0 20px;
+
+  border: 0;
   border-radius: 14px;
-  background: #fff;
-  color: #111;
-  font-size: 17px;
-  font-weight: 600;
+
+  background: var(--white);
+  color: var(--black);
+
+  font-size: 14px;
+  font-weight: 700;
+
   cursor: pointer;
+
+  transition:
+    opacity .15s ease,
+    transform .12s ease;
+}
+
+#generateButton:hover {
+  opacity: .9;
+}
+
+#generateButton:active {
+  transform: scale(.985);
 }
 
 #checkStatus {
-  min-height: 24px;
-  margin-top: 14px;
-  color: #999;
+  min-height: 18px;
+
+  margin-top: 10px;
+
+  color: var(--muted-2);
+
+  font-size: 12px;
 }
 
 .success {
-  color: #fff !important;
+  color: var(--success) !important;
 }
 
 .error {
-  color: #aaa !important;
+  color: var(--error) !important;
 }
+
+
+/* -------------------------------------------------- */
+/* CONFIGURATION */
+/* -------------------------------------------------- */
 
 #configuration {
   display: none;
@@ -634,119 +756,178 @@ label.title {
 
 
 /* -------------------------------------------------- */
-/* FILTERING */
+/* SECTION HEADERS */
 /* -------------------------------------------------- */
 
 .section-title {
   margin: 0;
-  font-size: 30px;
-  font-weight: 600;
-  letter-spacing: -0.5px;
+
+  color: var(--text);
+
+  font-size: 29px;
+  line-height: 1.15;
+  font-weight: 700;
+
+  letter-spacing: -.7px;
 }
 
 .section-description {
-  margin-top: 6px;
-  margin-bottom: 24px;
-  color: #85858d;
-  font-size: 13px;
-  line-height: 1.4;
+  margin:
+    6px 0 14px;
+
+  color: var(--muted-2);
+
+  font-size: 12px;
+  line-height: 1.45;
 }
 
+
+/* -------------------------------------------------- */
+/* FILTERING */
+/* -------------------------------------------------- */
+
 .filter-card {
-  padding: 16px;
-  border: 1px solid #202126;
-  border-radius: 20px;
-  background: #17181d;
+  padding: 14px;
+
+  border:
+    1px solid var(--border);
+
+  border-radius:
+    var(--radius-lg);
+
+  background:
+    var(--surface);
 }
 
 .filter-heading {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 14px;
-  color: #cfd0d7;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
+  padding:
+    5px 7px 12px;
+
+  color:
+    var(--muted-2);
+
+  font-size: 11px;
+  font-weight: 700;
+
+  letter-spacing: .12em;
   text-transform: uppercase;
 }
 
 .filter-icon {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #858995;
-  font-size: 22px;
+  display: none;
 }
 
 .filter-option {
-  padding: 20px;
-  border: 1px solid #2c2e36;
-  border-radius: 16px;
-  background: #20222a;
+  padding: 17px;
+
+  border:
+    1px solid var(--border-light);
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--surface-2);
 }
 
 .filter-option-title {
   display: flex;
   align-items: center;
+
   gap: 9px;
-  margin-bottom: 18px;
-  color: #f0f0f3;
-  font-size: 18px;
-  font-weight: 600;
+
+  margin: 0 0 5px;
+
+  color: var(--text);
+
+  font-size: 17px;
+  font-weight: 650;
+
+  letter-spacing: -.2px;
 }
 
 .help-button {
-  width: 29px;
-  height: 29px;
+  width: 24px;
+  height: 24px;
+
   padding: 0;
+
   border: 0;
   border-radius: 50%;
-  background: #363942;
-  color: #d7d8dd;
-  font-size: 15px;
+
+  background: #30333b;
+
+  color: var(--muted);
+
+  font-size: 12px;
   font-weight: 700;
+
+  cursor: pointer;
 }
 
 .size-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+
+  grid-template-columns:
+    1fr 1fr;
+
+  gap: 10px;
+
+  margin-top: 14px;
 }
 
 .size-field label {
   display: block;
-  margin-bottom: 8px;
-  color: #858995;
-  font-size: 14px;
+
+  margin:
+    0 0 7px;
+
+  color:
+    var(--muted-2);
+
+  font-size: 11px;
   font-weight: 600;
+
+  letter-spacing: .03em;
 }
 
 .size-input {
   width: 100%;
-  height: 54px;
-  padding: 0 18px;
-  border: 1px solid #343742;
-  border-radius: 13px;
-  background: #292c35;
-  color: #fff;
-  font-size: 18px;
+  height: 52px;
+
+  padding:
+    0 14px;
+
+  border:
+    1px solid var(--border-light);
+
+  border-radius:
+    var(--radius-sm);
+
   outline: none;
+
+  background:
+    var(--surface-3);
+
+  color:
+    var(--text);
+
+  font-size: 14px;
 }
 
 .size-input::placeholder {
-  color: #858995;
+  color:
+    var(--muted-2);
 }
 
 .size-input:focus {
-  border-color: #555a68;
+  border-color:
+    #50545f;
 }
 
 
 /* -------------------------------------------------- */
-/* QUALITY SETTINGS */
+/* QUALITY */
 /* -------------------------------------------------- */
 
 .quality-section {
@@ -754,66 +935,147 @@ label.title {
 }
 
 .configuration-title {
-  margin-bottom: 6px;
-  font-size: 24px;
-  font-weight: 600;
+  margin: 0;
+
+  color:
+    var(--text);
+
+  font-size: 29px;
+  line-height: 1.15;
+
+  font-weight: 700;
+
+  letter-spacing: -.7px;
 }
 
 .description {
-  margin-bottom: 22px;
-  color: #85858d;
-  font-size: 13px;
-  line-height: 1.4;
+  margin:
+    6px 0 14px;
+
+  color:
+    var(--muted-2);
+
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .quality-list {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+
+  flex-direction:
+    column;
+
+  gap: 8px;
+
+  padding: 8px;
+
+  border:
+    1px solid var(--border);
+
+  border-radius:
+    var(--radius-lg);
+
+  background:
+    var(--surface);
 }
 
 .quality-row {
   display: flex;
+
   align-items: center;
   justify-content: space-between;
-  padding: 15px 16px;
-  border: 1px solid #2d2d2d;
-  border-radius: 14px;
-  background: #1b1b1b;
+
+  min-height: 62px;
+
+  padding:
+    11px 12px 11px 14px;
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--surface-2);
+
+  border:
+    1px solid transparent;
+
+  transition:
+    background .15s ease,
+    border-color .15s ease;
+}
+
+.quality-row:hover {
+  border-color:
+    var(--border-light);
 }
 
 .quality-name {
   display: flex;
+
   align-items: center;
+
   gap: 12px;
-  font-size: 17px;
+
+  color:
+    var(--text);
+
+  font-size: 15px;
+  font-weight: 600;
+
+  cursor: pointer;
 }
 
 .quality-checkbox {
   width: 20px;
   height: 20px;
-  accent-color: #fff;
+
+  margin: 0;
+
+  accent-color:
+    #f1f1f2;
 }
 
 .move-buttons {
   display: flex;
-  gap: 7px;
+
+  gap: 6px;
 }
 
 .move-button {
-  width: 44px;
-  height: 40px;
+  width: 38px;
+  height: 36px;
+
   padding: 0;
-  border: 1px solid #333;
-  border-radius: 9px;
-  background: #292929;
-  color: #fff;
-  font-size: 18px;
+
+  border:
+    1px solid #343740;
+
+  border-radius:
+    10px;
+
+  background:
+    #292c34;
+
+  color:
+    var(--text-soft);
+
+  font-size: 16px;
+
   cursor: pointer;
+
+  transition:
+    background .15s ease,
+    opacity .15s ease;
+}
+
+.move-button:hover:not(:disabled) {
+  background:
+    #333640;
 }
 
 .move-button:disabled {
   opacity: .25;
+
   cursor: default;
 }
 
@@ -823,99 +1085,195 @@ label.title {
 /* -------------------------------------------------- */
 
 #result {
-  margin-top: 36px;
+  margin-top: 38px;
+
+  padding:
+    16px;
+
+  border:
+    1px solid var(--border);
+
+  border-radius:
+    var(--radius-lg);
+
+  background:
+    var(--surface);
 }
 
 .result-label {
   display: block;
-  margin-bottom: 10px;
-  color: #bbb;
+
+  margin:
+    2px 4px 9px;
+
+  color:
+    var(--muted-2);
+
+  font-size: 11px;
+  font-weight: 700;
+
+  letter-spacing: .11em;
+  text-transform: uppercase;
 }
 
 .result-row {
   display: flex;
-  gap: 10px;
+
+  gap: 9px;
 }
 
 #manifestUrl {
-  flex: 1;
   min-width: 0;
-  padding: 17px 18px;
-  border: 1px solid #333;
-  border-radius: 14px;
-  background: #1b1b1b;
-  color: #fff;
-  font-size: 15px;
+  flex: 1;
+
+  height: 50px;
+
+  padding:
+    0 14px;
+
+  border:
+    1px solid var(--border-light);
+
+  border-radius:
+    var(--radius-sm);
+
+  outline: none;
+
+  background:
+    var(--surface-2);
+
+  color:
+    var(--muted);
+
+  font-size: 12px;
 }
 
 #copyButton {
-  padding: 0 20px;
-  border: 1px solid #333;
-  border-radius: 14px;
-  background: #292929;
-  color: #fff;
-  font-size: 16px;
+  flex: 0 0 auto;
+
+  height: 50px;
+
+  padding:
+    0 17px;
+
+  border:
+    1px solid var(--border-light);
+
+  border-radius:
+    var(--radius-sm);
+
+  background:
+    #292c34;
+
+  color:
+    var(--text);
+
+  font-size: 13px;
+  font-weight: 650;
+
   cursor: pointer;
 }
 
 #installButton {
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
   width: 100%;
-  margin-top: 14px;
-  padding: 16px 20px;
-  display: block;
-  border: 0;
-  border-radius: 14px;
-  background: #fff;
-  color: #111;
-  text-align: center;
+  height: 51px;
+
+  margin-top: 9px;
+
+  border-radius:
+    var(--radius-sm);
+
+  background:
+    var(--white);
+
+  color:
+    var(--black);
+
   text-decoration: none;
-  font-size: 17px;
-  font-weight: 600;
+
+  font-size: 14px;
+  font-weight: 700;
 }
 
 #installButton.disabled {
-  background: #333;
-  color: #777;
-  pointer-events: none;
-  cursor: default;
+  background:
+    #292c34;
+
+  color:
+    #686b74;
+
+  pointer-events:
+    none;
 }
 
 .note {
-  margin-top: 16px;
-  color: #777;
+  margin:
+    11px 3px 1px;
+
+  color:
+    var(--muted-2);
+
   line-height: 1.5;
-  font-size: 13px;
+
+  font-size: 11px;
 }
+
+
+/* -------------------------------------------------- */
+/* MOBILE */
+/* -------------------------------------------------- */
 
 @media (max-width: 600px) {
 
-  body {
-    padding: 28px 16px;
+  .container {
+    width:
+      calc(100% - 24px);
+
+    padding:
+      38px 0 60px;
   }
 
   h1 {
-    font-size: 30px;
+    font-size:
+      38px;
+
+    letter-spacing:
+      -1.5px;
+  }
+
+  .subtitle {
+    font-size:
+      13px;
+  }
+
+  .section-title,
+  .configuration-title {
+    font-size:
+      27px;
   }
 
   .size-fields {
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-
-  .filter-option {
-    padding: 16px;
+    gap:
+      9px;
   }
 
   .size-input {
-    padding: 0 14px;
+    font-size:
+      14px;
   }
 
   .result-row {
-    flex-direction: column;
+    flex-direction:
+      column;
   }
 
   #copyButton {
-    min-height: 48px;
+    width: 100%;
   }
 
 }
@@ -928,13 +1286,19 @@ label.title {
 
 <div class="container">
 
+
+<!-- HERO -->
+
 <h1>
-ShowBox Stremio Addon
+ShowBox
 </h1>
 
 <div class="subtitle">
 Enter your FebBox UI token to generate your addon.
 </div>
+
+
+<!-- TOKEN -->
 
 <label
   class="title"
@@ -961,7 +1325,11 @@ Generate
 
 <div id="checkStatus"></div>
 
+
 <div id="configuration">
+
+
+<!-- FILTERING -->
 
 <section>
 
@@ -976,15 +1344,7 @@ Drop streams you never want to see.
 <div class="filter-card">
 
 <div class="filter-heading">
-
-<span class="filter-icon">
-▽
-</span>
-
-<span>
 FILE SIZE
-</span>
-
 </div>
 
 <div class="filter-option">
@@ -1050,6 +1410,8 @@ Max (GB)
 </section>
 
 
+<!-- QUALITY -->
+
 <section class="quality-section">
 
 <div class="configuration-title">
@@ -1069,6 +1431,8 @@ ${qualityRows()}
 
 </section>
 
+
+<!-- RESULT -->
 
 <div id="result">
 
@@ -1108,9 +1472,11 @@ use Copy and paste the manifest URL into Stremio's Add Addon field.
 
 </div>
 
+
 </div>
 
 </div>
+
 
 <script src="/homepage.js"></script>
 
