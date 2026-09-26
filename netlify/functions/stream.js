@@ -2,232 +2,282 @@ import CryptoJS from "crypto-js";
 
 const TMDB_API_KEY = "439c478a771f35c05022f9feabcca01c";
 
+const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+
 const SHOWBOX_API =
   "https://id-mapping-api-showbox-proxy.hf.space/api/media";
 
-const HEADERS = {
+const WORKING_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+
   Accept: "application/json",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Content-Type": "application/json"
+
+  "Accept-Language":
+    "en-US,en;q=0.9",
+
+  "Content-Type":
+    "application/json"
 };
 
-function log(id, ...args) {
-  console.log(`[ShowBox][${id}]`, ...args);
-}
 
-function error(id, ...args) {
-  console.error(`[ShowBox][${id}]`, ...args);
-}
-
-/* -------------------------------------------------------
-   CONFIG
-------------------------------------------------------- */
+// ---------------------------------------------------------
+// Base64URL
+// ---------------------------------------------------------
 
 function decodeBase64Url(value) {
-  let str = value.replace(/-/g, "+").replace(/_/g, "/");
+  let base64 = value
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
 
-  while (str.length % 4 !== 0) {
-    str += "=";
+  while (base64.length % 4) {
+    base64 += "=";
   }
 
-  return atob(str);
+  return Buffer.from(base64, "base64").toString("utf8");
 }
 
-function getConfig(rawConfig) {
+
+// ---------------------------------------------------------
+// Parse configured Stremio config
+// ---------------------------------------------------------
+
+function parseConfig(rawConfig) {
   try {
     const decoded = decodeBase64Url(rawConfig);
+
     return JSON.parse(decoded);
-  } catch (e) {
+
+  } catch (error) {
+    console.log(
+      "[ShowBox] Config parsing failed:",
+      error.message
+    );
+
     return {};
   }
 }
 
-/* -------------------------------------------------------
-   TOKEN
-------------------------------------------------------- */
+
+// ---------------------------------------------------------
+// ShowBox token parser
+// ---------------------------------------------------------
 
 function parseSingleToken(token) {
-  if (!token) return "";
-
-  if (token.startsWith("eyJ")) {
-    try {
-      const decoded = CryptoJS.enc.Base64.parse(token);
-      const text = decoded.toString(CryptoJS.enc.Utf8);
-      const data = JSON.parse(text);
-
-      if (data && data.encrypt_data) {
-        const key = "123d6cedf626dy54233aa1w6";
-        const iv = "wEiphTn!";
-
-        const keyParsed = CryptoJS.enc.Utf8.parse(key);
-        const ivParsed = CryptoJS.enc.Utf8.parse(iv);
-
-        const decrypted = CryptoJS.TripleDES.decrypt(
-          data.encrypt_data,
-          keyParsed,
-          {
-            iv: ivParsed,
-            mode: CryptoJS.mode.CBC,
-            padding: CryptoJS.pad.Pkcs7
-          }
-        );
-
-        const decryptedText = decrypted.toString(
-          CryptoJS.enc.Utf8
-        );
-
-        const decryptedJson = JSON.parse(decryptedText);
-
-        if (decryptedJson && decryptedJson.uid) {
-          return String(decryptedJson.uid);
-        }
-      }
-    } catch (e) {
-      console.log("[ShowBox] Token parsing failed:", e.message);
-    }
+  if (!token) {
+    return null;
   }
 
-  return token;
+  /*
+   * ShowBox sometimes supplies a JWT-like token.
+   * Some tokens contain encrypted_data.
+   *
+   * If decryption fails, the original token is still
+   * valid for the requests we are making, so return it.
+   */
+
+  if (!token.startsWith("eyJ")) {
+    return token;
+  }
+
+  try {
+    const decoded = JSON.parse(
+      Buffer.from(
+        token.split(".")[1] || "",
+        "base64"
+      ).toString("utf8")
+    );
+
+    if (!decoded || !decoded.encrypt_data) {
+      return token;
+    }
+
+    const key = CryptoJS.enc.Utf8.parse(
+      "123d6cedf626dy54233aa1w6"
+    );
+
+    const iv = CryptoJS.enc.Utf8.parse(
+      "wEiphTn!"
+    );
+
+    const decrypted =
+      CryptoJS.TripleDES.decrypt(
+        decoded.encrypt_data,
+        key,
+        {
+          iv,
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.Pkcs7
+        }
+      ).toString(CryptoJS.enc.Utf8);
+
+    const result =
+      JSON.parse(decrypted);
+
+    if (result && result.uid) {
+      return String(result.uid);
+    }
+
+    return token;
+
+  } catch (error) {
+    console.log(
+      "[ShowBox] Token parsing failed:",
+      error.message
+    );
+
+    return token;
+  }
 }
 
-/* -------------------------------------------------------
-   TMDB
-------------------------------------------------------- */
 
-async function imdbToTmdb(imdbId, type, requestId) {
-  log(requestId, "TMDB lookup:", imdbId);
+// ---------------------------------------------------------
+// IMDb -> TMDB
+// ---------------------------------------------------------
 
-  const url =
-    `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}` +
-    `?api_key=${TMDB_API_KEY}` +
-    `&external_source=imdb_id`;
+async function imdbToTmdb(imdbId) {
+  console.log(
+    "[ShowBox] TMDB lookup:",
+    imdbId
+  );
 
-  const response = await fetch(url);
+  const response = await fetch(
+    `${TMDB_BASE_URL}/find/${encodeURIComponent(imdbId)}?api_key=${TMDB_API_KEY}&external_source=imdb_id`
+  );
 
-  log(requestId, "TMDB response:", response.status);
+  console.log(
+    "[ShowBox] TMDB response:",
+    response.status
+  );
 
   if (!response.ok) {
-    throw new Error(`TMDB HTTP ${response.status}`);
+    throw new Error(
+      `TMDB lookup failed: HTTP ${response.status}`
+    );
   }
 
   const data = await response.json();
 
-  const movieResults = Array.isArray(data.movie_results)
-    ? data.movie_results
-    : [];
+  const movieResults =
+    Array.isArray(data.movie_results)
+      ? data.movie_results
+      : [];
 
-  const tvResults = Array.isArray(data.tv_results)
-    ? data.tv_results
-    : [];
+  const tvResults =
+    Array.isArray(data.tv_results)
+      ? data.tv_results
+      : [];
 
   const result =
-    type === "series"
-      ? tvResults[0] || movieResults[0]
-      : movieResults[0] || tvResults[0];
+    movieResults[0] ||
+    tvResults[0];
 
   if (!result || !result.id) {
-    throw new Error(`No TMDB result for ${imdbId}`);
+    throw new Error(
+      `TMDB ID not found for ${imdbId}`
+    );
   }
 
-  log(requestId, "TMDB result:", result.id);
+  console.log(
+    "[ShowBox] TMDB result:",
+    result.id
+  );
 
   return String(result.id);
 }
 
-/* -------------------------------------------------------
-   SHOWBOX
-------------------------------------------------------- */
+
+// ---------------------------------------------------------
+// ShowBox API
+// ---------------------------------------------------------
 
 async function getShowBoxData(
   tmdbId,
   type,
   season,
   episode,
-  parsedToken,
-  requestId
+  token
 ) {
-  let url;
+  let requestUrl;
 
   if (type === "series") {
-    url =
-      `${SHOWBOX_API}/tv/${encodeURIComponent(tmdbId)}` +
-      `/${encodeURIComponent(season)}` +
-      `/${encodeURIComponent(episode)}` +
-      `?cookie=${encodeURIComponent(parsedToken)}`;
+    requestUrl =
+      `${SHOWBOX_API}/tv/${tmdbId}/${season}/${episode}?cookie=${encodeURIComponent(token)}`;
   } else {
-    url =
-      `${SHOWBOX_API}/movie/${encodeURIComponent(tmdbId)}` +
-      `?cookie=${encodeURIComponent(parsedToken)}`;
+    requestUrl =
+      `${SHOWBOX_API}/movie/${tmdbId}?cookie=${encodeURIComponent(token)}`;
   }
 
-  log(requestId, "ShowBox request:", {
-    type,
-    tmdbId,
-    season,
-    episode
-  });
+  console.log(
+    "[ShowBox] ShowBox request:",
+    {
+      type,
+      tmdbId,
+      season,
+      episode
+    }
+  );
 
-  const response = await fetch(url, {
-    headers: HEADERS
-  });
+  const response = await fetch(
+    requestUrl,
+    {
+      headers: WORKING_HEADERS
+    }
+  );
 
-  let data;
+  console.log(
+    "[ShowBox] ShowBox response:",
+    {
+      status: response.status
+    }
+  );
 
-  try {
-    data = await response.json();
-  } catch {
+  if (!response.ok) {
     throw new Error(
-      `ShowBox returned non-JSON HTTP ${response.status}`
+      `ShowBox API HTTP ${response.status}`
     );
   }
 
-  log(requestId, "ShowBox response:", {
-    status: response.status,
-    success: data?.success,
-    id: data?.id ?? null,
-    mid: data?.mid ?? null,
-    versions: Array.isArray(data?.versions)
-      ? data.versions.length
-      : 0
-  });
-
-  if (!response.ok || !data?.success) {
-    throw new Error(
-      `ShowBox API failed: HTTP ${response.status}`
-    );
-  }
-
-  return data;
+  return await response.json();
 }
 
-/* -------------------------------------------------------
-   FEBBOX SHARE
-------------------------------------------------------- */
 
-async function febboxShare(showboxId, type) {
-  const boxType = type === "series" ? 2 : 1;
+// ---------------------------------------------------------
+// FebBox share
+// ---------------------------------------------------------
+
+async function febboxShare(
+  showboxId,
+  type
+) {
+  const boxType =
+    type === "series"
+      ? 2
+      : 1;
 
   const url =
-    `https://www.febbox.com/mbp/to_share_page` +
-    `?box_type=${boxType}` +
-    `&mid=${encodeURIComponent(showboxId)}` +
-    `&json=1`;
+    `https://www.febbox.com/mbp/to_share_page?box_type=${boxType}&mid=${showboxId}&json=1`;
 
-  console.log("[ShowBox] FebBox share request:", {
-    boxType,
-    showboxId
-  });
+  console.log(
+    "[ShowBox] FebBox share request:",
+    {
+      boxType,
+      showboxId
+    }
+  );
 
   const response = await fetch(url);
 
-  const text = await response.text();
+  const text =
+    await response.text();
 
-  console.log("[ShowBox] FebBox share response:", {
-    status: response.status,
-    bodyLength: text.length
-  });
+  console.log(
+    "[ShowBox] FebBox share response:",
+    {
+      status: response.status,
+      bodyLength: text.length
+    }
+  );
 
   let data;
 
@@ -235,17 +285,25 @@ async function febboxShare(showboxId, type) {
     data = JSON.parse(text);
   } catch {
     throw new Error(
-      `FebBox share returned non-JSON HTTP ${response.status}`
+      "FebBox share response was not JSON"
     );
   }
 
-  console.log("[ShowBox] FebBox share JSON:", {
-    code: data?.code,
-    hasData: !!data?.data
-  });
+  console.log(
+    "[ShowBox] FebBox share JSON:",
+    {
+      code: data.code,
+      hasData: !!data.data
+    }
+  );
 
-  if (data?.code !== 1 || !data?.data) {
-    throw new Error("FebBox share lookup failed");
+  if (
+    data.code !== 1 ||
+    !data.data
+  ) {
+    throw new Error(
+      "FebBox share request failed"
+    );
   }
 
   const shareLink =
@@ -253,46 +311,57 @@ async function febboxShare(showboxId, type) {
     data.data.share_link;
 
   if (!shareLink) {
-    throw new Error("FebBox share link missing");
+    throw new Error(
+      "FebBox share link missing"
+    );
   }
 
-  const shareKey = shareLink.split("/").pop();
+  const shareKey =
+    shareLink.split("/").pop();
 
-  console.log("[ShowBox] FebBox share key:", {
-    length: shareKey?.length
-  });
+  console.log(
+    "[ShowBox] FebBox share key:",
+    {
+      length: shareKey
+        ? shareKey.length
+        : 0
+    }
+  );
 
   return shareKey;
 }
 
-/* -------------------------------------------------------
-   FEBBOX FILE LIST
-------------------------------------------------------- */
 
-async function febboxFileList(shareKey, parentId = null) {
-  let url =
-    `https://www.febbox.com/file/file_share_list` +
-    `?share_key=${encodeURIComponent(shareKey)}`;
+// ---------------------------------------------------------
+// FebBox root file list
+// ---------------------------------------------------------
 
-  if (parentId !== null) {
-    url +=
-      `&parent_id=${encodeURIComponent(parentId)}` +
-      `&page=1`;
-  }
+async function febboxFileList(
+  shareKey
+) {
+  const url =
+    `https://www.febbox.com/file/file_share_list?share_key=${shareKey}`;
 
-  const response = await fetch(url, {
-    headers: {
-      "Accept-Language": "en"
+  const response = await fetch(
+    url,
+    {
+      headers: {
+        "Accept-Language": "en"
+      }
     }
-  });
+  );
 
-  const text = await response.text();
+  const text =
+    await response.text();
 
-  console.log("[ShowBox] FebBox file list:", {
-    status: response.status,
-    parentId,
-    bodyLength: text.length
-  });
+  console.log(
+    "[ShowBox] FebBox file list:",
+    {
+      status: response.status,
+      parentId: null,
+      bodyLength: text.length
+    }
+  );
 
   let data;
 
@@ -300,641 +369,833 @@ async function febboxFileList(shareKey, parentId = null) {
     data = JSON.parse(text);
   } catch {
     throw new Error(
-      `FebBox file list returned non-JSON HTTP ${response.status}`
+      "FebBox file list was not JSON"
+    );
+  }
+
+  const files =
+    data &&
+    data.data &&
+    Array.isArray(data.data.file_list)
+      ? data.data.file_list
+      : [];
+
+  console.log(
+    "[ShowBox] FebBox file list result:",
+    {
+      code: data.code,
+      count: files.length
+    }
+  );
+
+  if (
+    data.code !== 1 ||
+    !data.data ||
+    !Array.isArray(data.data.file_list)
+  ) {
+    throw new Error(
+      "FebBox file list failed"
+    );
+  }
+
+  return files;
+}
+
+
+// ---------------------------------------------------------
+// FebBox season file list
+// ---------------------------------------------------------
+
+async function febboxSeasonFileList(
+  shareKey,
+  seasonFolder
+) {
+  const url =
+    `https://www.febbox.com/file/file_share_list?share_key=${shareKey}&parent_id=${seasonFolder.fid}&page=1`;
+
+  const response = await fetch(
+    url,
+    {
+      headers: {
+        "Accept-Language": "en"
+      }
+    }
+  );
+
+  const text =
+    await response.text();
+
+  console.log(
+    "[ShowBox] FebBox episode list:",
+    {
+      status: response.status,
+      countBodyLength: text.length
+    }
+  );
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(
+      "FebBox episode list was not JSON"
     );
   }
 
   if (
-    data?.code !== 1 ||
-    !data?.data ||
+    data.code !== 1 ||
+    !data.data ||
     !Array.isArray(data.data.file_list)
   ) {
-    throw new Error("FebBox file list failed");
+    throw new Error(
+      "FebBox episode list failed"
+    );
   }
-
-  console.log("[ShowBox] FebBox file list result:", {
-    code: data.code,
-    count: data.data.file_list.length
-  });
 
   return data.data.file_list;
 }
 
-/* -------------------------------------------------------
-   FIND EPISODE
-------------------------------------------------------- */
 
-async function findEpisode(
+// ---------------------------------------------------------
+// Find movie / episode file
+// ---------------------------------------------------------
+
+async function findFebboxFile(
   shareKey,
+  type,
   season,
   episode
 ) {
-  const rootFiles = await febboxFileList(shareKey);
+  const rootFiles =
+    await febboxFileList(shareKey);
 
-  const seasonName = `season ${season}`;
+  if (type === "movie") {
+    const file =
+      rootFiles.find(
+        item =>
+          item &&
+          item.fid &&
+          item.file_name
+      );
 
-  const seasonFolder = rootFiles.find(
-    file =>
-      file?.file_name &&
-      file.file_name.toLowerCase() ===
-        seasonName.toLowerCase()
-  );
+    if (!file) {
+      throw new Error(
+        "Movie file not found"
+      );
+    }
+
+    console.log(
+      "[ShowBox] Movie file found:",
+      {
+        name: file.file_name,
+        fid: file.fid
+      }
+    );
+
+    return file;
+  }
+
+
+  // -------------------------------------------------------
+  // TV season
+  // -------------------------------------------------------
+
+  const expectedSeason =
+    `season ${season}`.toLowerCase();
+
+  const seasonFolder =
+    rootFiles.find(
+      item =>
+        item &&
+        item.file_name &&
+        item.file_name
+          .toLowerCase()
+          .trim() === expectedSeason
+    );
 
   if (!seasonFolder) {
     throw new Error(
-      `Season folder not found: ${seasonName}`
+      `Season folder not found: ${expectedSeason}`
     );
   }
 
-  console.log("[ShowBox] Season folder:", {
-    season,
-    fid: seasonFolder.fid
-  });
-
-  const episodeFiles = await febboxFileList(
-    shareKey,
-    seasonFolder.fid
+  console.log(
+    "[ShowBox] Season folder:",
+    {
+      name: seasonFolder.file_name,
+      fid: seasonFolder.fid
+    }
   );
 
-  const s = String(season).padStart(2, "0");
-  const e = String(episode).padStart(2, "0");
-
-  const target1 = `s${s}e${e}`;
-  const target2 = `s${season}e${episode}`;
-
-  const episodeFile = episodeFiles.find(file => {
-    if (!file?.file_name) return false;
-
-    const name = file.file_name.toLowerCase();
-
-    return (
-      name.includes(target1) ||
-      name.includes(target2)
+  const files =
+    await febboxSeasonFileList(
+      shareKey,
+      seasonFolder
     );
-  });
 
-  if (!episodeFile) {
+  const s2 =
+    String(season).padStart(2, "0");
+
+  const e2 =
+    String(episode).padStart(2, "0");
+
+  const lowerS =
+    String(season);
+
+  const lowerE =
+    String(episode);
+
+  const file =
+    files.find(item => {
+      if (!item || !item.file_name) {
+        return false;
+      }
+
+      const name =
+        item.file_name.toLowerCase();
+
+      return (
+        name.includes(`s${s2}e${e2}`) ||
+        name.includes(`s${lowerS}e${lowerE}`)
+      );
+    });
+
+  if (!file) {
     throw new Error(
       `Episode not found: S${season}E${episode}`
     );
   }
 
-  console.log("[ShowBox] Episode found:", {
-    name: episodeFile.file_name,
-    fid: episodeFile.fid
-  });
+  console.log(
+    "[ShowBox] Episode found:",
+    {
+      name: file.file_name,
+      fid: file.fid
+    }
+  );
 
-  return episodeFile;
+  return file;
 }
 
-/* -------------------------------------------------------
-   FEBBOX QUALITY
-------------------------------------------------------- */
+
+// ---------------------------------------------------------
+// FebBox quality list
+// ---------------------------------------------------------
 
 async function febboxQualityList(
   file,
   shareKey,
-  parsedToken
+  token
 ) {
-  const tokenString = String(parsedToken);
+  const cookieHeader =
+    token.startsWith("ui=")
+      ? token
+      : `ui=${token}`;
 
-  const cookieHeader = tokenString.startsWith("ui=")
-    ? tokenString
-    : `ui=${tokenString}`;
-
-  console.log("[ShowBox] Token diagnostics:", {
-    length: tokenString.length,
-    startsWithUi: tokenString.startsWith("ui="),
-    startsWithJwt: tokenString.startsWith("eyJ"),
-    cookieLength: cookieHeader.length
-  });
-
-  const url =
-    `https://www.febbox.com/console/video_quality_list` +
-    `?fid=${encodeURIComponent(file.fid)}` +
-    `&share_key=${encodeURIComponent(shareKey)}`;
-
-  console.log("[ShowBox] FebBox quality request:", {
-    fid: file.fid
-  });
-
-  /*
-   * IMPORTANT:
-   *
-   * This intentionally matches the original ShowBox
-   * implementation exactly.
-   *
-   * No Accept header.
-   * No User-Agent.
-   * No additional headers.
-   */
-  const response = await fetch(url, {
-    headers: {
-      Cookie: cookieHeader
+  console.log(
+    "[ShowBox] Token diagnostics:",
+    {
+      length: token.length,
+      startsWithUi:
+        token.startsWith("ui="),
+      startsWithJwt:
+        token.startsWith("eyJ"),
+      cookieLength:
+        cookieHeader.length
     }
-  });
+  );
+
+  const qualityUrl =
+    `https://www.febbox.com/console/video_quality_list?fid=${file.fid}&share_key=${shareKey}`;
+
+  console.log(
+    "[ShowBox] FebBox quality request:",
+    {
+      fid: file.fid
+    }
+  );
+
+  const response =
+    await fetch(
+      qualityUrl,
+      {
+        headers: {
+          Cookie: cookieHeader
+        }
+      }
+    );
 
   const contentType =
-    response.headers.get("content-type") || "";
+    response.headers.get(
+      "content-type"
+    ) || "";
 
-  const finalUrl = response.url;
+  const finalUrl =
+    response.url;
 
-  const body = await response.text();
+  const text =
+    await response.text();
 
-  console.log("[ShowBox] FebBox quality response:", {
-    status: response.status,
-    contentType,
-    bodyLength: body.length,
-    finalUrl
-  });
+  console.log(
+    "[ShowBox] FebBox quality response:",
+    {
+      status: response.status,
+      contentType,
+      bodyLength: text.length,
+      finalUrl
+    }
+  );
 
-  if (
-    finalUrl.includes("/login") ||
-    body.includes("<title>Login - FEB</title>")
-  ) {
-    console.log(
-      "[ShowBox] FebBox returned LOGIN HTML"
-    );
 
-    throw new Error(
-      "FebBox quality endpoint returned login page"
-    );
-  }
+  // -------------------------------------------------------
+  // NEW DIAGNOSTIC
+  //
+  // The endpoint is currently returning JSON rather than
+  // the HTML structure our old parser expected.
+  //
+  // Log the JSON structure so we can adapt the parser.
+  // -------------------------------------------------------
 
   let data;
 
   try {
-    data = JSON.parse(body);
+    data = JSON.parse(text);
+
+    console.log(
+      "[ShowBox] FebBox quality JSON:",
+      JSON.stringify(data)
+    );
+
   } catch {
-    console.log(
-      "[ShowBox] FebBox quality returned non-JSON"
-    );
-
-    console.log(
-      "[ShowBox] Quality body preview:",
-      body.slice(0, 300)
-    );
-
-    throw new Error(
-      `FebBox quality returned non-JSON: HTTP ${response.status}`
-    );
+    data = null;
   }
+
+
+  // -------------------------------------------------------
+  // Existing HTML response support
+  // -------------------------------------------------------
 
   if (
-    data?.code !== 1 ||
-    !data?.data ||
-    !data.data.html
+    data &&
+    data.html
   ) {
-    throw new Error(
-      "FebBox quality response missing HTML"
+    return parseFebboxHtml(
+      data.html,
+      file
     );
   }
 
-  return data.data.html;
-}
 
-/* -------------------------------------------------------
-   PARSE QUALITY HTML
-------------------------------------------------------- */
+  // -------------------------------------------------------
+  // If the response is HTML itself
+  // -------------------------------------------------------
 
-function parseQualityHtml(html, file) {
-  const streams = [];
-
-  const itemRegex =
-    /<div[^>]*class=["'][^"']*file_quality[^"']*["'][^>]*>/gi;
-
-  const matches = html.match(itemRegex);
-
-  if (!matches) {
-    return streams;
+  if (
+    text.includes(
+      "file_quality"
+    )
+  ) {
+    return parseFebboxHtml(
+      text,
+      file
+    );
   }
 
+
+  throw new Error(
+    "FebBox quality response missing HTML"
+  );
+}
+
+
+// ---------------------------------------------------------
+// Parse old FebBox HTML quality response
+// ---------------------------------------------------------
+
+function parseFebboxHtml(
+  html,
+  file
+) {
+  const streams = [];
+
   /*
-   * Cheerio isn't needed for the diagnostic version.
-   * Extract the data attributes from each quality element.
+   * The original FebBox response uses:
+   *
+   * div.file_quality
+   *
+   * with:
+   *
+   * data-url
+   * data-quality
+   *
+   * and a .size element.
+   *
+   * We keep the parser dependency-free here.
    */
-  for (const match of matches) {
+
+  const qualityRegex =
+    /<div[^>]*class=["'][^"']*file_quality[^"']*["'][^>]*>/gi;
+
+  let match;
+
+  while (
+    (match = qualityRegex.exec(html))
+  ) {
+    const blockStart =
+      match.index;
+
+    const block =
+      html.slice(
+        blockStart,
+        blockStart + 10000
+      );
+
     const urlMatch =
-      match.match(
+      block.match(
         /data-url=["']([^"']+)["']/i
       );
 
+    if (!urlMatch) {
+      continue;
+    }
+
     const qualityMatch =
-      match.match(
+      block.match(
         /data-quality=["']([^"']+)["']/i
-      );
-
-    if (!urlMatch) continue;
-
-    streams.push({
-      url: urlMatch[1],
-      quality: qualityMatch
-        ? qualityMatch[1]
-        : "Unknown",
-      fileName: file.file_name || ""
-    });
-  }
-
-  return streams;
-}
-
-/* -------------------------------------------------------
-   DIRECT HTML PARSER
-------------------------------------------------------- */
-
-function extractQualityItems(html) {
-  const streams = [];
-
-  /*
-   * Match complete file_quality divs.
-   */
-  const regex =
-    /<div\b[^>]*class=["'][^"']*\bfile_quality\b[^"']*["'][\s\S]*?<\/div>/gi;
-
-  const blocks = html.match(regex) || [];
-
-  for (const block of blocks) {
-    const urlMatch =
-      block.match(
-        /data-url\s*=\s*["']([^"']+)["']/i
-      );
-
-    if (!urlMatch) continue;
-
-    const qualityMatch =
-      block.match(
-        /data-quality\s*=\s*["']([^"']+)["']/i
       );
 
     const sizeMatch =
       block.match(
-        /class=["'][^"']*\bsize\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i
+        /class=["'][^"']*size[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i
       );
 
-    streams.push({
-      url: urlMatch[1],
-      quality: qualityMatch
+    const streamUrl =
+      urlMatch[1];
+
+    const quality =
+      qualityMatch
         ? qualityMatch[1]
-        : "Unknown",
-      size: sizeMatch
+        : "Unknown";
+
+    const size =
+      sizeMatch
         ? sizeMatch[1]
             .replace(/<[^>]+>/g, "")
             .trim()
-        : ""
+        : "";
+
+    streams.push({
+      url: streamUrl,
+      quality,
+      size,
+      fileName:
+        file.file_name || ""
     });
   }
+
+  console.log(
+    "[ShowBox] Parsed FebBox qualities:",
+    streams.length
+  );
 
   return streams;
 }
 
-/* -------------------------------------------------------
-   QUALITY LABEL
-------------------------------------------------------- */
 
-function normalizeQuality(value) {
-  if (!value) return "Unknown";
+// ---------------------------------------------------------
+// Convert quality name
+// ---------------------------------------------------------
 
-  const q = String(value).toUpperCase();
-
-  if (q === "ORIGINAL" || q === "ORIGINAL QUALITY") {
-    return "Original";
-  }
+function getQualityLabel(
+  quality,
+  fileName
+) {
+  const value =
+    String(
+      quality ||
+      fileName ||
+      ""
+    ).toLowerCase();
 
   if (
-    q === "4K" ||
-    q === "2160P" ||
-    q.includes("2160")
+    value.includes("2160") ||
+    value.includes("4k")
   ) {
     return "4K";
   }
 
   if (
-    q === "1440P" ||
-    q === "2K"
+    value.includes("1440")
   ) {
     return "1440p";
   }
 
   if (
-    q === "1080P" ||
-    q === "FHD"
+    value.includes("1080")
   ) {
     return "1080p";
   }
 
   if (
-    q === "720P" ||
-    q === "HD"
+    value.includes("720")
   ) {
     return "720p";
   }
 
   if (
-    q === "480P" ||
-    q === "SD"
+    value.includes("480")
   ) {
     return "480p";
   }
 
-  if (q === "360P") {
-    return "360p";
-  }
-
-  if (q === "240P") {
-    return "240p";
-  }
-
-  const match =
-    q.match(/(\d{3,4})P?/);
-
-  if (match) {
-    const n = Number(match[1]);
-
-    if (n >= 2160) return "4K";
-    if (n >= 1440) return "1440p";
-    if (n >= 1080) return "1080p";
-    if (n >= 720) return "720p";
-    if (n >= 480) return "480p";
-    if (n >= 360) return "360p";
-    return "240p";
-  }
-
-  return String(value);
+  return quality || "Unknown";
 }
 
-/* -------------------------------------------------------
-   FEBBOX EXTRACTION
-------------------------------------------------------- */
 
-async function extractFebBoxStreams(
-  showboxId,
-  type,
-  season,
-  episode,
-  parsedToken
+// ---------------------------------------------------------
+// Build Stremio streams
+// ---------------------------------------------------------
+
+function buildStreams(
+  qualityResults
 ) {
-  const shareKey = await febboxShare(
-    showboxId,
-    type
+  return qualityResults.map(
+    item => ({
+      name: "ShowBox",
+
+      title:
+        getQualityLabel(
+          item.quality,
+          item.fileName
+        ) +
+        (
+          item.size
+            ? `\n${item.size}`
+            : ""
+        ),
+
+      url: item.url,
+
+      behaviorHints: {
+        bingeGroup:
+          "showbox"
+      },
+
+      headers: {
+        Accept: "*/*",
+
+        "Accept-Language":
+          "en-US,en;q=0.8",
+
+        Connection:
+          "keep-alive",
+
+        Range:
+          "bytes=0-",
+
+        Referer:
+          "https://www.febbox.com/",
+
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      }
+    })
   );
-
-  let file;
-
-  if (type === "series") {
-    file = await findEpisode(
-      shareKey,
-      season,
-      episode
-    );
-  } else {
-    const files =
-      await febboxFileList(shareKey);
-
-    if (!files.length) {
-      throw new Error(
-        "No movie files found"
-      );
-    }
-
-    file = files[0];
-
-    console.log("[ShowBox] Movie file found:", {
-      name: file.file_name,
-      fid: file.fid
-    });
-  }
-
-  const html =
-    await febboxQualityList(
-      file,
-      shareKey,
-      parsedToken
-    );
-
-  const qualities =
-    extractQualityItems(html);
-
-  console.log(
-    "[ShowBox] Quality items found:",
-    qualities.length
-  );
-
-  return qualities.map(item => ({
-    name:
-      `FebBox | ${normalizeQuality(item.quality)}`,
-
-    title:
-      `${normalizeQuality(item.quality)}` +
-      (item.size
-        ? ` | ${item.size}`
-        : ""),
-
-    url: item.url,
-
-    quality:
-      normalizeQuality(item.quality),
-
-    size:
-      item.size || "",
-
-    headers: {
-      Accept: "*/*",
-      "Accept-Language": "en-US,en;q=0.8",
-      Connection: "keep-alive",
-      Range: "bytes=0-",
-      Referer: "https://www.febbox.com/",
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-  }));
 }
 
-/* -------------------------------------------------------
-   REQUEST PARSING
-------------------------------------------------------- */
 
-function parseRequestId(rawId, type) {
-  const decoded =
-    decodeURIComponent(rawId)
-      .replace(/\.json$/, "");
+// ---------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------
 
-  if (type === "series") {
-    const parts = decoded.split(":");
-
-    return {
-      imdbId: parts[0],
-      season: Number(parts[1]),
-      episode: Number(parts[2])
-    };
-  }
-
-  return {
-    imdbId: decoded
-  };
-}
-
-/* -------------------------------------------------------
-   MAIN
-------------------------------------------------------- */
-
-export default async (req, context) => {
+export default async (
+  req,
+  context
+) => {
   const requestId =
     Math.random()
       .toString(36)
       .slice(2, 8);
 
+  console.log(
+    `[ShowBox][${requestId}] ===== START =====`
+  );
+
   try {
     const url =
       new URL(req.url);
 
-    const parts =
-      url.pathname
-        .split("/")
-        .filter(Boolean);
+    const pathname =
+      url.pathname;
 
-    /*
-     * Expected:
-     *
-     * /:config/stream/:type/:id.json
-     */
-    const streamIndex =
-      parts.indexOf("stream");
 
-    if (streamIndex === -1) {
-      return new Response(
-        JSON.stringify({
-          streams: []
-        }),
-        {
-          status: 404,
-          headers: {
-            "Content-Type":
-              "application/json",
-            "Access-Control-Allow-Origin":
-              "*"
-          }
-        }
+    // -----------------------------------------------------
+    // Extract config + request
+    // -----------------------------------------------------
+
+    const match =
+      pathname.match(
+        /^\/([^/]+)\/stream\/([^/]+)\/(.+)$/
+      );
+
+    if (!match) {
+      throw new Error(
+        "Invalid stream request path"
       );
     }
+
+    const rawConfig =
+      match[1];
 
     const type =
-      parts[streamIndex + 1];
+      match[2];
 
-    const rawId =
-      parts[streamIndex + 2];
+    let rawId =
+      decodeURIComponent(match[3]);
 
-    log(requestId, "===== START =====");
 
-    log(requestId, "Request:", {
-      type,
-      rawId
-    });
+    console.log(
+      `[ShowBox][${requestId}] Request:`,
+      {
+        type,
+        rawId
+      }
+    );
 
-    if (!rawId) {
-      throw new Error(
-        "Missing stream ID"
+
+    // -----------------------------------------------------
+    // Remove .json
+    // -----------------------------------------------------
+
+    rawId =
+      rawId.replace(
+        /\.json$/,
+        ""
       );
-    }
 
-    /*
-     * Config is the segment immediately
-     * before /stream/.
-     */
-    const configSegment =
-      parts[streamIndex - 1];
+
+    // -----------------------------------------------------
+    // Parse configuration
+    // -----------------------------------------------------
 
     const config =
-      getConfig(configSegment);
+      parseConfig(rawConfig);
 
-    const rawToken =
+    const token =
       config.uiToken ||
       "";
 
-    if (!rawToken) {
+    console.log(
+      `[ShowBox][${requestId}] Token loaded:`,
+      {
+        present:
+          !!token
+      }
+    );
+
+    if (!token) {
       throw new Error(
         "No ShowBox UI token configured"
       );
     }
 
-    log(requestId, "Token loaded:", {
-      present: true
-    });
 
-    const parsed =
-      parseRequestId(
-        rawId,
-        type
-      );
+    // -----------------------------------------------------
+    // Parse IMDb / season / episode
+    // -----------------------------------------------------
 
-    log(requestId, "Parsed:", parsed);
-
-    let tmdbId;
+    let imdbId;
+    let season;
+    let episode;
 
     if (type === "series") {
-      tmdbId =
-        await imdbToTmdb(
-          parsed.imdbId,
-          type,
-          requestId
+      const parts =
+        rawId.split(":");
+
+      imdbId =
+        parts[0];
+
+      season =
+        Number(parts[1]);
+
+      episode =
+        Number(parts[2]);
+
+      if (
+        !imdbId ||
+        !Number.isFinite(season) ||
+        !Number.isFinite(episode)
+      ) {
+        throw new Error(
+          `Invalid series ID: ${rawId}`
         );
+      }
+
+      console.log(
+        `[ShowBox][${requestId}] Parsed:`,
+        {
+          imdbId,
+          season,
+          episode
+        }
+      );
+
     } else {
-      tmdbId =
-        await imdbToTmdb(
-          parsed.imdbId,
-          type,
-          requestId
-        );
+      imdbId =
+        rawId;
+
+      console.log(
+        `[ShowBox][${requestId}] Parsed:`,
+        {
+          imdbId
+        }
+      );
     }
 
-    log(requestId, "TMDB:", tmdbId);
+
+    // -----------------------------------------------------
+    // IMDb -> TMDB
+    // -----------------------------------------------------
+
+    const tmdbId =
+      await imdbToTmdb(
+        imdbId
+      );
+
+    console.log(
+      `[ShowBox][${requestId}] TMDB:`,
+      tmdbId
+    );
+
+
+    // -----------------------------------------------------
+    // Parse ShowBox token
+    // -----------------------------------------------------
 
     const parsedToken =
-      parseSingleToken(rawToken);
+      parseSingleToken(
+        token
+      );
 
-    log(requestId, "Token ready:", {
-      tokenParsed:
-        parsedToken !== rawToken
-    });
+    console.log(
+      `[ShowBox][${requestId}] Token ready:`,
+      {
+        tokenParsed:
+          parsedToken !== token
+      }
+    );
 
-    const showbox =
+
+    // -----------------------------------------------------
+    // ShowBox
+    // -----------------------------------------------------
+
+    const showboxData =
       await getShowBoxData(
         tmdbId,
         type,
-        parsed.season,
-        parsed.episode,
-        parsedToken,
-        requestId
-      );
-
-    const showboxId =
-      showbox.id ||
-      showbox.mid ||
-      showbox.data?.id ||
-      showbox.data?.mid;
-
-    if (!showboxId) {
-      throw new Error(
-        "ShowBox response contains no media ID"
-      );
-    }
-
-    log(requestId, "ShowBox ID:", showboxId);
-
-    /*
-     * Try the FebBox extraction.
-     */
-    const streams =
-      await extractFebBoxStreams(
-        showboxId,
-        type,
-        parsed.season,
-        parsed.episode,
+        season,
+        episode,
         parsedToken
       );
 
-    log(requestId, "Streams:", streams.length);
+    if (
+      !showboxData ||
+      showboxData.success === false
+    ) {
+      throw new Error(
+        "ShowBox API returned failure"
+      );
+    }
 
-    log(requestId, "===== END =====");
+    const showboxId =
+      showboxData.id ||
+      showboxData.mid ||
+      (
+        showboxData.data &&
+        (
+          showboxData.data.id ||
+          showboxData.data.mid
+        )
+      );
+
+    console.log(
+      `[ShowBox][${requestId}] ShowBox ID:`,
+      showboxId
+    );
+
+    if (!showboxId) {
+      throw new Error(
+        "ShowBox ID missing"
+      );
+    }
+
+
+    // -----------------------------------------------------
+    // FebBox share
+    // -----------------------------------------------------
+
+    const shareKey =
+      await febboxShare(
+        showboxId,
+        type
+      );
+
+
+    // -----------------------------------------------------
+    // Find FebBox file
+    // -----------------------------------------------------
+
+    const file =
+      await findFebboxFile(
+        shareKey,
+        type,
+        season,
+        episode
+      );
+
+
+    // -----------------------------------------------------
+    // Get quality URLs
+    // -----------------------------------------------------
+
+    const qualityResults =
+      await febboxQualityList(
+        file,
+        shareKey,
+        parsedToken
+      );
+
+
+    if (
+      !qualityResults.length
+    ) {
+      throw new Error(
+        "No FebBox quality streams found"
+      );
+    }
+
+
+    // -----------------------------------------------------
+    // Build Stremio response
+    // -----------------------------------------------------
+
+    const streams =
+      buildStreams(
+        qualityResults
+      );
+
+    console.log(
+      `[ShowBox][${requestId}] Streams:`,
+      streams.length
+    );
+
+
+    console.log(
+      `[ShowBox][${requestId}] ===== END =====`
+    );
+
 
     return new Response(
       JSON.stringify({
@@ -942,31 +1203,32 @@ export default async (req, context) => {
       }),
       {
         status: 200,
+
         headers: {
           "Content-Type":
             "application/json",
+
           "Access-Control-Allow-Origin":
-            "*",
-          "Cache-Control":
-            "no-store"
+            "*"
         }
       }
     );
-  } catch (e) {
-    error(
-      requestId,
-      "===== ERROR ====="
+
+  } catch (error) {
+
+    console.error(
+      `[ShowBox][${requestId}] ===== ERROR =====`
     );
 
-    error(
-      requestId,
-      e?.message || String(e)
+    console.error(
+      `[ShowBox][${requestId}]`,
+      error.message
     );
 
-    error(
-      requestId,
-      "===== END ERROR ====="
+    console.error(
+      `[ShowBox][${requestId}] ===== END ERROR =====`
     );
+
 
     return new Response(
       JSON.stringify({
@@ -974,21 +1236,25 @@ export default async (req, context) => {
       }),
       {
         status: 200,
+
         headers: {
           "Content-Type":
             "application/json",
+
           "Access-Control-Allow-Origin":
-            "*",
-          "Cache-Control":
-            "no-store"
+            "*"
         }
       }
     );
   }
 };
 
+
+// ---------------------------------------------------------
+// Netlify route
+// ---------------------------------------------------------
+
 export const config = {
-  path: [
+  path:
     "/:config/stream/:type/:id.json"
-  ]
 };
