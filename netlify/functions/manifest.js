@@ -8,12 +8,9 @@ const DEFAULT_QUALITIES = [
   "360p"
 ];
 
-
 function qualityRows() {
-
   return DEFAULT_QUALITIES
     .map((quality, index) => `
-
       <div class="quality-row">
 
         <label class="quality-name">
@@ -48,7 +45,6 @@ function qualityRows() {
         </div>
 
       </div>
-
     `)
     .join("");
 }
@@ -59,416 +55,394 @@ function homepageScript() {
   return `
 (function () {
 
-"use strict";
+  "use strict";
 
-const tokenInput =
-  document.getElementById("tokenInput");
+  const tokenInput =
+    document.getElementById("tokenInput");
 
-const testButton =
-  document.getElementById("testButton");
+  const testButton =
+    document.getElementById("testButton");
 
-const checkStatus =
-  document.getElementById("checkStatus");
+  const checkStatus =
+    document.getElementById("checkStatus");
 
-const configuration =
-  document.getElementById("configuration");
+  const configuration =
+    document.getElementById("configuration");
 
-const qualityList =
-  document.getElementById("qualityList");
+  const qualityList =
+    document.getElementById("qualityList");
 
-const manifestUrl =
-  document.getElementById("manifestUrl");
+  const manifestUrl =
+    document.getElementById("manifestUrl");
 
-const copyButton =
-  document.getElementById("copyButton");
+  const copyButton =
+    document.getElementById("copyButton");
 
-const installButton =
-  document.getElementById("installButton");
-
-let currentToken = "";
-let connectionValid = false;
+  const installButton =
+    document.getElementById("installButton");
 
 
-function getRows() {
-
-  return Array.from(
-    qualityList.querySelectorAll(".quality-row")
-  );
-
-}
+  let currentToken = "";
+  let connectionValid = false;
 
 
-function getQualityConfig() {
+  function getRows() {
 
-  return getRows().map(row => {
+    return Array.from(
+      qualityList.querySelectorAll(".quality-row")
+    );
 
-    const checkbox =
-      row.querySelector(".quality-checkbox");
+  }
 
-    return {
-      name: checkbox.dataset.quality,
-      enabled: checkbox.checked
+
+  function getQualityConfig() {
+
+    return getRows().map(row => {
+
+      const checkbox =
+        row.querySelector(".quality-checkbox");
+
+      return {
+        name: checkbox.dataset.quality,
+        enabled: checkbox.checked
+      };
+
+    });
+
+  }
+
+
+  function updateManifest() {
+
+    if (!connectionValid || !currentToken) {
+      return;
+    }
+
+
+    const qualities =
+      getQualityConfig();
+
+
+    if (!qualities.some(item => item.enabled)) {
+
+      manifestUrl.value = "";
+
+      installButton.classList.add("disabled");
+
+      installButton.href = "#";
+
+      return;
+
+    }
+
+
+    const config = {
+      uiToken: currentToken,
+      qualities
     };
 
-  });
 
-}
-
-
-function encodeConfig(config) {
-
-  const json =
-    JSON.stringify(config);
-
-  const bytes =
-    new TextEncoder().encode(json);
-
-  let binary = "";
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary)
-    .replace(/\\\\+/g, "-")
-    .replace(/\\\\//g, "_")
-    .replace(/=+$/, "");
-
-}
+    const encoded =
+      ${encodeConfig.toString()}(config);
 
 
-function updateManifest() {
-
-  if (!connectionValid || !currentToken) {
-    return;
-  }
-
-
-  const qualities =
-    getQualityConfig();
+    const httpsUrl =
+      window.location.origin +
+      "/" +
+      encoded +
+      "/manifest.json";
 
 
-  if (!qualities.some(item => item.enabled)) {
+    const stremioUrl =
+      "stremio://" +
+      window.location.host +
+      "/" +
+      encoded +
+      "/manifest.json";
 
-    manifestUrl.value = "";
 
-    installButton.classList.add("disabled");
+    manifestUrl.value =
+      httpsUrl;
 
-    installButton.href = "#";
+    installButton.href =
+      stremioUrl;
 
-    return;
+    installButton.classList.remove(
+      "disabled"
+    );
 
   }
 
 
-  const config = {
-    uiToken: currentToken,
-    qualities
-  };
-
-
-  const encoded =
-    encodeConfig(config);
-
-
-  const httpsUrl =
-    window.location.origin +
-    "/" +
-    encoded +
-    "/manifest.json";
-
-
-  const stremioUrl =
-    "stremio://" +
-    window.location.host +
-    "/" +
-    encoded +
-    "/manifest.json";
-
-
-  manifestUrl.value =
-    httpsUrl;
-
-  installButton.href =
-    stremioUrl;
-
-  installButton.classList.remove(
-    "disabled"
+  qualityList.addEventListener(
+    "change",
+    updateManifest
   );
 
-}
+
+  qualityList.addEventListener(
+    "click",
+    function (event) {
+
+      const button =
+        event.target.closest(".move-button");
+
+      if (!button) {
+        return;
+      }
 
 
-qualityList.addEventListener(
-  "change",
-  updateManifest
-);
+      const row =
+        button.closest(".quality-row");
+
+      const rows =
+        getRows();
+
+      const index =
+        rows.indexOf(row);
 
 
-qualityList.addEventListener(
-  "click",
-  function (event) {
+      if (
+        button.dataset.action === "up" &&
+        index > 0
+      ) {
 
-    const button =
-      event.target.closest(".move-button");
-
-    if (!button) {
-      return;
-    }
-
-
-    const row =
-      button.closest(".quality-row");
-
-    const rows =
-      getRows();
-
-    const index =
-      rows.indexOf(row);
-
-
-    if (
-      button.dataset.action === "up" &&
-      index > 0
-    ) {
-
-      qualityList.insertBefore(
-        row,
-        rows[index - 1]
-      );
-
-    }
-
-
-    if (
-      button.dataset.action === "down" &&
-      index < rows.length - 1
-    ) {
-
-      qualityList.insertBefore(
-        rows[index + 1],
-        row
-      );
-
-    }
-
-
-    updateManifest();
-
-  }
-);
-
-
-tokenInput.addEventListener(
-  "input",
-  function () {
-
-    connectionValid = false;
-    currentToken = "";
-
-    configuration.style.display =
-      "none";
-
-    manifestUrl.value = "";
-
-    installButton.classList.add(
-      "disabled"
-    );
-
-    installButton.href = "#";
-
-    checkStatus.textContent = "";
-
-  }
-);
-
-
-testButton.addEventListener(
-  "click",
-  async function () {
-
-    const token =
-      tokenInput.value.trim();
-
-
-    if (!token) {
-
-      checkStatus.textContent =
-        "Enter your ShowBox UI token first.";
-
-      checkStatus.className =
-        "error";
-
-      return;
-
-    }
-
-
-    testButton.disabled = true;
-
-    connectionValid = false;
-    currentToken = "";
-
-    configuration.style.display =
-      "none";
-
-    installButton.classList.add(
-      "disabled"
-    );
-
-    installButton.href = "#";
-
-    checkStatus.textContent =
-      "Checking connection...";
-
-    checkStatus.className = "";
-
-
-    try {
-
-      const response =
-        await fetch(
-          "/check-token",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-
-            body:
-              JSON.stringify({
-                token
-              })
-          }
+        qualityList.insertBefore(
+          row,
+          rows[index - 1]
         );
 
-
-      const data =
-        await response.json();
-
-
-      if (data.status === "usable") {
-
-        connectionValid = true;
-        currentToken = token;
-
-        checkStatus.textContent =
-          "Cookie is working.";
-
-        checkStatus.className =
-          "success";
-
-        configuration.style.display =
-          "block";
-
-        updateManifest();
-
-        tokenInput.value = "";
-
       }
 
-      else if (
-        data.status === "rate_limited"
+
+      if (
+        button.dataset.action === "down" &&
+        index < rows.length - 1
       ) {
 
-        checkStatus.textContent =
-          "Cookie is currently rate limited.";
-
-        checkStatus.className =
-          "error";
-
-      }
-
-      else if (
-        data.status === "invalid"
-      ) {
-
-        checkStatus.textContent =
-          "Cookie is not usable.";
-
-        checkStatus.className =
-          "error";
+        qualityList.insertBefore(
+          rows[index + 1],
+          row
+        );
 
       }
 
-      else {
 
-        checkStatus.textContent =
-          data.message ||
-          "Could not verify the cookie.";
-
-        checkStatus.className =
-          "error";
-
-      }
+      updateManifest();
 
     }
+  );
 
-    catch {
+
+  tokenInput.addEventListener(
+    "input",
+    function () {
+
+      connectionValid = false;
+      currentToken = "";
+
+      configuration.style.display = "none";
+
+      manifestUrl.value = "";
+
+      installButton.classList.add(
+        "disabled"
+      );
+
+      installButton.href = "#";
+
+      checkStatus.textContent = "";
+
+    }
+  );
+
+
+  testButton.addEventListener(
+    "click",
+    async function () {
+
+      const token =
+        tokenInput.value.trim();
+
+
+      if (!token) {
+
+        checkStatus.textContent =
+          "Enter your ShowBox UI token first.";
+
+        checkStatus.className =
+          "error";
+
+        return;
+
+      }
+
+
+      testButton.disabled = true;
+
+      connectionValid = false;
+      currentToken = "";
+
+      configuration.style.display =
+        "none";
+
+      installButton.classList.add(
+        "disabled"
+      );
+
+      installButton.href = "#";
 
       checkStatus.textContent =
-        "Could not contact the token checker.";
+        "Checking connection...";
 
-      checkStatus.className =
-        "error";
+      checkStatus.className = "";
+
+
+      try {
+
+        const response =
+          await fetch(
+            "/check-token",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body:
+                JSON.stringify({
+                  token
+                })
+            }
+          );
+
+
+        const data =
+          await response.json();
+
+
+        if (data.status === "usable") {
+
+          connectionValid = true;
+          currentToken = token;
+
+          checkStatus.textContent =
+            "Cookie is working.";
+
+          checkStatus.className =
+            "success";
+
+          configuration.style.display =
+            "block";
+
+          updateManifest();
+
+          tokenInput.value = "";
+
+        }
+
+        else if (
+          data.status === "rate_limited"
+        ) {
+
+          checkStatus.textContent =
+            "Cookie is currently rate limited.";
+
+          checkStatus.className =
+            "error";
+
+        }
+
+        else if (
+          data.status === "invalid"
+        ) {
+
+          checkStatus.textContent =
+            "Cookie is not usable.";
+
+          checkStatus.className =
+            "error";
+
+        }
+
+        else {
+
+          checkStatus.textContent =
+            data.message ||
+            "Could not verify the cookie.";
+
+          checkStatus.className =
+            "error";
+
+        }
+
+      }
+
+      catch {
+
+        checkStatus.textContent =
+          "Could not contact the token checker.";
+
+        checkStatus.className =
+          "error";
+
+      }
+
+      finally {
+
+        testButton.disabled = false;
+
+      }
 
     }
-
-    finally {
-
-      testButton.disabled = false;
-
-    }
-
-  }
-);
+  );
 
 
-copyButton.addEventListener(
-  "click",
-  async function () {
+  copyButton.addEventListener(
+    "click",
+    async function () {
 
-    if (!manifestUrl.value) {
-      return;
-    }
+      if (!manifestUrl.value) {
+        return;
+      }
 
 
-    try {
+      try {
 
-      await navigator.clipboard.writeText(
-        manifestUrl.value
+        await navigator.clipboard.writeText(
+          manifestUrl.value
+        );
+
+      }
+
+      catch {
+
+        manifestUrl.focus();
+        manifestUrl.select();
+
+        document.execCommand("copy");
+
+      }
+
+
+      copyButton.textContent =
+        "Copied";
+
+
+      setTimeout(
+        function () {
+
+          copyButton.textContent =
+            "Copy";
+
+        },
+        1500
       );
 
     }
-
-    catch {
-
-      manifestUrl.focus();
-      manifestUrl.select();
-
-      document.execCommand("copy");
-
-    }
-
-
-    copyButton.textContent =
-      "Copied";
-
-
-    setTimeout(
-      function () {
-
-        copyButton.textContent =
-          "Copy";
-
-      },
-      1500
-    );
-
-  }
-);
+  );
 
 })();
 `;
@@ -485,7 +459,7 @@ export default async (request) => {
 
 
   /* -------------------------------------------------- */
-  /* HOMEPAGE JAVASCRIPT */
+  /* EXTERNAL HOMEPAGE JAVASCRIPT */
   /* -------------------------------------------------- */
 
   if (pathname === "/homepage.js") {
@@ -518,7 +492,6 @@ export default async (request) => {
   ) {
 
     return new Response(
-
       JSON.stringify({
 
         id:
@@ -574,7 +547,6 @@ export default async (request) => {
             "application/json"
         }
       }
-
     );
 
   }
