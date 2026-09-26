@@ -852,6 +852,7 @@ Test Connection
 
 (function () {
 
+alert("SCRIPT IS RUNNING");
 
 const tokenInput =
   document.getElementById(
