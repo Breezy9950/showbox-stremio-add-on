@@ -1,21 +1,29 @@
 export default async (req, context) => {
   const url = new URL(req.url);
 
-  // ---------------------------------------------------------
-  // Homepage
-  // ---------------------------------------------------------
+  // =========================================================
+  // Homepage / Configure page
+  // =========================================================
 
   if (
     url.pathname === "/" ||
     url.pathname === "/configure"
   ) {
-    return new Response(
-      `<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#111111">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="theme-color"
+    content="#111111"
+  >
+
   <title>ShowBox Stremio Addon</title>
 
   <style>
@@ -27,11 +35,14 @@ export default async (req, context) => {
       margin: 0;
       min-height: 100vh;
       padding: 24px;
+
       display: flex;
       align-items: center;
       justify-content: center;
+
       background: #111;
       color: #fff;
+
       font-family:
         -apple-system,
         BlinkMacSystemFont,
@@ -46,37 +57,49 @@ export default async (req, context) => {
 
     h1 {
       margin: 0 0 8px;
+
       font-size: 32px;
       line-height: 1.2;
     }
 
     .subtitle {
       margin: 0 0 30px;
+
       color: #999;
+
       line-height: 1.5;
     }
 
     label {
       display: block;
+
       margin-bottom: 8px;
+
       color: #ccc;
+
       font-size: 14px;
       font-weight: 500;
     }
 
-    input {
+    #token {
       width: 100%;
+
       min-height: 48px;
+
       padding: 13px 14px;
+
       border: 1px solid #333;
       border-radius: 10px;
+
       background: #1a1a1a;
       color: #fff;
+
       font-size: 15px;
+
       outline: none;
     }
 
-    input:focus {
+    #token:focus {
       border-color: #666;
     }
 
@@ -86,14 +109,18 @@ export default async (req, context) => {
 
     .section-title {
       margin-bottom: 6px;
+
       color: #fff;
+
       font-size: 17px;
       font-weight: 600;
     }
 
     .section-description {
       margin: 0 0 14px;
+
       color: #888;
+
       font-size: 13px;
       line-height: 1.5;
     }
@@ -101,132 +128,201 @@ export default async (req, context) => {
     .quality-list {
       display: flex;
       flex-direction: column;
+
       gap: 8px;
     }
 
     .quality-row {
       min-height: 54px;
+
       display: flex;
       align-items: center;
+
       gap: 10px;
+
       padding: 8px 10px;
+
       border: 1px solid #2d2d2d;
       border-radius: 10px;
-      background: #1a1a1a;
-    }
 
-    .quality-name {
-      flex: 1;
-      font-size: 15px;
-      font-weight: 500;
+      background: #1a1a1a;
     }
 
     .quality-checkbox {
       width: 20px;
       height: 20px;
+
       margin: 0;
+
       accent-color: white;
+    }
+
+    .quality-name {
+      flex: 1;
+
+      font-size: 15px;
+      font-weight: 500;
     }
 
     .move-button {
       width: 38px;
       height: 38px;
+
       min-width: 38px;
+
       padding: 0;
+
       border: 1px solid #333;
       border-radius: 8px;
+
       background: #222;
-      color: white;
+      color: #fff;
+
       font-size: 18px;
+
       cursor: pointer;
     }
 
     .move-button:disabled {
       opacity: 0.25;
+
       cursor: default;
     }
 
-    .primary {
+    .move-button:active {
+      opacity: 0.7;
+    }
+
+    #generate {
       width: 100%;
+
       min-height: 48px;
+
       margin-top: 24px;
+
       padding: 13px 18px;
+
       border: 0;
       border-radius: 10px;
+
       background: #fff;
       color: #111;
+
       font-size: 16px;
       font-weight: 600;
+
       cursor: pointer;
     }
 
-    .primary:active,
-    .secondary:active {
+    #generate:active {
       opacity: 0.75;
     }
 
     #result {
       display: none;
+
       margin-top: 30px;
     }
 
     .result-title {
       margin-bottom: 8px;
+
       color: #ccc;
+
       font-size: 14px;
       font-weight: 500;
     }
 
     .url-row {
       display: flex;
+
       gap: 8px;
     }
 
-    .url-row input {
+    #manifestUrl {
       min-width: 0;
       flex: 1;
-    }
 
-    .secondary {
-      width: auto;
-      flex-shrink: 0;
+      width: 100%;
+
       min-height: 48px;
-      padding: 0 18px;
+
+      padding: 13px 14px;
+
       border: 1px solid #333;
       border-radius: 10px;
+
       background: #1a1a1a;
       color: #fff;
+
+      font-size: 13px;
+      outline: none;
+    }
+
+    #copy {
+      width: auto;
+
+      flex-shrink: 0;
+
+      min-height: 48px;
+
+      padding: 0 18px;
+
+      border: 1px solid #333;
+      border-radius: 10px;
+
+      background: #1a1a1a;
+      color: #fff;
+
       font-size: 15px;
       font-weight: 500;
+
       cursor: pointer;
     }
 
-    .install {
+    #copy:active {
+      opacity: 0.75;
+    }
+
+    #install {
       width: 100%;
+
       min-height: 48px;
+
       margin-top: 10px;
+
       padding: 13px 18px;
+
       display: block;
+
       border-radius: 10px;
+
       background: #fff;
       color: #111;
+
       text-align: center;
       text-decoration: none;
+
       font-size: 16px;
       font-weight: 600;
     }
 
     .instruction {
       margin-top: 14px;
+
       color: #888;
+
       font-size: 13px;
       line-height: 1.5;
     }
 
     #status {
       min-height: 20px;
+
       margin-top: 10px;
+
       color: #aaa;
+
       font-size: 14px;
     }
   </style>
@@ -242,6 +338,7 @@ export default async (req, context) => {
     Enter your ShowBox UI token and customize which video qualities the addon should show.
   </p>
 
+
   <label for="token">
     ShowBox UI Token
   </label>
@@ -253,7 +350,8 @@ export default async (req, context) => {
     autocomplete="off"
     autocapitalize="none"
     spellcheck="false"
-  />
+  >
+
 
   <div class="section">
 
@@ -272,12 +370,14 @@ export default async (req, context) => {
 
   </div>
 
+
   <button
     id="generate"
-    class="primary"
+    type="button"
   >
     Generate Install Link
   </button>
+
 
   <div id="result">
 
@@ -291,30 +391,32 @@ export default async (req, context) => {
         id="manifestUrl"
         type="text"
         readonly
-      />
+      >
 
       <button
         id="copy"
-        class="secondary"
+        type="button"
       >
         Copy
       </button>
 
     </div>
 
+
     <a
       id="install"
-      class="install"
       href="#"
     >
       Install in Stremio
     </a>
+
 
     <div class="instruction">
       On iOS, if the Install button does not open Stremio,
       use Copy and paste the manifest URL into Stremio's
       Add Addon field.
     </div>
+
 
     <div id="status"></div>
 
@@ -325,392 +427,518 @@ export default async (req, context) => {
 
 <script>
 
-const qualityDefaults = [
-  { name: "ORG", enabled: true },
-  { name: "4K", enabled: true },
-  { name: "1440p", enabled: true },
-  { name: "1080p", enabled: true },
-  { name: "720p", enabled: true },
-  { name: "480p", enabled: true },
-  { name: "360p", enabled: true }
-];
-
-let qualities =
-  qualityDefaults.map(
-    item => ({ ...item })
-  );
-
-
-const tokenInput =
-  document.getElementById("token");
-
-const generateButton =
-  document.getElementById("generate");
-
-const qualityList =
-  document.getElementById("qualityList");
-
-const result =
-  document.getElementById("result");
-
-const manifestUrl =
-  document.getElementById("manifestUrl");
-
-const copyButton =
-  document.getElementById("copy");
-
-const installButton =
-  document.getElementById("install");
-
-const status =
-  document.getElementById("status");
-
-
-function renderQualities() {
-
-  qualityList.innerHTML = "";
-
-  qualities.forEach(
-    (quality, index) => {
-
-      const row =
-        document.createElement("div");
-
-      row.className =
-        "quality-row";
-
-
-      const checkbox =
-        document.createElement("input");
-
-      checkbox.type =
-        "checkbox";
-
-      checkbox.className =
-        "quality-checkbox";
-
-      checkbox.checked =
-        quality.enabled;
-
-
-      checkbox.addEventListener(
-        "change",
-        () => {
-
-          quality.enabled =
-            checkbox.checked;
-
-        }
-      );
-
-
-      const name =
-        document.createElement("div");
-
-      name.className =
-        "quality-name";
-
-      name.textContent =
-        quality.name;
-
-
-      const up =
-        document.createElement("button");
-
-      up.type =
-        "button";
-
-      up.className =
-        "move-button";
-
-      up.textContent =
-        "↑";
-
-      up.disabled =
-        index === 0;
-
-
-      up.addEventListener(
-        "click",
-        () => {
-
-          if (index === 0) {
-            return;
-          }
-
-          const current =
-            qualities[index];
-
-          qualities[index] =
-            qualities[index - 1];
-
-          qualities[index - 1] =
-            current;
-
-          renderQualities();
-
-        }
-      );
-
-
-      const down =
-        document.createElement("button");
-
-      down.type =
-        "button";
-
-      down.className =
-        "move-button";
-
-      down.textContent =
-        "↓";
-
-      down.disabled =
-        index === qualities.length - 1;
-
-
-      down.addEventListener(
-        "click",
-        () => {
-
-          if (
-            index ===
-            qualities.length - 1
-          ) {
-            return;
-          }
-
-          const current =
-            qualities[index];
-
-          qualities[index] =
-            qualities[index + 1];
-
-          qualities[index + 1] =
-            current;
-
-          renderQualities();
-
-        }
-      );
-
-
-      row.appendChild(
-        checkbox
-      );
-
-      row.appendChild(
-        name
-      );
-
-      row.appendChild(
-        up
-      );
-
-      row.appendChild(
-        down
-      );
-
-
-      qualityList.appendChild(
-        row
-      );
-
+  // ========================================================
+  // Quality configuration
+  // ========================================================
+
+  let qualities = [
+    {
+      name: "ORG",
+      enabled: true
+    },
+    {
+      name: "4K",
+      enabled: true
+    },
+    {
+      name: "1440p",
+      enabled: true
+    },
+    {
+      name: "1080p",
+      enabled: true
+    },
+    {
+      name: "720p",
+      enabled: true
+    },
+    {
+      name: "480p",
+      enabled: true
+    },
+    {
+      name: "360p",
+      enabled: true
     }
-  );
-
-}
+  ];
 
 
-function base64UrlEncode(
-  value
-) {
+  // ========================================================
+  // Elements
+  // ========================================================
 
-  const bytes =
-    new TextEncoder()
-      .encode(value);
+  const tokenInput =
+    document.getElementById("token");
 
-  let binary = "";
+  const generateButton =
+    document.getElementById("generate");
 
-  for (
-    const byte of bytes
-  ) {
-    binary +=
-      String.fromCharCode(byte);
-  }
+  const qualityList =
+    document.getElementById("qualityList");
 
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  const result =
+    document.getElementById("result");
 
-}
+  const manifestUrl =
+    document.getElementById("manifestUrl");
 
+  const copyButton =
+    document.getElementById("copy");
 
-generateButton.addEventListener(
-  "click",
-  () => {
+  const installButton =
+    document.getElementById("install");
 
-    const token =
-      tokenInput.value.trim();
+  const status =
+    document.getElementById("status");
 
 
-    if (!token) {
+  // ========================================================
+  // Render quality list
+  // ========================================================
 
-      result.style.display =
-        "block";
+  function renderQualities() {
 
-      status.textContent =
-        "Please enter your ShowBox UI token.";
+    qualityList.innerHTML = "";
 
-      return;
+    qualities.forEach(
+      (quality, index) => {
 
-    }
+        const row =
+          document.createElement("div");
+
+        row.className =
+          "quality-row";
 
 
-    const enabledQualities =
-      qualities
-        .filter(
-          item => item.enabled
-        )
-        .map(
-          item => item.name
+        // Checkbox
+
+        const checkbox =
+          document.createElement("input");
+
+        checkbox.type =
+          "checkbox";
+
+        checkbox.className =
+          "quality-checkbox";
+
+        checkbox.checked =
+          quality.enabled;
+
+
+        checkbox.addEventListener(
+          "change",
+          function () {
+
+            quality.enabled =
+              checkbox.checked;
+
+          }
         );
 
 
-    if (
-      !enabledQualities.length
-    ) {
+        // Name
 
-      result.style.display =
-        "block";
+        const name =
+          document.createElement("div");
 
-      status.textContent =
-        "Please enable at least one quality.";
+        name.className =
+          "quality-name";
 
-      return;
-
-    }
+        name.textContent =
+          quality.name;
 
 
-    const config = {
+        // Up
 
-      uiToken:
-        token,
+        const upButton =
+          document.createElement("button");
 
-      qualities:
-        qualities.map(
-          item => ({
-            name:
-              item.name,
+        upButton.type =
+          "button";
 
-            enabled:
-              item.enabled
-          })
-        )
+        upButton.className =
+          "move-button";
 
-    };
+        upButton.textContent =
+          "↑";
 
-
-    const encodedConfig =
-      base64UrlEncode(
-        JSON.stringify(config)
-      );
+        upButton.disabled =
+          index === 0;
 
 
-    const httpsManifestUrl =
-      window.location.origin +
-      "/" +
-      encodedConfig +
-      "/manifest.json";
+        upButton.addEventListener(
+          "click",
+          function () {
+
+            if (index === 0) {
+              return;
+            }
 
 
-    const stremioInstallUrl =
-      "stremio://" +
-      window.location.host +
-      "/" +
-      encodedConfig +
-      "/manifest.json";
+            const previous =
+              qualities[index - 1];
+
+            qualities[index - 1] =
+              qualities[index];
+
+            qualities[index] =
+              previous;
 
 
-    manifestUrl.value =
-      httpsManifestUrl;
+            renderQualities();
 
-    installButton.href =
-      stremioInstallUrl;
-
-    result.style.display =
-      "block";
-
-    status.textContent =
-      "Quality settings saved in your configured addon link.";
-
-  }
-);
+          }
+        );
 
 
-copyButton.addEventListener(
-  "click",
-  async () => {
+        // Down
 
-    const value =
-      manifestUrl.value;
+        const downButton =
+          document.createElement("button");
 
-    if (!value) {
-      return;
-    }
+        downButton.type =
+          "button";
 
+        downButton.className =
+          "move-button";
 
-    try {
+        downButton.textContent =
+          "↓";
 
-      await navigator.clipboard
-        .writeText(value);
-
-      copyButton.textContent =
-        "Copied!";
-
-      status.textContent =
-        "Manifest URL copied.";
-
-    } catch (error) {
-
-      manifestUrl.focus();
-
-      manifestUrl.select();
-
-      document.execCommand(
-        "copy"
-      );
-
-      copyButton.textContent =
-        "Copied!";
-
-      status.textContent =
-        "Manifest URL copied.";
-
-    }
+        downButton.disabled =
+          index ===
+          qualities.length - 1;
 
 
-    setTimeout(
-      () => {
+        downButton.addEventListener(
+          "click",
+          function () {
 
-        copyButton.textContent =
-          "Copy";
+            if (
+              index ===
+              qualities.length - 1
+            ) {
+              return;
+            }
 
-      },
-      2000
+
+            const next =
+              qualities[index + 1];
+
+            qualities[index + 1] =
+              qualities[index];
+
+            qualities[index] =
+              next;
+
+
+            renderQualities();
+
+          }
+        );
+
+
+        row.appendChild(
+          checkbox
+        );
+
+        row.appendChild(
+          name
+        );
+
+        row.appendChild(
+          upButton
+        );
+
+        row.appendChild(
+          downButton
+        );
+
+
+        qualityList.appendChild(
+          row
+        );
+
+      }
     );
 
   }
-);
 
 
-renderQualities();
+  // ========================================================
+  // Base64URL encoder
+  // ========================================================
+
+  function base64UrlEncode(value) {
+
+    const bytes =
+      new TextEncoder()
+        .encode(value);
+
+    let binary = "";
+
+
+    for (
+      const byte of bytes
+    ) {
+
+      binary +=
+        String.fromCharCode(byte);
+
+    }
+
+
+    return btoa(binary)
+      .replace(/\\+/g, "-")
+      .replace(/\\//g, "_")
+      .replace(/=+$/, "");
+
+  }
+
+
+  // ========================================================
+  // Generate addon link
+  // ========================================================
+
+  generateButton.addEventListener(
+    "click",
+    function () {
+
+      try {
+
+        const token =
+          tokenInput.value.trim();
+
+
+        // -----------------------------------------------
+        // Token validation
+        // -----------------------------------------------
+
+        if (!token) {
+
+          result.style.display =
+            "block";
+
+          status.textContent =
+            "Please enter your ShowBox UI token.";
+
+          return;
+
+        }
+
+
+        // -----------------------------------------------
+        // At least one quality
+        // -----------------------------------------------
+
+        const enabledQualities =
+          qualities.filter(
+            function (quality) {
+              return quality.enabled;
+            }
+          );
+
+
+        if (
+          enabledQualities.length === 0
+        ) {
+
+          result.style.display =
+            "block";
+
+          status.textContent =
+            "Please enable at least one quality.";
+
+          return;
+
+        }
+
+
+        // -----------------------------------------------
+        // Build configuration
+        // -----------------------------------------------
+
+        const config = {
+          uiToken:
+            token,
+
+          qualities:
+            qualities.map(
+              function (quality) {
+                return {
+                  name:
+                    quality.name,
+
+                  enabled:
+                    quality.enabled
+                };
+              }
+            )
+        };
+
+
+        // -----------------------------------------------
+        // Encode configuration
+        // -----------------------------------------------
+
+        const json =
+          JSON.stringify(
+            config
+          );
+
+
+        const encodedConfig =
+          base64UrlEncode(
+            json
+          );
+
+
+        // -----------------------------------------------
+        // HTTPS manifest
+        // -----------------------------------------------
+
+        const httpsManifestUrl =
+          window.location.origin +
+          "/" +
+          encodedConfig +
+          "/manifest.json";
+
+
+        // -----------------------------------------------
+        // Stremio deep link
+        // -----------------------------------------------
+
+        const stremioInstallUrl =
+          "stremio://" +
+          window.location.host +
+          "/" +
+          encodedConfig +
+          "/manifest.json";
+
+
+        // -----------------------------------------------
+        // Display results
+        // -----------------------------------------------
+
+        manifestUrl.value =
+          httpsManifestUrl;
+
+        installButton.href =
+          stremioInstallUrl;
+
+        result.style.display =
+          "block";
+
+        status.textContent =
+          "Install link generated.";
+
+
+      } catch (error) {
+
+        console.error(
+          "Generate link error:",
+          error
+        );
+
+        result.style.display =
+          "block";
+
+        status.textContent =
+          "Failed to generate the install link.";
+
+      }
+
+    }
+  );
+
+
+  // ========================================================
+  // Copy manifest URL
+  // ========================================================
+
+  copyButton.addEventListener(
+    "click",
+    async function () {
+
+      const value =
+        manifestUrl.value;
+
+
+      if (!value) {
+        return;
+      }
+
+
+      try {
+
+        await navigator.clipboard
+          .writeText(value);
+
+
+        copyButton.textContent =
+          "Copied!";
+
+
+        status.textContent =
+          "Manifest URL copied.";
+
+
+      } catch (error) {
+
+        manifestUrl.focus();
+
+        manifestUrl.select();
+
+
+        try {
+
+          document.execCommand(
+            "copy"
+          );
+
+        } catch {
+          // Ignore fallback failure
+        }
+
+
+        copyButton.textContent =
+          "Copied!";
+
+
+        status.textContent =
+          "Manifest URL copied.";
+
+      }
+
+
+      setTimeout(
+        function () {
+
+          copyButton.textContent =
+            "Copy";
+
+        },
+        2000
+      );
+
+    }
+  );
+
+
+  // ========================================================
+  // Initial render
+  // ========================================================
+
+  renderQualities();
 
 </script>
 
 </body>
-</html>`,
+</html>`;
+
+
+    return new Response(
+      html,
       {
         status: 200,
 
@@ -726,9 +954,9 @@ renderQualities();
   }
 
 
-  // ---------------------------------------------------------
+  // =========================================================
   // Manifest
-  // ---------------------------------------------------------
+  // =========================================================
 
   return new Response(
     JSON.stringify({
@@ -797,17 +1025,15 @@ renderQualities();
 };
 
 
-// ---------------------------------------------------------
+// =========================================================
 // Netlify routes
-// ---------------------------------------------------------
+// =========================================================
 
 export const config = {
-
   path: [
     "/",
     "/configure",
     "/manifest.json",
     "/:config/manifest.json"
   ]
-
 };
