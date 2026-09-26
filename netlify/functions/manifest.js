@@ -8,6 +8,23 @@ const DEFAULT_QUALITIES = [
   "360p"
 ];
 
+function encodeConfig(config) {
+  const json = JSON.stringify(config);
+  const bytes = new TextEncoder().encode(json);
+
+  let binary = "";
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+
 function qualityRows() {
   return DEFAULT_QUALITIES
     .map((quality, index) => `
@@ -380,7 +397,7 @@ function homepageScript() {
 
       }
 
-      catch {
+      catch (error) {
 
         checkStatus.textContent =
           "Could not contact the token checker.";
@@ -433,10 +450,8 @@ function homepageScript() {
 
       setTimeout(
         function () {
-
           copyButton.textContent =
             "Copy";
-
         },
         1500
       );
