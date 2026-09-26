@@ -1170,6 +1170,15 @@ function getQualityLabel(
   }
 
 
+  if (
+    String(quality)
+      .toUpperCase()
+      === "ORG"
+  ) {
+    return "ORG";
+  }
+
+
   return quality || "";
 }
 
@@ -1497,7 +1506,7 @@ function getTechnicalMetadata(
 
 
 // ---------------------------------------------------------
-// Extract explicit language information
+// Normalize language value
 // ---------------------------------------------------------
 
 function normalizeLanguageValue(
@@ -1610,7 +1619,7 @@ function getLanguagesFromObject(
 
 
 // ---------------------------------------------------------
-// Detect explicitly written language names in filenames
+// Detect explicit languages in filenames
 // ---------------------------------------------------------
 
 function getLanguagesFromFilename(
@@ -1964,10 +1973,6 @@ function buildStreamTitle(
   }
 
 
-  // -------------------------------------------------------
-  // Episode number
-  // -------------------------------------------------------
-
   if (
     type === "series" &&
     Number.isFinite(season) &&
@@ -1980,10 +1985,6 @@ function buildStreamTitle(
 
   }
 
-
-  // -------------------------------------------------------
-  // Technical metadata
-  // -------------------------------------------------------
 
   const technical =
     buildTechnicalLine(
@@ -2002,10 +2003,6 @@ function buildStreamTitle(
   }
 
 
-  // -------------------------------------------------------
-  // Size
-  // -------------------------------------------------------
-
   if (
     item.size
   ) {
@@ -2016,10 +2013,6 @@ function buildStreamTitle(
 
   }
 
-
-  // -------------------------------------------------------
-  // Audio
-  // -------------------------------------------------------
 
   const audioLanguages =
     getAudioLanguages(
@@ -2037,10 +2030,6 @@ function buildStreamTitle(
 
   }
 
-
-  // -------------------------------------------------------
-  // Subtitles
-  // -------------------------------------------------------
 
   const subtitleLanguages =
     getSubtitleLanguages(
@@ -2357,9 +2346,9 @@ function dedupeStreams(
 }
 
 
-// ---------------------------------------------------------
+// =========================================================
 // QUALITY CONFIGURATION
-// ---------------------------------------------------------
+// =========================================================
 
 const DEFAULT_QUALITIES = [
   "ORG",
@@ -2381,11 +2370,10 @@ function normalizeQualityConfig(
 ) {
 
   /*
-   * Old configured addon URLs do not have
+   * Old configured addon URLs don't have
    * a qualities property.
    *
-   * In that case, preserve the old behavior
-   * and allow every quality.
+   * Preserve their previous behavior.
    */
 
   if (
@@ -2395,6 +2383,7 @@ function normalizeQualityConfig(
   ) {
 
     return {
+
       enabled:
         new Set(
           DEFAULT_QUALITIES
@@ -2405,6 +2394,7 @@ function normalizeQualityConfig(
 
       configured:
         false
+
     };
 
   }
@@ -2466,12 +2456,8 @@ function normalizeQualityConfig(
 
 
   /*
-   * Make sure qualities that may appear in a
-   * stream but weren't present in the config
-   * aren't accidentally lost because of an
-   * incomplete configuration.
-   *
-   * They are appended after configured qualities.
+   * Append any default qualities missing
+   * from the configuration.
    */
 
   for (
@@ -2494,10 +2480,14 @@ function normalizeQualityConfig(
 
 
   return {
+
     enabled,
+
     priority,
+
     configured:
       true
+
   };
 }
 
@@ -2594,7 +2584,7 @@ function getCanonicalQuality(
 
 
 // ---------------------------------------------------------
-// Get quality from a stream
+// Get quality from stream
 // ---------------------------------------------------------
 
 function getStreamQuality(
@@ -2617,23 +2607,39 @@ function getStreamQuality(
   }
 
 
-  /*
-   * Some ShowBox streams may have a less
-   * normalized name. Check the title too.
-   */
-
   const title =
     String(
       stream.title || ""
     );
 
 
-  return (
+  /*
+   * The quality is normally the first part
+   * of the technical line.
+   */
+
+  const firstLine =
+    title.split(
+      "\n"
+    )[2] || "";
+
+
+  const qualityFromTitle =
     getCanonicalQuality(
-      title
-    ) ||
-    ""
-  );
+      firstLine
+    );
+
+
+  if (
+    qualityFromTitle
+  ) {
+
+    return qualityFromTitle;
+
+  }
+
+
+  return "";
 }
 
 
@@ -2653,8 +2659,8 @@ function applyQualitySettings(
 
 
   /*
-   * If this is an old configuration URL,
-   * don't change its behavior.
+   * Old configuration URLs don't have
+   * quality settings.
    */
 
   if (
@@ -2677,9 +2683,8 @@ function applyQualitySettings(
 
 
         /*
-         * If we cannot identify the quality,
-         * keep the stream rather than silently
-         * deleting an otherwise playable stream.
+         * Keep streams whose quality cannot
+         * be identified.
          */
 
         if (!quality) {
@@ -2687,20 +2692,20 @@ function applyQualitySettings(
         }
 
 
-        return qualityConfig.enabled
-          .has(
-            quality
-          );
+        return qualityConfig.enabled.has(
+          quality
+        );
 
       }
     );
 
 
   /*
-   * Sort only recognized quality streams.
+   * Stable sort:
+   * recognized qualities follow the user's
+   * configured priority.
    *
-   * Unknown-quality streams are placed
-   * after configured qualities.
+   * Unknown qualities stay after them.
    */
 
   filtered.sort(
@@ -2715,21 +2720,19 @@ function applyQualitySettings(
 
       const ia =
         qa
-          ? qualityConfig.priority.indexOf(qa)
+          ? qualityConfig.priority.indexOf(
+              qa
+            )
           : Infinity;
 
 
       const ib =
         qb
-          ? qualityConfig.priority.indexOf(qb)
+          ? qualityConfig.priority.indexOf(
+              qb
+            )
           : Infinity;
 
-
-      /*
-       * Preserve original order when both
-       * streams have the same priority or
-       * are unknown.
-       */
 
       return ia - ib;
 
@@ -2740,6 +2743,7 @@ function applyQualitySettings(
   console.log(
     "[ShowBox] Quality settings:",
     {
+
       enabled:
         Array.from(
           qualityConfig.enabled
@@ -2753,6 +2757,7 @@ function applyQualitySettings(
 
       after:
         filtered.length
+
     }
   );
 
@@ -2761,9 +2766,9 @@ function applyQualitySettings(
 }
 
 
-// ---------------------------------------------------------
+// =========================================================
 // Main handler
-// ---------------------------------------------------------
+// =========================================================
 
 export default async (
   req,
@@ -3070,7 +3075,7 @@ export default async (
 
 
     // -----------------------------------------------------
-    // FIRST: Restore ShowBox version/link streams
+    // ShowBox version/link streams
     // -----------------------------------------------------
 
     const showboxStreams =
@@ -3176,9 +3181,6 @@ export default async (
 
     // -----------------------------------------------------
     // Combine both sources
-    //
-    // Keep FebBox first because that is the path we
-    // have already verified as working on iPad.
     // -----------------------------------------------------
 
     const streams =
@@ -3189,14 +3191,7 @@ export default async (
 
 
     // -----------------------------------------------------
-    // Apply quality configuration
-    //
-    // IMPORTANT:
-    //
-    // Nothing above this point has been changed.
-    //
-    // ShowBox and FebBox streams are generated exactly
-    // as before. Quality filtering happens only here.
+    // Apply quality settings
     // -----------------------------------------------------
 
     const configuredStreams =
@@ -3224,6 +3219,7 @@ export default async (
     console.log(
       `[ShowBox][${requestId}] Stream breakdown:`,
       {
+
         febbox:
           febboxStreams.length,
 
@@ -3235,6 +3231,7 @@ export default async (
 
         final:
           configuredStreams.length
+
       }
     );
 
@@ -3254,11 +3251,13 @@ export default async (
           200,
 
         headers: {
+
           "Content-Type":
             "application/json",
 
           "Access-Control-Allow-Origin":
             "*"
+
         }
       }
     );
@@ -3291,11 +3290,13 @@ export default async (
           200,
 
         headers: {
+
           "Content-Type":
             "application/json",
 
           "Access-Control-Allow-Origin":
             "*"
+
         }
       }
     );
