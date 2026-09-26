@@ -295,7 +295,7 @@ function homepageScript() {
       if (token.length <= 100) {
 
         checkStatus.textContent =
-          "Cookie must contain more than 100 characters.";
+          "Invalid Cookie";
 
         checkStatus.className =
           "error";
@@ -309,7 +309,7 @@ function homepageScript() {
 
 
       checkStatus.textContent =
-        "Manifest generated.";
+        "";
 
       checkStatus.className =
         "success";
