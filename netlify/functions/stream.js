@@ -16,7 +16,7 @@ const HEADERS = {
 
 
 // --------------------------------------------------
-// Base64 helpers
+// Helpers
 // --------------------------------------------------
 
 function decodeBase64Url(str) {
@@ -35,23 +35,20 @@ function decodeBase64Url(str) {
 }
 
 
-// --------------------------------------------------
-// Config
-// --------------------------------------------------
+function decodeHtmlEntities(str) {
+  if (!str) return str;
 
-function getConfig(req) {
-  const url = new URL(req.url);
-
-  const parts = url.pathname.split("/").filter(Boolean);
-
-  const config = parts[0] || "";
-
-  return decodeBase64Url(config);
+  return String(str)
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
 }
 
 
 // --------------------------------------------------
-// Original ShowBox token parser
+// Token
 // --------------------------------------------------
 
 function parseSingleToken(token) {
@@ -99,9 +96,10 @@ function parseSingleToken(token) {
     }
 
     return token;
+
   } catch (e) {
     console.log(
-      "[ShowBox] Token parse/decrypt failed, using original token"
+      "[ShowBox] Token parse/decrypt failed; using original token"
     );
 
     return token;
@@ -131,6 +129,7 @@ function getUiToken(config) {
     }
 
     return parseSingleToken(tokens[0]);
+
   } catch (e) {
     console.log("[ShowBox] Config JSON parse failed:", e.message);
     return null;
@@ -143,10 +142,7 @@ function getUiToken(config) {
 // --------------------------------------------------
 
 async function imdbToTmdb(imdbId, type) {
-  console.log("[ShowBox] TMDB lookup starting:", {
-    imdbId,
-    type
-  });
+  console.log("[ShowBox] TMDB lookup:", imdbId);
 
   const url =
     `${TMDB_BASE_URL}/find/${encodeURIComponent(imdbId)}` +
@@ -155,10 +151,7 @@ async function imdbToTmdb(imdbId, type) {
 
   const response = await fetch(url);
 
-  console.log("[ShowBox] TMDB response:", {
-    status: response.status,
-    ok: response.ok
-  });
+  console.log("[ShowBox] TMDB response:", response.status);
 
   if (!response.ok) {
     throw new Error(
@@ -181,11 +174,7 @@ async function imdbToTmdb(imdbId, type) {
       ? movieResults[0]
       : tvResults[0];
 
-  console.log("[ShowBox] TMDB lookup result:", {
-    movieResults: movieResults.length,
-    tvResults: tvResults.length,
-    tmdbId: result?.id ?? null
-  });
+  console.log("[ShowBox] TMDB result:", result?.id ?? null);
 
   if (!result?.id) {
     throw new Error(
@@ -198,7 +187,7 @@ async function imdbToTmdb(imdbId, type) {
 
 
 // --------------------------------------------------
-// ShowBox API
+// ShowBox
 // --------------------------------------------------
 
 async function getShowBoxMedia({
@@ -239,21 +228,15 @@ async function getShowBoxMedia({
   try {
     data = JSON.parse(text);
   } catch {
-    console.log("[ShowBox] ShowBox returned non-JSON:", {
-      status: response.status,
-      bodyLength: text.length
-    });
-
     throw new Error(
       `ShowBox returned invalid JSON: HTTP ${response.status}`
     );
   }
 
-  console.log("[ShowBox] API response:", {
+  console.log("[ShowBox] ShowBox response:", {
     status: response.status,
     success: data?.success,
     id: data?.id ?? null,
-    mid: data?.mid ?? null,
     versions: Array.isArray(data?.versions)
       ? data.versions.length
       : 0
@@ -270,25 +253,7 @@ async function getShowBoxMedia({
 
 
 // --------------------------------------------------
-// FebBox helper
-// --------------------------------------------------
-
-function decodeHtmlEntities(str) {
-  if (!str) {
-    return str;
-  }
-
-  return String(str)
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
-}
-
-
-// --------------------------------------------------
-// FebBox Stage 1
+// FebBox share
 // --------------------------------------------------
 
 async function febboxGetShareKey(showboxId, type) {
@@ -299,11 +264,6 @@ async function febboxGetShareKey(showboxId, type) {
     `?box_type=${boxType}` +
     `&mid=${encodeURIComponent(showboxId)}` +
     `&json=1`;
-
-  console.log("[ShowBox] FebBox share lookup starting:", {
-    showboxId,
-    type
-  });
 
   console.log("[ShowBox] FebBox share request:", {
     boxType,
@@ -322,7 +282,6 @@ async function febboxGetShareKey(showboxId, type) {
 
   console.log("[ShowBox] FebBox share response:", {
     status: response.status,
-    ok: response.ok,
     bodyLength: text.length
   });
 
@@ -331,11 +290,6 @@ async function febboxGetShareKey(showboxId, type) {
   try {
     data = JSON.parse(text);
   } catch {
-    console.log(
-      "[ShowBox] FebBox share response was not JSON:",
-      text.slice(0, 300)
-    );
-
     throw new Error(
       `FebBox share returned non-JSON: HTTP ${response.status}`
     );
@@ -362,10 +316,6 @@ async function febboxGetShareKey(showboxId, type) {
     data.data.shareLink ||
     data.data.share_link;
 
-  console.log("[ShowBox] FebBox share link:", {
-    found: !!shareLink
-  });
-
   if (!shareLink) {
     throw new Error(
       "FebBox response did not contain shareLink"
@@ -384,8 +334,8 @@ async function febboxGetShareKey(showboxId, type) {
     );
   }
 
-  console.log("[ShowBox] FebBox share key extracted:", {
-    shareKeyLength: String(shareKey).length
+  console.log("[ShowBox] FebBox share key:", {
+    length: String(shareKey).length
   });
 
   return shareKey;
@@ -393,7 +343,7 @@ async function febboxGetShareKey(showboxId, type) {
 
 
 // --------------------------------------------------
-// FebBox Stage 2
+// FebBox file list
 // --------------------------------------------------
 
 async function febboxFileList(shareKey, parentId = null) {
@@ -407,11 +357,6 @@ async function febboxFileList(shareKey, parentId = null) {
       `&page=1`;
   }
 
-  console.log("[ShowBox] FebBox file list request:", {
-    hasParent: parentId !== null,
-    parentId: parentId !== null ? parentId : null
-  });
-
   const response = await fetch(url, {
     headers: {
       "User-Agent": HEADERS["User-Agent"],
@@ -422,9 +367,9 @@ async function febboxFileList(shareKey, parentId = null) {
 
   const text = await response.text();
 
-  console.log("[ShowBox] FebBox file list response:", {
+  console.log("[ShowBox] FebBox file list:", {
     status: response.status,
-    ok: response.ok,
+    parentId,
     bodyLength: text.length
   });
 
@@ -433,22 +378,19 @@ async function febboxFileList(shareKey, parentId = null) {
   try {
     data = JSON.parse(text);
   } catch {
-    console.log(
-      "[ShowBox] FebBox file list was not JSON:",
-      text.slice(0, 300)
-    );
-
     throw new Error(
       `FebBox file list returned non-JSON: HTTP ${response.status}`
     );
   }
 
-  console.log("[ShowBox] FebBox file list JSON:", {
+  const files =
+    Array.isArray(data?.data?.file_list)
+      ? data.data.file_list
+      : [];
+
+  console.log("[ShowBox] FebBox file list result:", {
     code: data?.code ?? null,
-    hasData: !!data?.data,
-    fileCount: Array.isArray(data?.data?.file_list)
-      ? data.data.file_list.length
-      : 0
+    count: files.length
   });
 
   if (!response.ok) {
@@ -463,12 +405,12 @@ async function febboxFileList(shareKey, parentId = null) {
     );
   }
 
-  return data.data.file_list || [];
+  return files;
 }
 
 
 // --------------------------------------------------
-// Find TV episode
+// Find episode
 // --------------------------------------------------
 
 async function findEpisodeFile(
@@ -476,23 +418,8 @@ async function findEpisodeFile(
   season,
   episode
 ) {
-  console.log("[ShowBox] Looking for FebBox season folder:", {
-    season,
-    expectedName: `season ${season}`
-  });
-
-  const rootFiles = await febboxFileList(shareKey);
-
-  console.log("[ShowBox] FebBox root files:", {
-    count: rootFiles.length
-  });
-
-  for (const file of rootFiles.slice(0, 20)) {
-    console.log("[ShowBox] Root item:", {
-      name: file?.file_name ?? null,
-      fid: file?.fid ?? null
-    });
-  }
+  const rootFiles =
+    await febboxFileList(shareKey);
 
   const seasonName =
     `season ${season}`.toLowerCase();
@@ -509,22 +436,22 @@ async function findEpisodeFile(
     );
   }
 
-  console.log("[ShowBox] Season folder found:", {
-    name: seasonFolder.file_name,
+  console.log("[ShowBox] Season folder:", {
+    season,
     fid: seasonFolder.fid
   });
 
-  const episodeFiles = await febboxFileList(
-    shareKey,
-    seasonFolder.fid
-  );
+  const episodeFiles =
+    await febboxFileList(
+      shareKey,
+      seasonFolder.fid
+    );
 
-  console.log("[ShowBox] Episode folder contents:", {
-    count: episodeFiles.length
-  });
+  const s =
+    String(season).padStart(2, "0");
 
-  const s = String(season).padStart(2, "0");
-  const e = String(episode).padStart(2, "0");
+  const e =
+    String(episode).padStart(2, "0");
 
   const shortPattern =
     `s${s}e${e}`.toLowerCase();
@@ -532,40 +459,25 @@ async function findEpisodeFile(
   const normalPattern =
     `s${season}e${episode}`.toLowerCase();
 
-  console.log("[ShowBox] Episode matching:", {
-    shortPattern,
-    normalPattern
-  });
+  const episodeFile =
+    episodeFiles.find(file => {
+      const name =
+        String(file?.file_name || "")
+          .toLowerCase();
 
-  const episodeFile = episodeFiles.find(file => {
-    const name =
-      String(file?.file_name || "")
-        .toLowerCase();
-
-    return (
-      name.includes(shortPattern) ||
-      name.includes(normalPattern)
-    );
-  });
+      return (
+        name.includes(shortPattern) ||
+        name.includes(normalPattern)
+      );
+    });
 
   if (!episodeFile) {
-    console.log(
-      "[ShowBox] No matching episode. Available files:"
-    );
-
-    for (const file of episodeFiles.slice(0, 30)) {
-      console.log("[ShowBox] Episode item:", {
-        name: file?.file_name ?? null,
-        fid: file?.fid ?? null
-      });
-    }
-
     throw new Error(
       `FebBox episode not found: S${season}E${episode}`
     );
   }
 
-  console.log("[ShowBox] Episode file found:", {
+  console.log("[ShowBox] Episode found:", {
     name: episodeFile.file_name,
     fid: episodeFile.fid
   });
@@ -575,7 +487,7 @@ async function findEpisodeFile(
 
 
 // --------------------------------------------------
-// FebBox Stage 3
+// FebBox quality diagnostics
 // --------------------------------------------------
 
 async function febboxQualityList(
@@ -583,10 +495,26 @@ async function febboxQualityList(
   shareKey,
   parsedToken
 ) {
+  const tokenString =
+    String(parsedToken);
+
+  const startsWithUi =
+    tokenString.startsWith("ui=");
+
+  const startsWithJwt =
+    tokenString.startsWith("eyJ");
+
   const cookieHeader =
-    String(parsedToken).startsWith("ui=")
-      ? String(parsedToken)
-      : `ui=${parsedToken}`;
+    startsWithUi
+      ? tokenString
+      : `ui=${tokenString}`;
+
+  console.log("[ShowBox] Token diagnostics:", {
+    length: tokenString.length,
+    startsWithUi,
+    startsWithJwt,
+    cookieLength: cookieHeader.length
+  });
 
   const url =
     `https://www.febbox.com/console/video_quality_list` +
@@ -594,9 +522,7 @@ async function febboxQualityList(
     `&share_key=${encodeURIComponent(shareKey)}`;
 
   console.log("[ShowBox] FebBox quality request:", {
-    fid: file.fid,
-    fileName: file.file_name,
-    hasCookie: !!cookieHeader
+    fid: file.fid
   });
 
   const response = await fetch(url, {
@@ -611,9 +537,29 @@ async function febboxQualityList(
 
   console.log("[ShowBox] FebBox quality response:", {
     status: response.status,
-    ok: response.ok,
-    bodyLength: text.length
+    contentType:
+      response.headers.get("content-type"),
+    bodyLength: text.length,
+    finalUrl: response.url
   });
+
+  if (
+    text.trimStart().startsWith("<!DOCTYPE") ||
+    text.trimStart().startsWith("<html") ||
+    text.includes("<title>Login - FEB</title>")
+  ) {
+    console.log(
+      "[ShowBox] FebBox returned LOGIN HTML"
+    );
+
+    console.log(
+      "[ShowBox] Authentication appears to be rejected at quality endpoint."
+    );
+
+    throw new Error(
+      "FebBox quality endpoint returned login page"
+    );
+  }
 
   let data;
 
@@ -621,12 +567,8 @@ async function febboxQualityList(
     data = JSON.parse(text);
   } catch {
     console.log(
-      "[ShowBox] FebBox quality response was not JSON."
-    );
-
-    console.log(
       "[ShowBox] Quality response preview:",
-      text.slice(0, 500)
+      text.slice(0, 300)
     );
 
     throw new Error(
@@ -712,26 +654,40 @@ function parseQualityHtml(html) {
 // --------------------------------------------------
 
 export default async (req, context) => {
-  try {
-    console.log("");
-    console.log("========================================");
-    console.log("[ShowBox] STREAM TEST v6.1");
-    console.log("========================================");
+  const requestId =
+    Math.random()
+      .toString(36)
+      .slice(2, 8);
 
+  try {
     const url = new URL(req.url);
 
     const parts =
-      url.pathname.split("/").filter(Boolean);
+      url.pathname
+        .split("/")
+        .filter(Boolean);
 
-    const configEncoded = parts[0] || "";
-    const type = parts[2] || "";
+    const configEncoded =
+      parts[0] || "";
+
+    const type =
+      parts[2] || "";
+
     const rawId =
       parts.slice(3).join("/") || "";
 
-    console.log("[ShowBox] Request path:", {
-      type,
-      rawId
-    });
+    console.log("");
+    console.log(
+      `[ShowBox][${requestId}] ===== START =====`
+    );
+
+    console.log(
+      `[ShowBox][${requestId}] Request:`,
+      {
+        type,
+        rawId
+      }
+    );
 
     const config =
       decodeBase64Url(configEncoded);
@@ -745,9 +701,12 @@ export default async (req, context) => {
     const parsedToken =
       getUiToken(config);
 
-    console.log("[ShowBox] Config decoded:", {
-      hasUiToken: !!parsedToken
-    });
+    console.log(
+      `[ShowBox][${requestId}] Token loaded:`,
+      {
+        present: !!parsedToken
+      }
+    );
 
     if (!parsedToken) {
       throw new Error(
@@ -756,40 +715,59 @@ export default async (req, context) => {
     }
 
     // ----------------------------------------------
-    // Parse Stremio ID
+    // Parse ID
     // ----------------------------------------------
 
-    let imdbId = rawId;
-    let season = null;
-    let episode = null;
+    let imdbId =
+      rawId;
+
+    let season =
+      null;
+
+    let episode =
+      null;
 
     if (type === "series") {
       const decodedId =
-        decodeURIComponent(rawId).replace(/\.json$/, "");
+        decodeURIComponent(rawId)
+          .replace(/\.json$/, "");
 
       const pieces =
         decodedId.split(":");
 
-      imdbId = pieces[0];
-      season = Number(pieces[1]);
-      episode = Number(pieces[2]);
+      imdbId =
+        pieces[0];
 
-      console.log("[ShowBox] Series parsed:", {
-        imdbId,
-        season,
-        episode
-      });
+      season =
+        Number(pieces[1]);
+
+      episode =
+        Number(pieces[2]);
+
+      console.log(
+        `[ShowBox][${requestId}] Parsed:`,
+        {
+          imdbId,
+          season,
+          episode
+        }
+      );
+
     } else {
       imdbId =
-        decodeURIComponent(rawId).replace(/\.json$/, "");
+        decodeURIComponent(rawId)
+          .replace(/\.json$/, "");
 
-      console.log("[ShowBox] Movie parsed:", {
+      console.log(
+        `[ShowBox][${requestId}] Movie:`,
         imdbId
-      });
+      );
     }
 
     if (!imdbId) {
-      throw new Error("Missing IMDb ID");
+      throw new Error(
+        "Missing IMDb ID"
+      );
     }
 
     // ----------------------------------------------
@@ -802,13 +780,10 @@ export default async (req, context) => {
         type
       );
 
-    console.log("[ShowBox] IMDb → TMDB conversion:", {
-      imdbId,
-      tmdbId,
-      type,
-      season,
-      episode
-    });
+    console.log(
+      `[ShowBox][${requestId}] TMDB:`,
+      tmdbId
+    );
 
     // ----------------------------------------------
     // ShowBox
@@ -833,9 +808,10 @@ export default async (req, context) => {
       );
     }
 
-    console.log("[ShowBox] ShowBox media ID:", {
+    console.log(
+      `[ShowBox][${requestId}] ShowBox ID:`,
       showboxId
-    });
+    );
 
     // ----------------------------------------------
     // FebBox share
@@ -847,10 +823,12 @@ export default async (req, context) => {
         type
       );
 
-    console.log("[ShowBox] FebBox share key ready.");
+    console.log(
+      `[ShowBox][${requestId}] FebBox share: OK`
+    );
 
     // ----------------------------------------------
-    // Find actual file
+    // Find file
     // ----------------------------------------------
 
     let file;
@@ -868,11 +846,8 @@ export default async (req, context) => {
           shareKey
         );
 
-      console.log("[ShowBox] Movie file count:", {
-        count: files.length
-      });
-
-      file = files[0];
+      file =
+        files[0];
 
       if (!file) {
         throw new Error(
@@ -880,14 +855,17 @@ export default async (req, context) => {
         );
       }
 
-      console.log("[ShowBox] Movie file selected:", {
-        name: file.file_name,
-        fid: file.fid
-      });
+      console.log(
+        `[ShowBox][${requestId}] Movie file:`,
+        {
+          name: file.file_name,
+          fid: file.fid
+        }
+      );
     }
 
     // ----------------------------------------------
-    // Quality list
+    // Quality
     // ----------------------------------------------
 
     const qualityHtml =
@@ -897,38 +875,31 @@ export default async (req, context) => {
         parsedToken
       );
 
-    console.log("[ShowBox] Quality HTML received:", {
-      length: qualityHtml.length
-    });
+    console.log(
+      `[ShowBox][${requestId}] Quality HTML:`,
+      qualityHtml.length
+    );
 
     const streams =
       parseQualityHtml(
         qualityHtml
       );
 
-    console.log("[ShowBox] Quality streams found:", {
-      count: streams.length
-    });
-
-    for (const stream of streams) {
-      console.log("[ShowBox] Quality:", {
-        quality: stream.quality,
-        hasUrl: !!stream.url
-      });
-    }
-
-    // ----------------------------------------------
-    // Stremio response
-    // ----------------------------------------------
+    console.log(
+      `[ShowBox][${requestId}] Streams found:`,
+      streams.length
+    );
 
     const stremioStreams =
       streams.map(stream => ({
         name: "ShowBox",
         title: stream.quality,
         url: stream.url,
+
         behaviorHints: {
           notWebReady: true
         },
+
         headers: {
           Accept: "*/*",
           "Accept-Language": "en-US,en;q=0.8",
@@ -940,13 +911,17 @@ export default async (req, context) => {
         }
       }));
 
-    console.log("[ShowBox] Final Stremio streams:", {
-      count: stremioStreams.length
-    });
+    console.log(
+      `[ShowBox][${requestId}] FINAL:`,
+      {
+        streams: stremioStreams.length
+      }
+    );
 
-    console.log("========================================");
-    console.log("[ShowBox] STREAM TEST v6.1 COMPLETE");
-    console.log("========================================");
+    console.log(
+      `[ShowBox][${requestId}] ===== END OK =====`
+    );
+
     console.log("");
 
     return new Response(
@@ -955,6 +930,7 @@ export default async (req, context) => {
       }),
       {
         status: 200,
+
         headers: {
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*",
@@ -964,14 +940,20 @@ export default async (req, context) => {
     );
 
   } catch (error) {
-    console.log("");
-    console.log("========================================");
-    console.log("[ShowBox] ERROR");
-    console.log("========================================");
 
-    console.log("[ShowBox] ERROR:", error.message);
+    console.log(
+      `[ShowBox][${requestId}] ===== ERROR =====`
+    );
 
-    console.log("========================================");
+    console.log(
+      `[ShowBox][${requestId}]`,
+      error.message
+    );
+
+    console.log(
+      `[ShowBox][${requestId}] ===== END ERROR =====`
+    );
+
     console.log("");
 
     return new Response(
@@ -981,6 +963,7 @@ export default async (req, context) => {
       }),
       {
         status: 200,
+
         headers: {
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*",
