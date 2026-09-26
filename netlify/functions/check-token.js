@@ -1,23 +1,17 @@
-const CryptoJS = require("crypto-js");
+import CryptoJS from "crypto-js";
 
 const SHOWBOX_API =
   "https://id-mapping-api-showbox-proxy.hf.space/api/media";
 
+// Old, stable movie used only for cookie validation.
+const TEST_TMDB_ID = "603"; // The Matrix (1999)
+
 const WORKING_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "Accept": "application/json",
+  Accept: "application/json",
   "Accept-Language": "en-US,en;q=0.9",
-  "Content-Type": "application/json"
-};
-
-const FEBBOX_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "Accept": "*/*",
-  "Accept-Language": "en-US,en;q=0.8",
-  "Connection": "keep-alive",
-  "Range": "bytes=0-"
+  "Content-Type": "application/json",
 };
 
 function jsonResponse(body, status = 200) {
@@ -28,290 +22,185 @@ function jsonResponse(body, status = 200) {
       "Cache-Control": "no-store",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    }
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
   });
 }
 
 /*
- * Same token handling used by stream.js.
+ * Same token parsing used by stream.js.
  */
 function parseSingleToken(token) {
-  if (!token) return "";
+  if (!token) return null;
 
-  if (token.startsWith("eyJ")) {
-    try {
-      const parsed = CryptoJS.enc.Base64.parse(token);
-      const decoded = parsed.toString(CryptoJS.enc.Utf8);
-      const outer = JSON.parse(decoded);
-
-      if (outer && outer.encrypt_data) {
-        const keyString = "123d6cedf626dy54233aa1w6";
-        const ivString = "wEiphTn!";
-
-        const key = CryptoJS.enc.Utf8.parse(keyString);
-        const iv = CryptoJS.enc.Utf8.parse(ivString);
-
-        const decrypted = CryptoJS.TripleDES.decrypt(
-          outer.encrypt_data,
-          key,
-          {
-            iv,
-            mode: CryptoJS.mode.CBC,
-            padding: CryptoJS.pad.Pkcs7
-          }
-        );
-
-        const result = decrypted.toString(CryptoJS.enc.Utf8);
-        const data = JSON.parse(result);
-
-        if (data && data.uid) {
-          return String(data.uid);
-        }
-      }
-    } catch {
-      // Same fallback behavior as stream.js.
-    }
+  if (!token.startsWith("eyJ")) {
+    return token;
   }
 
-  return token;
-}
-
-/*
- * Ask ShowBox for a known movie.
- *
- * Spider-Man: Brand New Day
- * TMDB ID: 969681
- *
- * This is one of the IDs already confirmed to produce
- * working ShowBox/FEBBox streams in the addon.
- */
-async function getShowBoxId(token) {
-  const parsedToken = parseSingleToken(token);
-
-  const url =
-    `${SHOWBOX_API}/movie/969681?cookie=${encodeURIComponent(parsedToken)}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: WORKING_HEADERS
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const data = await response.json();
-
-  if (data?.id || data?.mid) {
-    return data.id || data.mid;
-  }
-
-  if (data?.data?.id || data?.data?.mid) {
-    return data.data.id || data.data.mid;
-  }
-
-  return null;
-}
-
-/*
- * Same FebBox share-page step used by stream.js.
- */
-async function getShareKey(showBoxId) {
-  const url =
-    `https://www.febbox.com/mbp/to_share_page?box_type=1&mid=${showBoxId}&json=1`;
-
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const data = await response.json();
-
-  if (data?.code !== 1 || !data?.data) {
-    return null;
-  }
-
-  const shareLink = data.data.share_link;
-
-  if (!shareLink) {
-    return null;
-  }
-
-  /*
-   * Example:
-   * https://www.febbox.com/share/zcegI2J7
-   *
-   * The final path component is the share key.
-   */
-  return shareLink.split("/").pop() || null;
-}
-
-/*
- * Get the files associated with the share.
- */
-async function getFiles(shareKey) {
-  const url =
-    `https://www.febbox.com/file/file_share_list?share_key=${encodeURIComponent(shareKey)}`;
-
-  const response = await fetch(url, {
-    headers: {
-      "Accept-Language": "en"
-    }
-  });
-
-  if (!response.ok) {
-    return [];
-  }
-
-  const data = await response.json();
-
-  if (
-    data?.code !== 1 ||
-    !data?.data ||
-    !Array.isArray(data.data.file_list)
-  ) {
-    return [];
-  }
-
-  return data.data.file_list;
-}
-
-/*
- * Same quality lookup used by stream.js.
- *
- * The important part is the Cookie header.
- *
- * We don't merely check whether ShowBox returned success.
- * We require an actual playable data-url from FebBox.
- */
-async function hasWorkingStream(file, shareKey, token) {
-  if (!file?.fid) {
-    return false;
-  }
-
-  const parsedToken = parseSingleToken(token);
-
-  const url =
-    `https://www.febbox.com/console/video_quality_list?fid=${file.fid}&share_key=${encodeURIComponent(shareKey)}`;
-
-  const response = await fetch(url, {
-    headers: {
-      Cookie: parsedToken
-    }
-  });
-
-  if (!response.ok) {
-    return false;
-  }
-
-  const data = await response.json().catch(() => null);
-
-  if (!data?.html) {
-    return false;
-  }
-
-  /*
-   * stream.js parses:
-   *
-   * div.file_quality
-   *
-   * and reads:
-   *
-   * data-url
-   *
-   * We only need to know whether at least one
-   * actual stream URL exists.
-   */
-  const qualityBlocks =
-    data.html.match(/<div[^>]*class=["'][^"']*file_quality[^"']*["'][^>]*>/gi) || [];
-
-  for (const block of qualityBlocks) {
-    const match = block.match(
-      /data-url=["']([^"']+)["']/i
+  try {
+    const decoded = JSON.parse(
+      Buffer.from(token.split(".")[1] || "", "base64").toString("utf8")
     );
 
-    if (match && match[1]) {
-      return true;
+    if (!decoded || !decoded.encrypt_data) {
+      return token;
     }
-  }
 
-  return false;
+    const key = CryptoJS.enc.Utf8.parse("123d6cedf626dy54233aa1w6");
+    const iv = CryptoJS.enc.Utf8.parse("wEiphTn!");
+
+    const decrypted = CryptoJS.TripleDES.decrypt(
+      decoded.encrypt_data,
+      key,
+      {
+        iv,
+        mode: CryptoJS.mode.CBC,
+        padding: CryptoJS.pad.Pkcs7,
+      }
+    ).toString(CryptoJS.enc.Utf8);
+
+    const result = JSON.parse(decrypted);
+
+    if (result && result.uid) {
+      return String(result.uid);
+    }
+
+    return token;
+  } catch {
+    return token;
+  }
 }
 
-async function validateToken(token) {
-  /*
-   * Step 1:
-   * ShowBox lookup.
-   */
-  const showBoxId = await getShowBoxId(token);
+/*
+ * Same ShowBox request used by stream.js.
+ */
+async function getShowBoxData(tmdbId, token) {
+  const requestUrl =
+    `${SHOWBOX_API}/movie/${tmdbId}?cookie=${encodeURIComponent(token)}`;
 
-  if (!showBoxId) {
-    return {
-      status: "invalid",
-      message: "The token could not retrieve a ShowBox media entry."
-    };
+  const response = await fetch(requestUrl, {
+    method: "GET",
+    headers: WORKING_HEADERS,
+  });
+
+  const text = await response.text();
+
+  let data = null;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = null;
   }
 
-  /*
-   * Step 2:
-   * Get FebBox share key.
-   */
-  const shareKey = await getShareKey(showBoxId);
+  return {
+    response,
+    data,
+  };
+}
+
+/*
+ * Same FebBox share lookup used by stream.js.
+ */
+async function febboxShare(showboxId) {
+  const url =
+    `https://www.febbox.com/mbp/to_share_page?box_type=1&mid=${showboxId}&json=1`;
+
+  const response = await fetch(url);
+  const text = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("Invalid FebBox share response");
+  }
+
+  if (data.code !== 1 || !data.data) {
+    throw new Error("FebBox share lookup failed");
+  }
+
+  const shareLink =
+    data.data.shareLink ||
+    data.data.share_link;
+
+  if (!shareLink) {
+    throw new Error("FebBox share link missing");
+  }
+
+  const shareKey = shareLink.split("/").pop();
 
   if (!shareKey) {
-    return {
-      status: "invalid",
-      message: "The token did not produce a usable FebBox share."
-    };
+    throw new Error("FebBox share key missing");
   }
 
-  /*
-   * Step 3:
-   * Get files.
-   */
-  const files = await getFiles(shareKey);
+  return shareKey;
+}
 
-  if (!files.length) {
-    return {
-      status: "invalid",
-      message: "No playable files were found."
-    };
+/*
+ * Same root file-list request used by stream.js.
+ */
+async function febboxFileList(shareKey) {
+  const url =
+    `https://www.febbox.com/file/file_share_list?share_key=${shareKey}`;
+
+  const response = await fetch(url, {
+    headers: {
+      "Accept-Language": "en",
+    },
+  });
+
+  const text = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("Invalid FebBox file-list response");
   }
 
-  /*
-   * Step 4:
-   * Try the actual quality/stream endpoint using
-   * the user's token as the FebBox Cookie.
-   */
-  for (const file of files) {
-    try {
-      const working = await hasWorkingStream(
-        file,
-        shareKey,
-        token
-      );
+  return data;
+}
 
-      if (working) {
-        return {
-          status: "usable",
-          message: "Cookie is working."
-        };
-      }
-    } catch {
-      // Try the next file.
+/*
+ * We only need to know whether FebBox has video files.
+ *
+ * This deliberately does NOT call video_quality_list.
+ */
+function findVideoFiles(data) {
+  const files = Array.isArray(data?.file_list)
+    ? data.file_list
+    : [];
+
+  const videoExtensions = [
+    ".mp4",
+    ".mkv",
+    ".avi",
+    ".webm",
+    ".mov",
+    ".m4v",
+    ".ts",
+    ".m2ts",
+    ".wmv",
+    ".flv",
+  ];
+
+  return files.filter((file) => {
+    if (!file) return false;
+
+    // stream.js requires a file ID and filename.
+    if (!file.fid || !file.file_name) {
+      return false;
     }
-  }
 
-  /*
-   * We reached the actual stream lookup but couldn't
-   * obtain a playable URL.
-   */
-  return {
-    status: "invalid",
-    message: "The token could not retrieve a playable stream."
-  };
+    const name = String(file.file_name).toLowerCase();
+
+    return videoExtensions.some((ext) =>
+      name.endsWith(ext)
+    );
+  });
 }
 
 export default async (request) => {
@@ -323,7 +212,7 @@ export default async (request) => {
     return jsonResponse(
       {
         status: "error",
-        message: "Method not allowed."
+        message: "Method not allowed.",
       },
       405
     );
@@ -336,8 +225,8 @@ export default async (request) => {
   } catch {
     return jsonResponse(
       {
-        status: "error",
-        message: "Invalid request."
+        status: "invalid",
+        message: "Invalid request.",
       },
       400
     );
@@ -352,30 +241,140 @@ export default async (request) => {
     return jsonResponse(
       {
         status: "invalid",
-        message: "No token was provided."
+        message: "No token was provided.",
       },
       400
     );
   }
 
   try {
-    const result = await validateToken(token);
+    /*
+     * Exactly the same token transformation as stream.js.
+     */
+    const parsedToken = parseSingleToken(token);
 
-    return jsonResponse(result);
+    if (!parsedToken) {
+      return jsonResponse({
+        status: "invalid",
+        message: "The cookie could not be parsed.",
+      });
+    }
 
-  } catch (error) {
-    console.error(
-      "[Token Check] Error:",
-      error?.message || error
+    /*
+     * 1. Ask ShowBox for The Matrix (TMDB 603).
+     */
+    const showboxResult = await getShowBoxData(
+      TEST_TMDB_ID,
+      parsedToken
     );
 
+    const { response, data } = showboxResult;
+
+    /*
+     * Explicit rejection from ShowBox.
+     */
+    if (
+      response.status === 401 ||
+      response.status === 403
+    ) {
+      return jsonResponse({
+        status: "invalid",
+        message: "The cookie was rejected by ShowBox.",
+      });
+    }
+
+    /*
+     * Detect rate limiting.
+     */
+    const responseText = JSON.stringify(data || "").toLowerCase();
+
+    if (
+      response.status === 429 ||
+      responseText.includes("rate limit") ||
+      responseText.includes("rate-limit") ||
+      responseText.includes("too many requests")
+    ) {
+      return jsonResponse({
+        status: "rate_limited",
+        message: "This cookie is currently rate limited.",
+      });
+    }
+
+    if (!response.ok || !data) {
+      return jsonResponse({
+        status: "unknown",
+        message: "ShowBox returned an unexpected response.",
+      });
+    }
+
+    /*
+     * Same ShowBox ID extraction as stream.js.
+     */
+    if (data.success === false) {
+      return jsonResponse({
+        status: "invalid",
+        message: "ShowBox rejected the cookie.",
+      });
+    }
+
+    const showboxId =
+      data.id ||
+      data.mid ||
+      (
+        data.data &&
+        (
+          data.data.id ||
+          data.data.mid
+        )
+      );
+
+    if (!showboxId) {
+      return jsonResponse({
+        status: "invalid",
+        message: "The cookie did not resolve to a ShowBox movie.",
+      });
+    }
+
+    /*
+     * 2. Resolve the ShowBox movie to FebBox.
+     */
+    const shareKey = await febboxShare(showboxId);
+
+    /*
+     * 3. Get the actual FebBox file list.
+     */
+    const fileData = await febboxFileList(shareKey);
+
+    /*
+     * 4. Success means FebBox actually has video files.
+     *
+     * We intentionally stop here.
+     * No quality endpoint is required for validation.
+     */
+    const videoFiles = findVideoFiles(fileData);
+
+    if (videoFiles.length > 0) {
+      return jsonResponse({
+        status: "usable",
+        message: "Cookie is working.",
+      });
+    }
+
+    /*
+     * FebBox resolved, but there were no usable video files.
+     */
+    return jsonResponse({
+      status: "invalid",
+      message: "No video files were found for the test movie.",
+    });
+  } catch (error) {
     return jsonResponse({
       status: "unknown",
-      message: "Could not complete the stream test."
+      message: "Could not verify the cookie.",
     });
   }
 };
 
 export const config = {
-  path: "/check-token"
+  path: "/check-token",
 };
