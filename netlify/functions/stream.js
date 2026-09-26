@@ -44,7 +44,6 @@ function getConfig(req) {
 
   const parts = url.pathname.split("/").filter(Boolean);
 
-  // /:config/stream/:type/:id.json
   const config = parts[0] || "";
 
   return decodeBase64Url(config);
@@ -290,9 +289,6 @@ function decodeHtmlEntities(str) {
 
 // --------------------------------------------------
 // FebBox Stage 1
-//
-// EXACT original endpoint:
-// /mbp/to_share_page?box_type=...&mid=...&json=1
 // --------------------------------------------------
 
 async function febboxGetShareKey(showboxId, type) {
@@ -398,8 +394,6 @@ async function febboxGetShareKey(showboxId, type) {
 
 // --------------------------------------------------
 // FebBox Stage 2
-//
-// file_share_list
 // --------------------------------------------------
 
 async function febboxFileList(shareKey, parentId = null) {
@@ -582,12 +576,6 @@ async function findEpisodeFile(
 
 // --------------------------------------------------
 // FebBox Stage 3
-//
-// EXACT original quality endpoint:
-// /console/video_quality_list?fid=...&share_key=...
-//
-// IMPORTANT:
-// original source sends Cookie: ui=<parsedToken>
 // --------------------------------------------------
 
 async function febboxQualityList(
@@ -669,9 +657,7 @@ async function febboxQualityList(
 
 
 // --------------------------------------------------
-// Parse original div.file_quality elements
-//
-// We avoid adding another npm dependency for this test.
+// Parse quality HTML
 // --------------------------------------------------
 
 function parseQualityHtml(html) {
@@ -680,18 +666,6 @@ function parseQualityHtml(html) {
   if (!html) {
     return streams;
   }
-
-  /*
-    Original source looks for:
-
-      div.file_quality
-
-    and reads:
-
-      data-url
-      data-quality
-      .size
-  */
 
   const divRegex =
     /<div\b[^>]*class\s*=\s*["'][^"']*\bfile_quality\b[^"']*["'][^>]*>/gi;
@@ -741,7 +715,7 @@ export default async (req, context) => {
   try {
     console.log("");
     console.log("========================================");
-    console.log("[ShowBox] STREAM TEST v6");
+    console.log("[ShowBox] STREAM TEST v6.1");
     console.log("========================================");
 
     const url = new URL(req.url);
@@ -791,7 +765,7 @@ export default async (req, context) => {
 
     if (type === "series") {
       const decodedId =
-        decodeURIComponent(rawId);
+        decodeURIComponent(rawId).replace(/\.json$/, "");
 
       const pieces =
         decodedId.split(":");
@@ -807,7 +781,7 @@ export default async (req, context) => {
       });
     } else {
       imdbId =
-        decodeURIComponent(rawId);
+        decodeURIComponent(rawId).replace(/\.json$/, "");
 
       console.log("[ShowBox] Movie parsed:", {
         imdbId
@@ -971,7 +945,7 @@ export default async (req, context) => {
     });
 
     console.log("========================================");
-    console.log("[ShowBox] STREAM TEST v6 COMPLETE");
+    console.log("[ShowBox] STREAM TEST v6.1 COMPLETE");
     console.log("========================================");
     console.log("");
 
