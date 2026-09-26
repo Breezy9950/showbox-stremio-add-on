@@ -282,6 +282,16 @@ function homepageScript() {
         tokenInput.value.trim();
 
 
+      /* ------------------------------------------------ */
+      /* TEMPORARY DIAGNOSTIC                            */
+      /* ------------------------------------------------ */
+
+      alert(
+        "TOKEN LENGTH: " +
+        token.length
+      );
+
+
       if (!token) {
 
         checkStatus.textContent =
