@@ -5,7 +5,8 @@ const WORKING_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 
-  "Accept": "application/json",
+  "Accept":
+    "application/json",
 
   "Accept-Language":
     "en-US,en;q=0.9",
@@ -158,6 +159,12 @@ export default async (request) => {
     }
 
 
+    /*
+     * TEMPORARY DIAGNOSTIC RESPONSE
+     *
+     * We deliberately do not return the token.
+     */
+
     return jsonResponse({
 
       status:
@@ -179,13 +186,19 @@ export default async (request) => {
         data?.id ?? null,
 
       showboxMid:
-        data?.mid ?? null
+        data?.mid ?? null,
+
+      showboxStatus:
+        data?.status ?? null,
+
+      showboxVersions:
+        data?.versions ?? null
 
     });
 
   }
 
-  catch {
+  catch (error) {
 
     return jsonResponse({
 
