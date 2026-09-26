@@ -85,11 +85,6 @@ async function imdbToTmdb(imdbId, type) {
     `?api_key=${encodeURIComponent(TMDB_API_KEY)}` +
     `&external_source=imdb_id`;
 
-  console.log("[ShowBox] TMDB lookup:", {
-    endpoint: `/find/${imdbId}`,
-    externalSource: "imdb_id"
-  });
-
   const response = await fetch(url);
 
   console.log("[ShowBox] TMDB response:", {
@@ -126,8 +121,381 @@ async function imdbToTmdb(imdbId, type) {
 }
 
 
+/*
+ * Step 1:
+ * Ask the FebBox share API for the share information
+ * associated with the ShowBox media ID.
+ */
+async function getFebBoxShareKey(
+  showboxId,
+  type
+) {
+  console.log(
+    "[ShowBox] FebBox share lookup starting:",
+    {
+      showboxId,
+      type
+    }
+  );
+
+  const mediaType =
+    type === "series" ? 2 : 1;
+
+  const url =
+    `https://www.febbox.com/share/1${mediaType}/${showboxId}&json=1`;
+
+  console.log("[ShowBox] FebBox share request:", {
+    mediaType,
+    showboxId
+  });
+
+  const response = await fetch(url);
+
+  console.log(
+    "[ShowBox] FebBox share response:",
+    {
+      status: response.status,
+      ok: response.ok
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `FebBox share lookup failed: HTTP ${response.status}`
+    );
+  }
+
+  const data = await response.json();
+
+  console.log(
+    "[ShowBox] FebBox share data:",
+    {
+      code: data?.code,
+      hasData: Boolean(data?.data),
+      hasShare: Boolean(data?.data?.share)
+    }
+  );
+
+  if (
+    !data ||
+    data.code !== 1 ||
+    !data.data
+  ) {
+    return null;
+  }
+
+  const share =
+    data.data.share ||
+    data.data.url;
+
+  if (!share) {
+    return null;
+  }
+
+  const parts = String(share)
+    .split("/")
+    .filter(Boolean);
+
+  const shareKey =
+    parts.length > 0
+      ? parts[parts.length - 1]
+      : null;
+
+  console.log(
+    "[ShowBox] FebBox share key:",
+    {
+      found: Boolean(shareKey)
+    }
+  );
+
+  return shareKey;
+}
+
+
+/*
+ * Step 2:
+ * Retrieve the files belonging to the share.
+ */
+async function getFebBoxFiles(
+  shareKey,
+  type,
+  season,
+  episode
+) {
+  console.log(
+    "[ShowBox] FebBox file lookup starting:",
+    {
+      shareKeyPresent: Boolean(shareKey),
+      type,
+      season,
+      episode
+    }
+  );
+
+  if (!shareKey) {
+    return [];
+  }
+
+  const baseUrl =
+    `https://www.febbox.com/file/file_share_list?share_key=${encodeURIComponent(
+      shareKey
+    )}`;
+
+  const response = await fetch(baseUrl, {
+    headers: {
+      "Accept-Language": "en"
+    }
+  });
+
+  console.log(
+    "[ShowBox] FebBox file response:",
+    {
+      status: response.status,
+      ok: response.ok
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `FebBox file lookup failed: HTTP ${response.status}`
+    );
+  }
+
+  const data = await response.json();
+
+  if (
+    !data ||
+    data.code !== 1 ||
+    !data.data
+  ) {
+    console.log(
+      "[ShowBox] FebBox returned no file data"
+    );
+
+    return [];
+  }
+
+  let files = [];
+
+  if (type === "movie") {
+    files =
+      data.data.file_list ||
+      data.data.list ||
+      [];
+  } else {
+    /*
+     * For TV, the original addon first finds
+     * the season directory and then queries
+     * that directory's files.
+     */
+
+    const folders =
+      data.data.file_list ||
+      data.data.list ||
+      [];
+
+    const seasonText =
+      `season ${season}`;
+
+    const seasonFolder =
+      folders.find(file => {
+        const name =
+          String(
+            file?.file_name ||
+            file?.name ||
+            ""
+          ).toLowerCase();
+
+        return (
+          name.includes(
+            `season ${season}`
+          ) ||
+          name.includes(
+            `s${String(season).padStart(2, "0")}`
+          )
+        );
+      });
+
+    if (!seasonFolder) {
+      console.log(
+        "[ShowBox] FebBox season folder not found"
+      );
+
+      return [];
+    }
+
+    const fid =
+      seasonFolder.fid ||
+      seasonFolder.id;
+
+    if (!fid) {
+      return [];
+    }
+
+    const seasonUrl =
+      `${baseUrl}&fid=${encodeURIComponent(fid)}&page=1`;
+
+    const seasonResponse =
+      await fetch(seasonUrl, {
+        headers: {
+          "Accept-Language": "en"
+        }
+      });
+
+    console.log(
+      "[ShowBox] FebBox season response:",
+      {
+        status: seasonResponse.status,
+        ok: seasonResponse.ok
+      }
+    );
+
+    if (!seasonResponse.ok) {
+      return [];
+    }
+
+    const seasonData =
+      await seasonResponse.json();
+
+    files =
+      seasonData?.data?.file_list ||
+      [];
+  }
+
+  console.log(
+    "[ShowBox] FebBox files found:",
+    files.length
+  );
+
+  /*
+   * For TV, only keep the requested episode.
+   */
+  if (
+    type === "series" &&
+    season != null &&
+    episode != null
+  ) {
+    const s =
+      String(season).padStart(2, "0");
+
+    const e =
+      String(episode).padStart(2, "0");
+
+    files = files.filter(file => {
+      const name =
+        String(
+          file?.file_name ||
+          file?.name ||
+          ""
+        ).toLowerCase();
+
+      return (
+        name.includes(`s${s}e${e}`) ||
+        name.includes(
+          `s${season}e${episode}`
+        )
+      );
+    });
+
+    console.log(
+      "[ShowBox] Episode files found:",
+      files.length
+    );
+  }
+
+  return files;
+}
+
+
+/*
+ * Step 3:
+ * Ask FebBox for the available video qualities.
+ *
+ * This is intentionally only diagnostic for now.
+ */
+async function getFebBoxQualities(
+  files,
+  shareKey
+) {
+  console.log(
+    "[ShowBox] FebBox quality lookup starting:",
+    {
+      files: files.length,
+      shareKeyPresent: Boolean(shareKey)
+    }
+  );
+
+  const results = [];
+
+  for (const file of files) {
+    const fid =
+      file?.fid ||
+      file?.id;
+
+    if (!fid) {
+      continue;
+    }
+
+    const url =
+      `https://www.febbox.com/console/video_quality_list` +
+      `?fid=${encodeURIComponent(fid)}` +
+      `&share_key=${encodeURIComponent(shareKey)}`;
+
+    try {
+      const response =
+        await fetch(url);
+
+      console.log(
+        "[ShowBox] FebBox quality response:",
+        {
+          fid,
+          status: response.status
+        }
+      );
+
+      const html =
+        await response.text();
+
+      results.push({
+        fid,
+        fileName:
+          file?.file_name ||
+          file?.name ||
+          null,
+        status: response.status,
+        htmlLength: html.length,
+        hasDataUrl:
+          html.includes("data-url")
+      });
+
+    } catch (error) {
+      console.log(
+        "[ShowBox] FebBox quality request failed:",
+        {
+          fid,
+          error: error.message
+        }
+      );
+    }
+  }
+
+  console.log(
+    "[ShowBox] FebBox quality results:",
+    results.map(item => ({
+      fid: item.fid,
+      fileName: item.fileName,
+      status: item.status,
+      htmlLength: item.htmlLength,
+      hasDataUrl: item.hasDataUrl
+    }))
+  );
+
+  return results;
+}
+
+
 export default async (req, context) => {
-  console.log("[ShowBox] STREAM TEST v4");
+  console.log("[ShowBox] STREAM TEST v5");
 
   try {
     const {
@@ -136,8 +504,9 @@ export default async (req, context) => {
       config
     } = context.params;
 
-
-    // Decode addon configuration
+    /*
+     * Decode addon configuration.
+     */
     let configData = {};
 
     if (config) {
@@ -146,9 +515,13 @@ export default async (req, context) => {
           decodeBase64Url(config)
         );
 
-        console.log("[ShowBox] Config decoded:", {
-          hasUiToken: Boolean(configData.uiToken)
-        });
+        console.log(
+          "[ShowBox] Config decoded:",
+          {
+            hasUiToken:
+              Boolean(configData.uiToken)
+          }
+        );
 
       } catch {
         throw new Error(
@@ -157,8 +530,8 @@ export default async (req, context) => {
       }
     }
 
-
-    const token = configData.uiToken;
+    const token =
+      configData.uiToken;
 
     if (!token) {
       throw new Error(
@@ -166,102 +539,103 @@ export default async (req, context) => {
       );
     }
 
+    /*
+     * Decode incoming Stremio ID.
+     */
+    const decodedId =
+      decodeURIComponent(id);
 
-    // Decode incoming ID
-    const decodedId = decodeURIComponent(id);
+    console.log(
+      "[ShowBox] Incoming request:",
+      {
+        type,
+        id: decodedId
+      }
+    );
 
-    console.log("[ShowBox] Incoming request:", {
-      type,
-      id: decodedId
-    });
-
-
-    let showboxId = decodedId;
     let season = null;
     let episode = null;
     let imdbId = decodedId;
 
-
-    // Parse series ID
-    //
-    // Example:
-    // tt0434665:1:1
-
     if (type === "series") {
-      const parts = decodedId.split(":");
+      const parts =
+        decodedId.split(":");
 
       imdbId = parts[0];
       season = Number(parts[1]);
       episode = Number(parts[2]);
 
-      console.log("[ShowBox] Series parsed:", {
-        imdbId,
-        season,
-        episode
-      });
+      console.log(
+        "[ShowBox] Series parsed:",
+        {
+          imdbId,
+          season,
+          episode
+        }
+      );
     }
 
-
-    // Convert IMDb → TMDB
-
-    showboxId = await imdbToTmdb(
-      imdbId,
-      type
-    );
-
+    /*
+     * IMDb → TMDB.
+     */
+    const tmdbId =
+      await imdbToTmdb(
+        imdbId,
+        type
+      );
 
     console.log(
       "[ShowBox] IMDb → TMDB conversion:",
       {
         imdbId,
-        tmdbId: showboxId,
+        tmdbId,
         type,
         season,
         episode
       }
     );
 
-
-    // Parse ShowBox token
-
+    /*
+     * Parse ShowBox token.
+     */
     const parsedToken =
       parseSingleToken(token);
 
+    console.log(
+      "[ShowBox] Token ready:",
+      {
+        tokenParsed:
+          parsedToken !== token
+      }
+    );
 
-    console.log("[ShowBox] Token ready:", {
-      tokenParsed: parsedToken !== token
-    });
-
-
-    // Build ShowBox API URL
-
+    /*
+     * Build ShowBox request.
+     */
     let apiUrl;
 
     if (type === "series") {
       apiUrl =
-        `${SHOWBOX_API_BASE}/tv/${showboxId}/${season}/${episode}` +
+        `${SHOWBOX_API_BASE}/tv/${tmdbId}/${season}/${episode}` +
         `?cookie=${encodeURIComponent(parsedToken)}`;
     } else {
       apiUrl =
-        `${SHOWBOX_API_BASE}/movie/${showboxId}` +
+        `${SHOWBOX_API_BASE}/movie/${tmdbId}` +
         `?cookie=${encodeURIComponent(parsedToken)}`;
     }
 
-
-    console.log("[ShowBox] Request:", {
-      type,
-      imdbId,
-      tmdbId: showboxId,
-      season,
-      episode
-    });
-
-
-    // Request ShowBox API
-
-    const response = await fetch(
-      apiUrl,
+    console.log(
+      "[ShowBox] ShowBox request:",
       {
+        type,
+        tmdbId,
+        season,
+        episode
+      }
+    );
+
+    const response =
+      await fetch(apiUrl, {
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -275,51 +649,123 @@ export default async (req, context) => {
           "Content-Type":
             "application/json"
         }
-      }
-    );
+      });
 
+    const data =
+      await response.json();
 
-    const data = await response.json();
-
-
-    console.log("[ShowBox] API response:", {
-      status: response.status,
-      success: data?.success,
-      id: data?.id ?? null,
-      mid: data?.mid ?? null,
-      versions: Array.isArray(data?.versions)
-        ? data.versions.length
-        : 0
-    });
-
-
-    // Diagnostic response
-
-    return new Response(
-      JSON.stringify({
-        test: true,
-        type,
-        receivedId: decodedId,
-        imdbId,
-        tmdbId: showboxId,
-        season,
-        episode,
-        apiStatus: response.status,
-        success: data?.success ?? false,
-        showboxIdReturned:
-          data?.id ??
-          data?.mid ??
-          null,
+    console.log(
+      "[ShowBox] API response:",
+      {
+        status: response.status,
+        success: data?.success,
+        id: data?.id ?? null,
+        mid: data?.mid ?? null,
         versions:
           Array.isArray(data?.versions)
             ? data.versions.length
             : 0
+      }
+    );
+
+    /*
+     * ShowBox gives us the media ID.
+     */
+    const showboxId =
+      data?.id ??
+      data?.mid ??
+      null;
+
+    if (!showboxId) {
+      throw new Error(
+        "ShowBox returned no media ID"
+      );
+    }
+
+    /*
+     * FebBox share lookup.
+     */
+    const shareKey =
+      await getFebBoxShareKey(
+        showboxId,
+        type
+      );
+
+    if (!shareKey) {
+      console.log(
+        "[ShowBox] No FebBox share key found"
+      );
+
+      return new Response(
+        JSON.stringify({
+          test: true,
+          stage: "febbox-share",
+          type,
+          imdbId,
+          tmdbId,
+          showboxId,
+          shareKeyFound: false
+        }),
+        {
+          headers: {
+            "Content-Type":
+              "application/json",
+            "Access-Control-Allow-Origin":
+              "*"
+          }
+        }
+      );
+    }
+
+    /*
+     * FebBox file lookup.
+     */
+    const files =
+      await getFebBoxFiles(
+        shareKey,
+        type,
+        season,
+        episode
+      );
+
+    /*
+     * FebBox quality lookup.
+     */
+    const qualities =
+      await getFebBoxQualities(
+        files,
+        shareKey
+      );
+
+    /*
+     * Diagnostic response only.
+     */
+    return new Response(
+      JSON.stringify({
+        test: true,
+        stage: "febbox-quality",
+        type,
+        receivedId: decodedId,
+        imdbId,
+        tmdbId,
+        season,
+        episode,
+        showboxId,
+        apiStatus: response.status,
+        success:
+          data?.success ?? false,
+        versions:
+          Array.isArray(data?.versions)
+            ? data.versions.length
+            : 0,
+        shareKeyFound: true,
+        filesFound: files.length,
+        qualities
       }),
       {
         headers: {
           "Content-Type":
             "application/json",
-
           "Access-Control-Allow-Origin":
             "*"
         }
@@ -343,7 +789,6 @@ export default async (req, context) => {
         headers: {
           "Content-Type":
             "application/json",
-
           "Access-Control-Allow-Origin":
             "*"
         }
