@@ -1140,3 +1140,11 @@ ${homepageScript}
     body: "Not found",
   };
 }
+export const config = {
+  path: [
+    "/",
+    "/homepage.js",
+    "/manifest.json",
+    "/:config/manifest.json",
+  ],
+};
