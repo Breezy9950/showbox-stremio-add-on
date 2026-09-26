@@ -3,7 +3,6 @@ import CryptoJS from "crypto-js";
 const SHOWBOX_API =
   "https://id-mapping-api-showbox-proxy.hf.space/api/media";
 
-// Old, stable movie used only for cookie validation.
 const TEST_TMDB_ID = "603"; // The Matrix (1999)
 
 const WORKING_HEADERS = {
@@ -28,7 +27,7 @@ function jsonResponse(body, status = 200) {
 }
 
 /*
- * Same token parsing used by stream.js.
+ * EXACT token parsing from stream.js
  */
 function parseSingleToken(token) {
   if (!token) return null;
@@ -39,15 +38,23 @@ function parseSingleToken(token) {
 
   try {
     const decoded = JSON.parse(
-      Buffer.from(token.split(".")[1] || "", "base64").toString("utf8")
+      Buffer.from(
+        token.split(".")[1] || "",
+        "base64"
+      ).toString("utf8")
     );
 
     if (!decoded || !decoded.encrypt_data) {
       return token;
     }
 
-    const key = CryptoJS.enc.Utf8.parse("123d6cedf626dy54233aa1w6");
-    const iv = CryptoJS.enc.Utf8.parse("wEiphTn!");
+    const key = CryptoJS.enc.Utf8.parse(
+      "123d6cedf626dy54233aa1w6"
+    );
+
+    const iv = CryptoJS.enc.Utf8.parse(
+      "wEiphTn!"
+    );
 
     const decrypted = CryptoJS.TripleDES.decrypt(
       decoded.encrypt_data,
@@ -72,14 +79,13 @@ function parseSingleToken(token) {
 }
 
 /*
- * Same ShowBox request used by stream.js.
+ * EXACT ShowBox movie request from stream.js
  */
 async function getShowBoxData(tmdbId, token) {
   const requestUrl =
     `${SHOWBOX_API}/movie/${tmdbId}?cookie=${encodeURIComponent(token)}`;
 
   const response = await fetch(requestUrl, {
-    method: "GET",
     headers: WORKING_HEADERS,
   });
 
@@ -100,11 +106,13 @@ async function getShowBoxData(tmdbId, token) {
 }
 
 /*
- * Same FebBox share lookup used by stream.js.
+ * EXACT FebBox share lookup from stream.js
  */
 async function febboxShare(showboxId) {
+  const boxType = 1;
+
   const url =
-    `https://www.febbox.com/mbp/to_share_page?box_type=1&mid=${showboxId}&json=1`;
+    `https://www.febbox.com/mbp/to_share_page?box_type=${boxType}&mid=${showboxId}&json=1`;
 
   const response = await fetch(url);
   const text = await response.text();
@@ -139,7 +147,7 @@ async function febboxShare(showboxId) {
 }
 
 /*
- * Same root file-list request used by stream.js.
+ * EXACT root file-list request from stream.js
  */
 async function febboxFileList(shareKey) {
   const url =
@@ -165,42 +173,22 @@ async function febboxFileList(shareKey) {
 }
 
 /*
- * We only need to know whether FebBox has video files.
+ * EXACT movie file discovery behavior from stream.js.
  *
- * This deliberately does NOT call video_quality_list.
+ * Do NOT require .mp4/.mkv/etc.
+ * stream.js considers entries with fid + file_name.
  */
-function findVideoFiles(data) {
+function findMovieFiles(data) {
   const files = Array.isArray(data?.file_list)
     ? data.file_list
     : [];
 
-  const videoExtensions = [
-    ".mp4",
-    ".mkv",
-    ".avi",
-    ".webm",
-    ".mov",
-    ".m4v",
-    ".ts",
-    ".m2ts",
-    ".wmv",
-    ".flv",
-  ];
-
-  return files.filter((file) => {
-    if (!file) return false;
-
-    // stream.js requires a file ID and filename.
-    if (!file.fid || !file.file_name) {
-      return false;
-    }
-
-    const name = String(file.file_name).toLowerCase();
-
-    return videoExtensions.some((ext) =>
-      name.endsWith(ext)
-    );
-  });
+  return files.filter(
+    (file) =>
+      file &&
+      file.fid &&
+      file.file_name
+  );
 }
 
 export default async (request) => {
@@ -249,7 +237,7 @@ export default async (request) => {
 
   try {
     /*
-     * Exactly the same token transformation as stream.js.
+     * Same token transformation as stream.js.
      */
     const parsedToken = parseSingleToken(token);
 
@@ -261,18 +249,16 @@ export default async (request) => {
     }
 
     /*
-     * 1. Ask ShowBox for The Matrix (TMDB 603).
+     * 1. ShowBox
      */
-    const showboxResult = await getShowBoxData(
+    const {
+      response,
+      data,
+    } = await getShowBoxData(
       TEST_TMDB_ID,
       parsedToken
     );
 
-    const { response, data } = showboxResult;
-
-    /*
-     * Explicit rejection from ShowBox.
-     */
     if (
       response.status === 401 ||
       response.status === 403
@@ -283,17 +269,7 @@ export default async (request) => {
       });
     }
 
-    /*
-     * Detect rate limiting.
-     */
-    const responseText = JSON.stringify(data || "").toLowerCase();
-
-    if (
-      response.status === 429 ||
-      responseText.includes("rate limit") ||
-      responseText.includes("rate-limit") ||
-      responseText.includes("too many requests")
-    ) {
+    if (response.status === 429) {
       return jsonResponse({
         status: "rate_limited",
         message: "This cookie is currently rate limited.",
@@ -307,9 +283,6 @@ export default async (request) => {
       });
     }
 
-    /*
-     * Same ShowBox ID extraction as stream.js.
-     */
     if (data.success === false) {
       return jsonResponse({
         status: "invalid",
@@ -317,6 +290,9 @@ export default async (request) => {
       });
     }
 
+    /*
+     * EXACT ShowBox ID extraction from stream.js.
+     */
     const showboxId =
       data.id ||
       data.mid ||
@@ -336,33 +312,33 @@ export default async (request) => {
     }
 
     /*
-     * 2. Resolve the ShowBox movie to FebBox.
+     * 2. FebBox share
      */
     const shareKey = await febboxShare(showboxId);
 
     /*
-     * 3. Get the actual FebBox file list.
+     * 3. FebBox root file list
      */
     const fileData = await febboxFileList(shareKey);
 
     /*
-     * 4. Success means FebBox actually has video files.
-     *
-     * We intentionally stop here.
-     * No quality endpoint is required for validation.
+     * 4. EXACT same movie-file discovery behavior
+     *    as stream.js.
      */
-    const videoFiles = findVideoFiles(fileData);
+    const files = findMovieFiles(fileData);
 
-    if (videoFiles.length > 0) {
+    /*
+     * If FebBox has files, validation succeeds.
+     *
+     * We deliberately do not call the quality endpoint.
+     */
+    if (files.length > 0) {
       return jsonResponse({
         status: "usable",
         message: "Cookie is working.",
       });
     }
 
-    /*
-     * FebBox resolved, but there were no usable video files.
-     */
     return jsonResponse({
       status: "invalid",
       message: "No video files were found for the test movie.",
