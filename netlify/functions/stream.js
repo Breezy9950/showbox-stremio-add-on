@@ -45,6 +45,11 @@ function parseSingleToken(token) {
 export default async (req, context) => {
   const { type, id, config } = context.params;
 
+  console.log("[ShowBox] received request:", {
+   type,
+    id
+   });
+
   let uiToken;
 
   try {
