@@ -1,569 +1,915 @@
 export default async () => {
-  const html = [
-    "<!DOCTYPE html>",
-    "<html>",
-    "<head>",
-    "<meta charset='UTF-8'>",
-    "<meta name='viewport' content='width=device-width, initial-scale=1.0'>",
-    "<meta name='theme-color' content='#111111'>",
-    "<title>ShowBox Configuration</title>",
-    "<style>",
-
-    "* {",
-    "  box-sizing: border-box;",
-    "}",
-
-    "body {",
-    "  margin: 0;",
-    "  min-height: 100vh;",
-    "  padding: 24px;",
-    "  display: flex;",
-    "  align-items: center;",
-    "  justify-content: center;",
-    "  background: #111;",
-    "  color: #fff;",
-    "  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;",
-    "}",
-
-    "main {",
-    "  width: 100%;",
-    "  max-width: 560px;",
-    "}",
-
-    "h1 {",
-    "  margin: 0 0 8px;",
-    "  font-size: 32px;",
-    "  line-height: 1.2;",
-    "}",
-
-    ".subtitle {",
-    "  margin: 0 0 30px;",
-    "  color: #999;",
-    "  line-height: 1.5;",
-    "}",
-
-    "label {",
-    "  display: block;",
-    "  margin-bottom: 8px;",
-    "  color: #ccc;",
-    "  font-size: 14px;",
-    "  font-weight: 500;",
-    "}",
-
-    "input {",
-    "  width: 100%;",
-    "  min-height: 48px;",
-    "  padding: 13px 14px;",
-    "  border: 1px solid #333;",
-    "  border-radius: 10px;",
-    "  background: #1a1a1a;",
-    "  color: #fff;",
-    "  font-size: 15px;",
-    "  outline: none;",
-    "}",
-
-    "input:focus {",
-    "  border-color: #666;",
-    "}",
-
-    ".section {",
-    "  margin-top: 28px;",
-    "}",
-
-    ".section-title {",
-    "  margin-bottom: 6px;",
-    "  color: #fff;",
-    "  font-size: 17px;",
-    "  font-weight: 600;",
-    "}",
-
-    ".section-description {",
-    "  margin: 0 0 14px;",
-    "  color: #888;",
-    "  font-size: 13px;",
-    "  line-height: 1.5;",
-    "}",
-
-    ".quality-list {",
-    "  display: flex;",
-    "  flex-direction: column;",
-    "  gap: 8px;",
-    "}",
-
-    ".quality-row {",
-    "  min-height: 54px;",
-    "  display: flex;",
-    "  align-items: center;",
-    "  gap: 10px;",
-    "  padding: 8px 10px;",
-    "  border: 1px solid #2d2d2d;",
-    "  border-radius: 10px;",
-    "  background: #1a1a1a;",
-    "}",
-
-    ".quality-name {",
-    "  flex: 1;",
-    "  font-size: 15px;",
-    "  font-weight: 500;",
-    "}",
-
-    ".quality-checkbox {",
-    "  width: 20px;",
-    "  height: 20px;",
-    "  margin: 0;",
-    "  accent-color: white;",
-    "}",
-
-    ".move-button {",
-    "  width: 38px;",
-    "  height: 38px;",
-    "  min-width: 38px;",
-    "  padding: 0;",
-    "  border: 1px solid #333;",
-    "  border-radius: 8px;",
-    "  background: #222;",
-    "  color: white;",
-    "  font-size: 18px;",
-    "  cursor: pointer;",
-    "}",
-
-    ".move-button:disabled {",
-    "  opacity: 0.25;",
-    "  cursor: default;",
-    "}",
-
-    ".move-button:active {",
-    "  opacity: 0.7;",
-    "}",
-
-    ".primary {",
-    "  width: 100%;",
-    "  min-height: 48px;",
-    "  margin-top: 24px;",
-    "  padding: 13px 18px;",
-    "  border: 0;",
-    "  border-radius: 10px;",
-    "  background: #fff;",
-    "  color: #111;",
-    "  font-size: 16px;",
-    "  font-weight: 600;",
-    "  cursor: pointer;",
-    "}",
-
-    ".primary:active,",
-    ".secondary:active {",
-    "  opacity: 0.75;",
-    "}",
-
-    "#result {",
-    "  display: none;",
-    "  margin-top: 30px;",
-    "}",
-
-    ".result-title {",
-    "  margin-bottom: 8px;",
-    "  color: #ccc;",
-    "  font-size: 14px;",
-    "  font-weight: 500;",
-    "}",
-
-    ".url-row {",
-    "  display: flex;",
-    "  gap: 8px;",
-    "}",
-
-    ".url-row input {",
-    "  min-width: 0;",
-    "  flex: 1;",
-    "}",
-
-    ".secondary {",
-    "  width: auto;",
-    "  flex-shrink: 0;",
-    "  min-height: 48px;",
-    "  padding: 0 18px;",
-    "  border: 1px solid #333;",
-    "  border-radius: 10px;",
-    "  background: #1a1a1a;",
-    "  color: #fff;",
-    "  font-size: 15px;",
-    "  font-weight: 500;",
-    "  cursor: pointer;",
-    "}",
-
-    ".install {",
-    "  width: 100%;",
-    "  min-height: 48px;",
-    "  margin-top: 10px;",
-    "  padding: 13px 18px;",
-    "  display: block;",
-    "  border-radius: 10px;",
-    "  background: #fff;",
-    "  color: #111;",
-    "  text-align: center;",
-    "  text-decoration: none;",
-    "  font-size: 16px;",
-    "  font-weight: 600;",
-    "}",
-
-    ".instruction {",
-    "  margin-top: 14px;",
-    "  color: #888;",
-    "  font-size: 13px;",
-    "  line-height: 1.5;",
-    "}",
-
-    "#status {",
-    "  min-height: 20px;",
-    "  margin-top: 10px;",
-    "  color: #aaa;",
-    "  font-size: 14px;",
-    "}",
-
-    "</style>",
-    "</head>",
-
-    "<body>",
-
-    "<main>",
-
-    "<h1>ShowBox Stremio Addon</h1>",
-
-    "<p class='subtitle'>",
-    "Enter your ShowBox UI token and customize which video qualities the addon should show.",
-    "</p>",
-
-    "<label for='token'>",
-    "ShowBox UI Token",
-    "</label>",
-
-    "<input",
-    "  id='token'",
-    "  type='password'",
-    "  placeholder='Enter your ShowBox UI token'",
-    "  autocomplete='off'",
-    "  autocapitalize='none'",
-    "  spellcheck='false'",
-    "/>",
-
-
-    "<div class='section'>",
-
-    "<div class='section-title'>",
-    "Quality settings",
-    "</div>",
-
-    "<p class='section-description'>",
-    "Enable the qualities you want. Move them up or down to set their priority.",
-    "</p>",
-
-    "<div id='qualityList' class='quality-list'>",
-
-    "</div>",
-
-    "</div>",
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#111111">
+
+<title>ShowBox Configuration</title>
+
+<style>
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #111;
+  color: #fff;
+
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+main {
+  width: 100%;
+  max-width: 560px;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 32px;
+  line-height: 1.2;
+}
+
+.subtitle {
+  margin: 0 0 30px;
+  color: #999;
+  line-height: 1.5;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  color: #ccc;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+input {
+  width: 100%;
+  min-height: 48px;
+
+  padding: 13px 14px;
+
+  border: 1px solid #333;
+  border-radius: 10px;
+
+  background: #1a1a1a;
+  color: #fff;
+
+  font-size: 15px;
+  outline: none;
+}
+
+input:focus {
+  border-color: #777;
+}
+
+/* -------------------------------------------------- */
+/* CONNECTION */
+/* -------------------------------------------------- */
+
+#testButton {
+  width: 100%;
+  min-height: 48px;
+
+  margin-top: 16px;
+  padding: 13px 18px;
+
+  border: 1px solid #444;
+  border-radius: 10px;
+
+  background: #fff;
+  color: #111;
+
+  font-size: 16px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
 
+#testButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 
-    "<button id='generate' class='primary'>",
-    "Generate Install Link",
-    "</button>",
+#status {
+  min-height: 22px;
+  margin-top: 12px;
 
+  color: #aaa;
+  font-size: 14px;
+}
 
-    "<div id='result'>",
+.success {
+  color: #fff !important;
+}
 
-    "<div class='result-title'>",
-    "Configured Manifest URL",
-    "</div>",
+.error {
+  color: #aaa !important;
+}
 
-    "<div class='url-row'>",
+/* -------------------------------------------------- */
+/* QUALITY SETTINGS */
+/* -------------------------------------------------- */
 
-    "<input",
-    "  id='manifestUrl'",
-    "  type='text'",
-    "  readonly",
-    "/>",
+#configuration {
+  display: none;
+  margin-top: 30px;
+}
 
-    "<button id='copy' class='secondary'>",
-    "Copy",
-    "</button>",
+#configuration.visible {
+  display: block;
+}
 
-    "</div>",
+.section-title {
+  margin-bottom: 6px;
 
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+}
 
-    "<a",
-    "  id='install'",
-    "  class='install'",
-    "  href='#'",
-    ">",
-    "Install in Stremio",
-    "</a>",
+.section-description {
+  margin: 0 0 14px;
 
+  color: #888;
+  font-size: 13px;
+  line-height: 1.5;
+}
 
-    "<div class='instruction'>",
-    "On iOS, if the Install button does not open Stremio, use Copy and paste the manifest URL into Stremio's Add Addon field.",
-    "</div>",
+.quality-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
-    "<div id='status'></div>",
+.quality-row {
+  min-height: 54px;
 
-    "</div>",
+  display: flex;
+  align-items: center;
+  gap: 10px;
 
-    "</main>",
+  padding: 8px 10px;
 
+  border: 1px solid #2d2d2d;
+  border-radius: 10px;
 
-    "<script>",
+  background: #1a1a1a;
+}
 
-    "const qualityDefaults = [",
-    "  { name: 'ORG', enabled: true },",
-    "  { name: '4K', enabled: true },",
-    "  { name: '1440p', enabled: true },",
-    "  { name: '1080p', enabled: true },",
-    "  { name: '720p', enabled: true },",
-    "  { name: '480p', enabled: true },",
-    "  { name: '360p', enabled: true }",
-    "];",
+.quality-checkbox {
+  width: 20px;
+  height: 20px;
+  margin: 0;
 
+  accent-color: #fff;
+}
 
-    "let qualities = qualityDefaults.map(item => ({ ...item }));",
+.quality-name {
+  flex: 1;
 
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+}
 
-    "const tokenInput =",
-    "  document.getElementById('token');",
+.move-button {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
 
-    "const generateButton =",
-    "  document.getElementById('generate');",
+  padding: 0;
 
-    "const qualityList =",
-    "  document.getElementById('qualityList');",
+  border: 1px solid #333;
+  border-radius: 8px;
 
-    "const result =",
-    "  document.getElementById('result');",
+  background: #222;
+  color: #fff;
 
-    "const manifestUrl =",
-    "  document.getElementById('manifestUrl');",
+  font-size: 18px;
 
-    "const copyButton =",
-    "  document.getElementById('copy');",
+  cursor: pointer;
+}
 
-    "const installButton =",
-    "  document.getElementById('install');",
+.move-button:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
 
-    "const status =",
-    "  document.getElementById('status');",
+/* -------------------------------------------------- */
+/* RESULT */
+/* -------------------------------------------------- */
 
+#result {
+  margin-top: 30px;
+}
 
-    "function renderQualities() {",
+.result-title {
+  margin-bottom: 8px;
 
-    "  qualityList.innerHTML = '';",
+  color: #ccc;
+  font-size: 14px;
+  font-weight: 500;
+}
 
-    "  qualities.forEach((quality, index) => {",
+.url-row {
+  display: flex;
+  gap: 8px;
+}
 
-    "    const row = document.createElement('div');",
+.url-row input {
+  min-width: 0;
+  flex: 1;
+}
 
-    "    row.className = 'quality-row';",
+#copy {
+  min-height: 48px;
 
+  padding: 0 18px;
 
-    "    const checkbox = document.createElement('input');",
+  border: 1px solid #333;
+  border-radius: 10px;
 
-    "    checkbox.type = 'checkbox';",
-    "    checkbox.className = 'quality-checkbox';",
-    "    checkbox.checked = quality.enabled;",
-    "    checkbox.addEventListener('change', () => {",
-    "      quality.enabled = checkbox.checked;",
-    "    });",
+  background: #1a1a1a;
+  color: #fff;
 
+  font-size: 15px;
+  font-weight: 500;
 
-    "    const name = document.createElement('div');",
+  cursor: pointer;
+}
 
-    "    name.className = 'quality-name';",
-    "    name.textContent = quality.name;",
+#install {
+  width: 100%;
+  min-height: 48px;
 
+  margin-top: 10px;
+  padding: 13px 18px;
 
-    "    const up = document.createElement('button');",
+  display: block;
 
-    "    up.type = 'button';",
-    "    up.className = 'move-button';",
-    "    up.textContent = '↑';",
-    "    up.disabled = index === 0;",
+  border-radius: 10px;
 
+  background: #fff;
+  color: #111;
 
-    "    up.addEventListener('click', () => {",
+  text-align: center;
+  text-decoration: none;
 
-    "      if (index === 0) return;",
+  font-size: 16px;
+  font-weight: 600;
 
-    "      const current = qualities[index];",
-    "      qualities[index] = qualities[index - 1];",
-    "      qualities[index - 1] = current;",
+  transition: opacity 0.15s;
+}
 
-    "      renderQualities();",
+#install.disabled {
+  background: #333;
+  color: #777;
 
-    "    });",
+  pointer-events: none;
+  cursor: default;
+}
 
+.instruction {
+  margin-top: 14px;
 
-    "    const down = document.createElement('button');",
+  color: #777;
 
-    "    down.type = 'button';",
-    "    down.className = 'move-button';",
-    "    down.textContent = '↓';",
-    "    down.disabled = index === qualities.length - 1;",
+  font-size: 13px;
+  line-height: 1.5;
+}
 
+</style>
+</head>
 
-    "    down.addEventListener('click', () => {",
+<body>
 
-    "      if (index === qualities.length - 1) return;",
+<main>
 
-    "      const current = qualities[index];",
-    "      qualities[index] = qualities[index + 1];",
-    "      qualities[index + 1] = current;",
+<h1>ShowBox Stremio Addon</h1>
 
-    "      renderQualities();",
+<p class="subtitle">
+Enter your ShowBox UI token to test the connection and configure the addon.
+</p>
 
-    "    });",
+<label for="token">
+ShowBox UI Token
+</label>
 
+<input
+  id="token"
+  type="password"
+  placeholder="Enter your ShowBox UI token"
+  autocomplete="off"
+  autocapitalize="none"
+  spellcheck="false"
+/>
 
-    "    row.appendChild(checkbox);",
-    "    row.appendChild(name);",
-    "    row.appendChild(up);",
-    "    row.appendChild(down);",
+<button id="testButton" type="button">
+Test Connection
+</button>
 
-    "    qualityList.appendChild(row);",
+<div id="status"></div>
 
-    "  });",
+<div id="configuration">
 
-    "}",
+  <div class="section-title">
+    Quality settings
+  </div>
 
+  <p class="section-description">
+    Enable the qualities you want. Move them up or down to set their priority.
+  </p>
 
-    "function base64UrlEncode(value) {",
+  <div id="qualityList" class="quality-list"></div>
 
-    "  const bytes =",
-    "    new TextEncoder().encode(value);",
+  <div id="result">
 
-    "  let binary = '';",
+    <div class="result-title">
+      Manifest URL
+    </div>
 
-    "  for (const byte of bytes) {",
-    "    binary += String.fromCharCode(byte);",
-    "  }",
+    <div class="url-row">
 
-    "  return btoa(binary)",
-    "    .replace(/\\+/g, '-')",
-    "    .replace(/\\//g, '_')",
-    "    .replace(/=+$/, '');",
+      <input
+        id="manifestUrl"
+        type="text"
+        readonly
+      />
 
-    "}",
+      <button id="copy" type="button">
+        Copy
+      </button>
 
+    </div>
 
-    "generateButton.addEventListener('click', () => {",
+    <a
+      id="install"
+      class="disabled"
+      href="#"
+    >
+      Install in Stremio
+    </a>
 
-    "  const token = tokenInput.value.trim();",
+    <div class="instruction">
+      On iOS, if the Install button does not open Stremio,
+      use Copy and paste the manifest URL into Stremio's Add Addon field.
+    </div>
 
-    "  if (!token) {",
-    "    result.style.display = 'block';",
-    "    status.textContent = 'Please enter your ShowBox UI token.';",
-    "    return;",
-    "  }",
+  </div>
 
+</div>
 
-    "  const enabledQualities = qualities",
-    "    .filter(item => item.enabled)",
-    "    .map(item => item.name);",
+</main>
 
+<script>
 
-    "  if (!enabledQualities.length) {",
-    "    result.style.display = 'block';",
-    "    status.textContent = 'Please enable at least one quality.';",
-    "    return;",
-    "  }",
+const DEFAULT_QUALITIES = [
+  { name: "ORG", enabled: true },
+  { name: "4K", enabled: true },
+  { name: "1440p", enabled: true },
+  { name: "1080p", enabled: true },
+  { name: "720p", enabled: true },
+  { name: "480p", enabled: true },
+  { name: "360p", enabled: true }
+];
 
+let qualities = DEFAULT_QUALITIES.map(item => ({
+  ...item
+}));
 
-    "  const config = {",
-    "    uiToken: token,",
-    "    qualities: qualities.map(item => ({",
-    "      name: item.name,",
-    "      enabled: item.enabled",
-    "    }))",
-    "  };",
+let currentToken = "";
+let connectionValid = false;
 
+const tokenInput =
+  document.getElementById("token");
 
-    "  const encodedConfig =",
-    "    base64UrlEncode(JSON.stringify(config));",
+const testButton =
+  document.getElementById("testButton");
 
+const status =
+  document.getElementById("status");
 
-    "  const httpsManifestUrl =",
-    "    window.location.origin +",
-    "    '/' +",
-    "    encodedConfig +",
-    "    '/manifest.json';",
+const configuration =
+  document.getElementById("configuration");
 
+const qualityList =
+  document.getElementById("qualityList");
 
-    "  const stremioInstallUrl =",
-    "    'stremio://' +",
-    "    window.location.host +",
-    "    '/' +",
-    "    encodedConfig +",
-    "    '/manifest.json';",
+const manifestUrl =
+  document.getElementById("manifestUrl");
 
+const copyButton =
+  document.getElementById("copy");
 
-    "  manifestUrl.value = httpsManifestUrl;",
-    "  installButton.href = stremioInstallUrl;",
+const installButton =
+  document.getElementById("install");
 
-    "  result.style.display = 'block';",
 
-    "  status.textContent =",
-    "    'Quality settings saved in your configured addon link.';",
+/* -------------------------------------------------- */
+/* BASE64URL */
+/* -------------------------------------------------- */
 
-    "});",
+function base64UrlEncode(value) {
 
+  const bytes =
+    new TextEncoder().encode(value);
 
-    "copyButton.addEventListener('click', async () => {",
+  let binary = "";
 
-    "  const value = manifestUrl.value;",
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
 
-    "  if (!value) return;",
+  return btoa(binary)
+    .replace(/\\+/g, "-")
+    .replace(/\\//g, "_")
+    .replace(/=+$/, "");
+}
 
 
-    "  try {",
+/* -------------------------------------------------- */
+/* BUILD MANIFEST */
+/* -------------------------------------------------- */
 
-    "    await navigator.clipboard.writeText(value);",
+function updateManifest() {
 
-    "    copyButton.textContent = 'Copied!';",
-    "    status.textContent = 'Manifest URL copied.';",
+  if (!connectionValid || !currentToken) {
+    return;
+  }
 
-    "  } catch (error) {",
+  const enabled =
+    qualities.filter(item => item.enabled);
 
-    "    manifestUrl.focus();",
-    "    manifestUrl.select();",
+  if (!enabled.length) {
 
-    "    document.execCommand('copy');",
+    manifestUrl.value = "";
 
-    "    copyButton.textContent = 'Copied!';",
-    "    status.textContent = 'Manifest URL copied.';",
+    installButton.classList.add("disabled");
+    installButton.href = "#";
 
-    "  }",
+    return;
+  }
 
+  const config = {
 
-    "  setTimeout(() => {",
-    "    copyButton.textContent = 'Copy';",
-    "  }, 2000);",
+    uiToken: currentToken,
 
-    "});",
+    qualities: qualities.map(item => ({
+      name: item.name,
+      enabled: item.enabled
+    }))
 
+  };
 
-    "renderQualities();",
+  const encoded =
+    base64UrlEncode(
+      JSON.stringify(config)
+    );
 
-    "</script>",
+  const httpsUrl =
+    window.location.origin +
+    "/" +
+    encoded +
+    "/manifest.json";
 
-    "</body>",
-    "</html>"
-  ].join("\n");
+  const stremioUrl =
+    "stremio://" +
+    window.location.host +
+    "/" +
+    encoded +
+    "/manifest.json";
 
+  manifestUrl.value = httpsUrl;
+
+  installButton.href = stremioUrl;
+
+  installButton.classList.remove("disabled");
+}
+
+
+/* -------------------------------------------------- */
+/* QUALITY UI */
+/* -------------------------------------------------- */
+
+function renderQualities() {
+
+  qualityList.innerHTML = "";
+
+  qualities.forEach((quality, index) => {
+
+    const row =
+      document.createElement("div");
+
+    row.className =
+      "quality-row";
+
+
+    const checkbox =
+      document.createElement("input");
+
+    checkbox.type =
+      "checkbox";
+
+    checkbox.className =
+      "quality-checkbox";
+
+    checkbox.checked =
+      quality.enabled;
+
+    checkbox.addEventListener(
+      "change",
+      () => {
+
+        quality.enabled =
+          checkbox.checked;
+
+        updateManifest();
+
+      }
+    );
+
+
+    const name =
+      document.createElement("div");
+
+    name.className =
+      "quality-name";
+
+    name.textContent =
+      quality.name;
+
+
+    const up =
+      document.createElement("button");
+
+    up.type =
+      "button";
+
+    up.className =
+      "move-button";
+
+    up.textContent =
+      "↑";
+
+    up.disabled =
+      index === 0;
+
+
+    up.addEventListener(
+      "click",
+      () => {
+
+        if (index === 0) {
+          return;
+        }
+
+        const temp =
+          qualities[index];
+
+        qualities[index] =
+          qualities[index - 1];
+
+        qualities[index - 1] =
+          temp;
+
+        renderQualities();
+        updateManifest();
+
+      }
+    );
+
+
+    const down =
+      document.createElement("button");
+
+    down.type =
+      "button";
+
+    down.className =
+      "move-button";
+
+    down.textContent =
+      "↓";
+
+    down.disabled =
+      index === qualities.length - 1;
+
+
+    down.addEventListener(
+      "click",
+      () => {
+
+        if (
+          index ===
+          qualities.length - 1
+        ) {
+          return;
+        }
+
+        const temp =
+          qualities[index];
+
+        qualities[index] =
+          qualities[index + 1];
+
+        qualities[index + 1] =
+          temp;
+
+        renderQualities();
+        updateManifest();
+
+      }
+    );
+
+
+    row.appendChild(checkbox);
+    row.appendChild(name);
+    row.appendChild(up);
+    row.appendChild(down);
+
+    qualityList.appendChild(row);
+
+  });
+
+}
+
+
+/* -------------------------------------------------- */
+/* TOKEN INPUT */
+/* -------------------------------------------------- */
+
+tokenInput.addEventListener(
+  "input",
+  () => {
+
+    connectionValid = false;
+    currentToken = "";
+
+    configuration.style.display =
+      "none";
+
+    manifestUrl.value = "";
+
+    installButton.classList.add(
+      "disabled"
+    );
+
+    installButton.href = "#";
+
+    status.textContent = "";
+
+  }
+);
+
+
+/* -------------------------------------------------- */
+/* TEST CONNECTION */
+/* -------------------------------------------------- */
+
+testButton.addEventListener(
+  "click",
+  async () => {
+
+    const token =
+      tokenInput.value.trim();
+
+    if (!token) {
+
+      status.textContent =
+        "Enter your ShowBox UI token first.";
+
+      status.className =
+        "error";
+
+      return;
+    }
+
+    testButton.disabled =
+      true;
+
+    connectionValid =
+      false;
+
+    currentToken =
+      "";
+
+    configuration.style.display =
+      "none";
+
+    installButton.classList.add(
+      "disabled"
+    );
+
+    status.textContent =
+      "Checking connection...";
+
+    status.className = "";
+
+
+    try {
+
+      const response =
+        await fetch(
+          "/check-token",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body: JSON.stringify({
+              token
+            })
+          }
+        );
+
+
+      const data =
+        await response.json();
+
+
+      if (data.status === "usable") {
+
+        connectionValid =
+          true;
+
+        currentToken =
+          token;
+
+        status.textContent =
+          "Cookie is working.";
+
+        status.className =
+          "success";
+
+
+        configuration.style.display =
+          "block";
+
+
+        /*
+         * The successful test automatically
+         * generates the manifest.
+         */
+        updateManifest();
+
+
+        /*
+         * Remove the cookie from the
+         * visible input after success.
+         */
+        tokenInput.value = "";
+
+      }
+
+      else if (
+        data.status ===
+        "rate_limited"
+      ) {
+
+        status.textContent =
+          "Cookie is currently rate limited.";
+
+        status.className =
+          "error";
+
+      }
+
+      else if (
+        data.status ===
+        "invalid"
+      ) {
+
+        status.textContent =
+          "Cookie is not usable.";
+
+        status.className =
+          "error";
+
+      }
+
+      else {
+
+        status.textContent =
+          data.message ||
+          "Could not verify the cookie.";
+
+        status.className =
+          "error";
+
+      }
+
+    }
+
+    catch (error) {
+
+      status.textContent =
+        "Could not contact the token checker.";
+
+      status.className =
+        "error";
+
+    }
+
+    finally {
+
+      testButton.disabled =
+        false;
+
+    }
+
+  }
+);
+
+
+/* -------------------------------------------------- */
+/* COPY */
+/* -------------------------------------------------- */
+
+copyButton.addEventListener(
+  "click",
+  async () => {
+
+    if (!manifestUrl.value) {
+      return;
+    }
+
+    try {
+
+      await navigator.clipboard.writeText(
+        manifestUrl.value
+      );
+
+      copyButton.textContent =
+        "Copied";
+
+    }
+
+    catch {
+
+      manifestUrl.focus();
+      manifestUrl.select();
+
+      document.execCommand(
+        "copy"
+      );
+
+      copyButton.textContent =
+        "Copied";
+
+    }
+
+    setTimeout(
+      () => {
+        copyButton.textContent =
+          "Copy";
+      },
+      1500
+    );
+
+  }
+);
+
+
+/* -------------------------------------------------- */
+/* INITIAL */
+/* -------------------------------------------------- */
+
+renderQualities();
+
+</script>
+
+</body>
+</html>`;
 
   return new Response(html, {
     headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Access-Control-Allow-Origin": "*"
+      "Content-Type":
+        "text/html; charset=utf-8",
+
+      "Access-Control-Allow-Origin":
+        "*"
     }
   });
 };
-
 
 export const config = {
   path: "/configure"
