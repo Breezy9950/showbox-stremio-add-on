@@ -14,225 +14,200 @@ const WORKING_HEADERS = {
     "application/json"
 };
 
+
 function jsonResponse(body, status = 200) {
+
   return new Response(
     JSON.stringify(body),
     {
       status,
+
       headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
+        "Content-Type":
+          "application/json",
+
+        "Cache-Control":
+          "no-store",
+
+        "Access-Control-Allow-Origin":
+          "*",
+
+        "Access-Control-Allow-Methods":
+          "POST, OPTIONS",
+
+        "Access-Control-Allow-Headers":
+          "Content-Type"
       }
     }
   );
+
 }
+
 
 export default async (request) => {
 
-  // ------------------------------------------------------------
-  // CORS PREFLIGHT
-  // ------------------------------------------------------------
-
   if (request.method === "OPTIONS") {
-    return jsonResponse({ ok: true });
+
+    return jsonResponse({
+      ok: true
+    });
+
   }
 
-  // ------------------------------------------------------------
-  // ONLY POST
-  // ------------------------------------------------------------
 
   if (request.method !== "POST") {
+
     return jsonResponse(
       {
-        status: "error",
-        message: "Method not allowed."
+        status:
+          "error",
+
+        message:
+          "Method not allowed."
       },
       405
     );
+
   }
 
-  // ------------------------------------------------------------
-  // READ TOKEN
-  // ------------------------------------------------------------
 
   let body;
 
   try {
-    body = await request.json();
-  } catch {
+
+    body =
+      await request.json();
+
+  }
+
+  catch {
+
     return jsonResponse(
       {
-        status: "error",
-        message: "Invalid request."
+        status:
+          "error",
+
+        message:
+          "Invalid request."
       },
       400
     );
+
   }
+
 
   const token =
     typeof body?.token === "string"
       ? body.token.trim()
       : "";
 
+
   if (!token) {
+
     return jsonResponse(
       {
-        status: "invalid",
-        message: "No token was provided."
+        status:
+          "invalid",
+
+        message:
+          "No token was provided."
       },
       400
     );
+
   }
 
-  // ------------------------------------------------------------
-  // TEST THE SAME SHOWBOX AUTHENTICATION USED BY THE ADDON
-  //
-  // The Matrix TMDB ID = 603.
-  //
-  // We intentionally make only ONE request so that checking
-  // the token does not itself create unnecessary API traffic.
-  // ------------------------------------------------------------
 
   const testUrl =
     `${SHOWBOX_API}/movie/603?cookie=${encodeURIComponent(token)}`;
 
+
   try {
 
-    const response = await fetch(
-      testUrl,
-      {
-        method: "GET",
-        headers: WORKING_HEADERS
-      }
-    );
+    const response =
+      await fetch(
+        testUrl,
+        {
+          method:
+            "GET",
+
+          headers:
+            WORKING_HEADERS
+        }
+      );
+
 
     const responseText =
       await response.text();
 
-    // ----------------------------------------------------------
-    // RATE LIMIT
-    // ----------------------------------------------------------
-
-    const lowerText =
-      responseText.toLowerCase();
-
-    const looksRateLimited =
-      response.status === 429 ||
-      lowerText.includes("rate limit") ||
-      lowerText.includes("rate-limit") ||
-      lowerText.includes("too many requests");
-
-    if (looksRateLimited) {
-
-      return jsonResponse({
-        status: "rate_limited",
-        message:
-          "This token is currently rate limited."
-      });
-    }
-
-    // ----------------------------------------------------------
-    // AUTHENTICATION REJECTED
-    // ----------------------------------------------------------
-
-    if (
-      response.status === 401 ||
-      response.status === 403
-    ) {
-
-      return jsonResponse({
-        status: "invalid",
-        message:
-          "The token was rejected by ShowBox."
-      });
-    }
-
-    // ----------------------------------------------------------
-    // PARSE SHOWBOX RESPONSE
-    // ----------------------------------------------------------
 
     let data = null;
 
     try {
-      data = JSON.parse(responseText);
-    } catch {
-      data = null;
+
+      data =
+        JSON.parse(responseText);
+
     }
 
-    // ----------------------------------------------------------
-    // SUCCESS
-    //
-    // This is the same success condition the addon relies on:
-    // success === true
-    // ----------------------------------------------------------
+    catch {
 
-    if (
-      response.ok &&
-      data &&
-      data.success === true
-    ) {
+      data =
+        null;
 
-      return jsonResponse({
-        status: "usable",
-        message:
-          "Token is usable."
-      });
     }
 
-    // ----------------------------------------------------------
-    // EXPLICIT SHOWBOX FAILURE
-    // ----------------------------------------------------------
-
-    if (
-      data &&
-      data.success === false
-    ) {
-
-      return jsonResponse({
-        status: "invalid",
-        message:
-          "ShowBox rejected the token or could not validate it."
-      });
-    }
-
-    // ----------------------------------------------------------
-    // OTHER HTTP ERRORS
-    // ----------------------------------------------------------
-
-    if (!response.ok) {
-
-      return jsonResponse({
-        status: "unknown",
-        message:
-          `ShowBox returned HTTP ${response.status}.`
-      });
-    }
-
-    // ----------------------------------------------------------
-    // UNKNOWN RESPONSE
-    // ----------------------------------------------------------
 
     return jsonResponse({
-      status: "unknown",
-      message:
-        "ShowBox returned an unexpected response."
+
+      status:
+        "diagnostic",
+
+      receivedTokenLength:
+        token.length,
+
+      showboxHttpStatus:
+        response.status,
+
+      showboxResponseIsJson:
+        data !== null,
+
+      showboxSuccess:
+        data?.success ?? null,
+
+      showboxId:
+        data?.id ?? null,
+
+      showboxMid:
+        data?.mid ?? null
+
     });
 
-  } catch (error) {
+  }
 
-    // IMPORTANT:
-    // Do not return or log the token.
+  catch {
+
     return jsonResponse({
-      status: "unknown",
+
+      status:
+        "diagnostic",
+
+      receivedTokenLength:
+        token.length,
+
       message:
         "Could not contact the ShowBox API."
+
     });
+
   }
+
 };
 
+
 export const config = {
-  path: "/check-token"
+
+  path:
+    "/check-token"
+
 };
