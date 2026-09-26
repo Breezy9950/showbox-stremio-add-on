@@ -69,6 +69,14 @@ export default async (req, context) => {
 
     const tmdbId = await imdbToTmdb(imdbId, type);
 
+    console.log("[ShowBox] TMDB conversion:", {
+  type,
+  imdbId,
+  season,
+  episode,
+  tmdbId
+});
+
     return new Response(
       JSON.stringify({
         test: true,
