@@ -1,210 +1,106 @@
 const DEFAULT_QUALITIES = [
-  "ORG",
-  "4K",
-  "1440p",
-  "1080p",
-  "720p",
-  "480p",
-  "360p"
+  { label: "2160p", enabled: true },
+  { label: "1440p", enabled: true },
+  { label: "1080p", enabled: true },
+  { label: "720p", enabled: true },
+  { label: "480p", enabled: true },
+  { label: "360p", enabled: false },
 ];
 
 function encodeConfig(config) {
-  const json = JSON.stringify(config);
-  const bytes = new TextEncoder().encode(json);
-
-  let binary = "";
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return Buffer.from(JSON.stringify(config)).toString("base64url");
 }
 
 function qualityRows() {
-  return DEFAULT_QUALITIES
-    .map((quality, index) => `
-      <div class="quality-row">
-
-        <label class="quality-name">
-
-          <input
-            type="checkbox"
-            class="quality-checkbox"
-            data-quality="${quality}"
-            checked
-          >
-
-          <span>${quality}</span>
-
-        </label>
-
-        <div class="move-buttons">
-
-          <button
-            type="button"
-            class="move-button"
-            data-action="up"
-            ${index === 0 ? "disabled" : ""}
-          >↑</button>
-
-          <button
-            type="button"
-            class="move-button"
-            data-action="down"
-            ${index === DEFAULT_QUALITIES.length - 1 ? "disabled" : ""}
-          >↓</button>
-
+  return DEFAULT_QUALITIES.map(
+    (q) => `
+      <label class="quality-row">
+        <div class="quality-info">
+          <span class="quality-name">${q.label}</span>
+          <span class="quality-description">
+            ${q.enabled ? "Included in streams" : "Excluded from streams"}
+          </span>
         </div>
 
-      </div>
-    `)
-    .join("");
+        <span class="switch">
+          <input
+            type="checkbox"
+            data-quality="${q.label}"
+            ${q.enabled ? "checked" : ""}
+          >
+          <span class="slider"></span>
+        </span>
+      </label>
+    `
+  ).join("");
 }
 
-function homepageScript() {
+const homepageScript = `
+<script>
+(() => {
+  const tokenInput = document.getElementById("tokenInput");
+  const generateButton = document.getElementById("generateButton");
+  const checkStatus = document.getElementById("checkStatus");
 
-  return `
-(function () {
+  const configuration = document.getElementById("configuration");
+  const qualityList = document.getElementById("qualityList");
 
-  "use strict";
+  const minSizeInput = document.getElementById("minSizeInput");
+  const maxSizeInput = document.getElementById("maxSizeInput");
 
-  const tokenInput =
-    document.getElementById("tokenInput");
-
-  const generateButton =
-    document.getElementById("generateButton");
-
-  const checkStatus =
-    document.getElementById("checkStatus");
-
-  const configuration =
-    document.getElementById("configuration");
-
-  const qualityList =
-    document.getElementById("qualityList");
-
-  const minSizeInput =
-    document.getElementById("minSize");
-
-  const maxSizeInput =
-    document.getElementById("maxSize");
-
-  const manifestUrl =
-    document.getElementById("manifestUrl");
-
-  const copyButton =
-    document.getElementById("copyButton");
-
-  const installButton =
-    document.getElementById("installButton");
-
+  const manifestUrl = document.getElementById("manifestUrl");
+  const copyButton = document.getElementById("copyButton");
+  const installButton = document.getElementById("installButton");
 
   let currentToken = "";
 
-
-  function getRows() {
-
-    return Array.from(
-      qualityList.querySelectorAll(".quality-row")
-    );
-
-  }
-
-
   function getQualityConfig() {
+    const qualities = {};
 
-    return getRows().map(row => {
-
-      const checkbox =
-        row.querySelector(".quality-checkbox");
-
-      return {
-        name: checkbox.dataset.quality,
-        enabled: checkbox.checked
-      };
-
+    document.querySelectorAll("[data-quality]").forEach((input) => {
+      qualities[input.dataset.quality] = input.checked;
     });
 
+    return qualities;
   }
 
-
   function getFileSizeConfig() {
-
-    const minValue =
-      minSizeInput.value.trim();
-
-    const maxValue =
-      maxSizeInput.value.trim();
-
+    const minValue = minSizeInput.value.trim();
+    const maxValue = maxSizeInput.value.trim();
 
     return {
-
       minGb:
-        minValue === ""
+        minValue === "" || Number.isNaN(Number(minValue))
           ? null
           : Number(minValue),
 
       maxGb:
-        maxValue === ""
+        maxValue === "" || Number.isNaN(Number(maxValue))
           ? null
-          : Number(maxValue)
-
+          : Number(maxValue),
     };
-
   }
 
-
   function updateManifest() {
-
-    if (!currentToken) {
-      return;
-    }
-
-
-    const qualities =
-      getQualityConfig();
-
-
-    if (!qualities.some(item => item.enabled)) {
-
-      manifestUrl.value = "";
-
-      installButton.classList.add("disabled");
-
-      installButton.href = "#";
-
-      return;
-
-    }
-
+    if (!currentToken) return;
 
     const config = {
-
-      uiToken:
-        currentToken,
-
-      fileSize:
-        getFileSizeConfig(),
-
-      qualities
-
+      uiToken: currentToken,
+      fileSize: getFileSizeConfig(),
+      qualities: getQualityConfig(),
     };
 
+    const encoded = btoa(
+      unescape(encodeURIComponent(JSON.stringify(config)))
+    )
+      .replace(/\\+/g, "-")
+      .replace(/\\//g, "_")
+      .replace(/=+$/, "");
 
-    const encoded =
-      ${encodeConfig.toString()}(config);
-
+    const base = window.location.origin;
 
     const httpsUrl =
-      window.location.origin +
-      "/" +
-      encoded +
-      "/manifest.json";
-
+      base + "/" + encoded + "/manifest.json";
 
     const stremioUrl =
       "stremio://" +
@@ -213,935 +109,1034 @@ function homepageScript() {
       encoded +
       "/manifest.json";
 
+    manifestUrl.value = httpsUrl;
+    installButton.href = stremioUrl;
 
-    manifestUrl.value =
-      httpsUrl;
-
-    installButton.href =
-      stremioUrl;
-
-    installButton.classList.remove(
-      "disabled"
-    );
-
+    configuration.classList.add("visible");
   }
 
+  generateButton.addEventListener("click", () => {
+    const token = tokenInput.value.trim();
 
-  qualityList.addEventListener(
-    "change",
-    updateManifest
-  );
-
-
-  qualityList.addEventListener(
-    "click",
-    function (event) {
-
-      const button =
-        event.target.closest(".move-button");
-
-      if (!button) {
-        return;
-      }
-
-
-      const row =
-        button.closest(".quality-row");
-
-      const rows =
-        getRows();
-
-      const index =
-        rows.indexOf(row);
-
-
-      if (
-        button.dataset.action === "up" &&
-        index > 0
-      ) {
-
-        qualityList.insertBefore(
-          row,
-          rows[index - 1]
-        );
-
-      }
-
-
-      if (
-        button.dataset.action === "down" &&
-        index < rows.length - 1
-      ) {
-
-        qualityList.insertBefore(
-          rows[index + 1],
-          row
-        );
-
-      }
-
-
-      updateManifest();
-
-    }
-  );
-
-
-  minSizeInput.addEventListener(
-    "input",
-    updateManifest
-  );
-
-
-  maxSizeInput.addEventListener(
-    "input",
-    updateManifest
-  );
-
-
-  tokenInput.addEventListener(
-    "input",
-    function () {
-
-      currentToken = "";
-
-      configuration.style.display =
-        "none";
-
-      manifestUrl.value = "";
-
-      installButton.classList.add(
-        "disabled"
-      );
-
-      installButton.href = "#";
-
-      checkStatus.textContent = "";
-
-    }
-  );
-
-
-  generateButton.addEventListener(
-    "click",
-    function () {
-
-      const token =
-        tokenInput.value.trim();
-
-
-      if (!token) {
-
-        checkStatus.textContent =
-          "Enter your ShowBox UI token first.";
-
-        checkStatus.className =
-          "error";
-
-        return;
-
-      }
-
-
-      if (token.length <= 100) {
-
-        checkStatus.textContent =
-          "Invalid Cookie";
-
-        checkStatus.className =
-          "error";
-
-        return;
-
-      }
-
-
-      currentToken = token;
-
-
+    if (!token) {
       checkStatus.textContent =
-        "";
-
-      checkStatus.className =
-        "success";
-
-
-      configuration.style.display =
-        "block";
-
-
-      updateManifest();
-
+        "Enter your ShowBox UI token first.";
+      checkStatus.className = "status error";
+      return;
     }
-  );
 
-
-  copyButton.addEventListener(
-    "click",
-    async function () {
-
-      if (!manifestUrl.value) {
-        return;
-      }
-
-
-      try {
-
-        await navigator.clipboard.writeText(
-          manifestUrl.value
-        );
-
-      }
-
-      catch {
-
-        manifestUrl.focus();
-        manifestUrl.select();
-
-        document.execCommand("copy");
-
-      }
-
-
-      copyButton.textContent =
-        "Copied";
-
-
-      setTimeout(
-        function () {
-          copyButton.textContent =
-            "Copy";
-        },
-        1500
-      );
-
+    if (token.length <= 100) {
+      checkStatus.textContent = "Invalid Cookie";
+      checkStatus.className = "status error";
+      return;
     }
-  );
 
+    currentToken = token;
+
+    checkStatus.textContent = "Token accepted";
+    checkStatus.className = "status success";
+
+    updateManifest();
+  });
+
+  tokenInput.addEventListener("input", () => {
+    currentToken = "";
+    configuration.classList.remove("visible");
+
+    checkStatus.textContent = "";
+    checkStatus.className = "status";
+  });
+
+  document.querySelectorAll("[data-quality]").forEach((input) => {
+    input.addEventListener("change", updateManifest);
+  });
+
+  minSizeInput.addEventListener("input", updateManifest);
+  maxSizeInput.addEventListener("input", updateManifest);
+
+  copyButton.addEventListener("click", async () => {
+    if (!manifestUrl.value) return;
+
+    try {
+      await navigator.clipboard.writeText(manifestUrl.value);
+
+      copyButton.textContent = "Copied";
+
+      setTimeout(() => {
+        copyButton.textContent = "Copy";
+      }, 1500);
+    } catch {
+      manifestUrl.select();
+      document.execCommand("copy");
+
+      copyButton.textContent = "Copied";
+
+      setTimeout(() => {
+        copyButton.textContent = "Copy";
+      }, 1500);
+    }
+  });
 })();
+</script>
 `;
-}
 
-
-export default async (request) => {
-
-  const url =
-    new URL(request.url);
-
-  const pathname =
-    url.pathname;
-
-
-  /* -------------------------------------------------- */
-  /* EXTERNAL HOMEPAGE JAVASCRIPT */
-  /* -------------------------------------------------- */
-
-  if (pathname === "/homepage.js") {
-
-    return new Response(
-      homepageScript(),
-      {
-        headers: {
-          "Content-Type":
-            "application/javascript; charset=utf-8",
-
-          "Cache-Control":
-            "no-store"
-        }
-      }
-    );
-
-  }
-
-
-  /* -------------------------------------------------- */
-  /* MANIFEST */
-  /* -------------------------------------------------- */
+export async function handler(event) {
+  const path = event.path || "/";
 
   if (
-    pathname === "/manifest.json" ||
-    pathname.match(
-      /^\/[^/]+\/manifest\.json$/
-    )
+    path === "/" ||
+    path === "/homepage.js" ||
+    path === "/manifest.json"
   ) {
-
-    return new Response(
-      JSON.stringify({
-
-        id:
-          "com.showbox.stremio",
-
-        version:
-          "1.0.0",
-
-        name:
-          "ShowBox",
-
-        description:
-          "ShowBox Stremio addon",
-
-        resources:
-          ["stream"],
-
-        types:
-          ["movie", "series"],
-
-        catalogs:
-          [],
-
-        behaviorHints: {
-          configurable:
-            true,
-
-          configurationRequired:
-            false
-        },
-
-        config: [
-          {
-            key:
-              "uiToken",
-
-            type:
-              "password",
-
-            title:
-              "ShowBox UI Token",
-
-            required:
-              true
-          }
-        ]
-
-      }),
-
-      {
-        headers: {
-          "Content-Type":
-            "application/json"
-        }
-      }
-    );
-
-  }
-
-
-  /* -------------------------------------------------- */
-  /* HOMEPAGE */
-  /* -------------------------------------------------- */
-
-  const html = `<!DOCTYPE html>
-
-<html>
-
+    const homepage = `
+<!DOCTYPE html>
+<html lang="en">
 <head>
-
-<meta name="viewport"
-      content="width=device-width, initial-scale=1">
-
-<meta name="theme-color"
-      content="#111111">
+<meta charset="UTF-8">
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1, maximum-scale=1"
+/>
 
 <title>ShowBox Stremio Addon</title>
 
 <style>
+:root {
+  color-scheme: dark;
+
+  --background: #0d0e11;
+  --surface: #15161b;
+  --surface-2: #1d1f25;
+  --surface-3: #252831;
+
+  --border: #292c34;
+  --border-light: #32353e;
+
+  --text: #f4f4f5;
+  --muted: #92959f;
+  --muted-2: #6f727c;
+
+  --accent: #ffffff;
+  --accent-text: #0d0e11;
+
+  --success: #a7e3b1;
+  --error: #ff9696;
+
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 13px;
+}
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  background: var(--background);
+}
+
 body {
   margin: 0;
-  padding: 40px 20px;
-  background: #111;
-  color: #eee;
+  min-height: 100vh;
+
+  background:
+    radial-gradient(
+      circle at 50% -20%,
+      rgba(255,255,255,.055),
+      transparent 38%
+    ),
+    var(--background);
+
+  color: var(--text);
+
   font-family:
     -apple-system,
     BlinkMacSystemFont,
-    "Segoe UI",
+    "SF Pro Display",
+    "SF Pro Text",
+    Inter,
+    system-ui,
     sans-serif;
+
+  -webkit-font-smoothing: antialiased;
 }
 
-.container {
-  width: 100%;
-  max-width: 760px;
-  margin: auto;
+.page {
+  width: min(680px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 54px 0 70px;
 }
 
-h1 {
-  margin: 0 0 12px;
-  font-size: 38px;
-}
+/* ---------------- HEADER ---------------- */
 
-.subtitle {
+.hero {
   margin-bottom: 42px;
-  color: #999;
-  font-size: 18px;
 }
 
-label.title {
-  display: block;
-  margin-bottom: 10px;
-  font-size: 17px;
-}
+.eyebrow {
+  margin-bottom: 12px;
 
-#tokenInput {
-  width: 100%;
-  padding: 17px 18px;
-  border: 1px solid #333;
-  border-radius: 14px;
-  background: #1b1b1b;
-  color: #fff;
-  font-size: 17px;
-  outline: none;
-}
+  color: var(--muted-2);
 
-#tokenInput:focus {
-  border-color: #777;
-}
-
-#generateButton {
-  width: 100%;
-  margin-top: 16px;
-  padding: 16px 20px;
-  border: 1px solid #444;
-  border-radius: 14px;
-  background: #fff;
-  color: #111;
-  font-size: 17px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-#checkStatus {
-  min-height: 24px;
-  margin-top: 14px;
-  color: #999;
-}
-
-.success {
-  color: #fff !important;
-}
-
-.error {
-  color: #aaa !important;
-}
-
-#configuration {
-  display: none;
-  margin-top: 42px;
-}
-
-
-/* -------------------------------------------------- */
-/* FILTERING */
-/* -------------------------------------------------- */
-
-.section-title {
-  margin: 0;
-  font-size: 30px;
-  font-weight: 600;
-  letter-spacing: -0.5px;
-}
-
-.section-description {
-  margin-top: 6px;
-  margin-bottom: 24px;
-  color: #85858d;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.filter-card {
-  padding: 16px;
-  border: 1px solid #202126;
-  border-radius: 20px;
-  background: #17181d;
-}
-
-.filter-heading {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 14px;
-  color: #cfd0d7;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .13em;
   text-transform: uppercase;
 }
 
-.filter-icon {
-  width: 28px;
-  height: 28px;
+.title {
+  margin: 0;
+
+  font-size: clamp(34px, 7vw, 46px);
+  line-height: 1.05;
+  letter-spacing: -.045em;
+  font-weight: 750;
+}
+
+.subtitle {
+  max-width: 520px;
+  margin: 14px 0 0;
+
+  color: var(--muted);
+
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ---------------- SECTIONS ---------------- */
+
+.section {
+  margin-top: 38px;
+}
+
+.section:first-of-type {
+  margin-top: 0;
+}
+
+.section-header {
+  margin-bottom: 13px;
+}
+
+.section-title {
+  margin: 0;
+
+  font-size: 25px;
+  line-height: 1.15;
+  letter-spacing: -.025em;
+  font-weight: 700;
+}
+
+.section-description {
+  margin: 6px 0 0;
+
+  color: var(--muted-2);
+
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* ---------------- CARDS ---------------- */
+
+.card {
+  background: var(--surface);
+
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+
+  padding: 20px;
+}
+
+/* ---------------- TOKEN ---------------- */
+
+.token-card {
+  padding: 18px;
+}
+
+.token-label {
+  display: block;
+
+  margin: 0 0 9px;
+
+  color: var(--muted-2);
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.token-input {
+  width: 100%;
+  height: 54px;
+
+  padding: 0 15px;
+
+  background: var(--surface-2);
+
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+
+  outline: none;
+
+  color: var(--text);
+
+  font-size: 14px;
+
+  transition:
+    border-color .15s ease,
+    background .15s ease;
+}
+
+.token-input::placeholder {
+  color: var(--muted-2);
+}
+
+.token-input:focus {
+  border-color: #4a4d57;
+  background: var(--surface-3);
+}
+
+.generate-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #858995;
-  font-size: 22px;
+  gap: 10px;
+
+  margin-top: 12px;
+}
+
+.generate-button {
+  height: 48px;
+
+  padding: 0 20px;
+
+  border: 0;
+  border-radius: 14px;
+
+  background: var(--accent);
+  color: var(--accent-text);
+
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    transform .12s ease,
+    opacity .12s ease;
+}
+
+.generate-button:active {
+  transform: scale(.97);
+}
+
+.generate-button:hover {
+  opacity: .9;
+}
+
+.status {
+  min-height: 18px;
+
+  color: var(--muted-2);
+
+  font-size: 12px;
+}
+
+.status.success {
+  color: var(--success);
+}
+
+.status.error {
+  color: var(--error);
+}
+
+/* ---------------- FILTER ---------------- */
+
+.filter-card {
+  padding: 14px;
+}
+
+.filter-heading {
+  padding: 5px 7px 12px;
+
+  color: var(--muted-2);
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
 }
 
 .filter-option {
-  padding: 20px;
-  border: 1px solid #2c2e36;
-  border-radius: 16px;
-  background: #20222a;
+  padding: 17px;
+
+  background: var(--surface-2);
+
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
 }
 
 .filter-option-title {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 18px;
-  color: #f0f0f3;
-  font-size: 18px;
-  font-weight: 600;
+  margin: 0;
+
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -.015em;
 }
 
-.help-button {
-  width: 29px;
-  height: 29px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: #363942;
-  color: #d7d8dd;
-  font-size: 15px;
-  font-weight: 700;
+.filter-option-description {
+  margin: 5px 0 15px;
+
+  color: var(--muted-2);
+
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .size-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 10px;
 }
 
-.size-field label {
-  display: block;
-  margin-bottom: 8px;
-  color: #858995;
-  font-size: 14px;
-  font-weight: 600;
+.size-field {
+  position: relative;
 }
 
 .size-input {
   width: 100%;
-  height: 54px;
-  padding: 0 18px;
-  border: 1px solid #343742;
-  border-radius: 13px;
-  background: #292c35;
-  color: #fff;
-  font-size: 18px;
+  height: 52px;
+
+  padding: 0 42px 0 14px;
+
+  background: var(--surface-3);
+
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+
   outline: none;
+
+  color: var(--text);
+
+  font-size: 14px;
+
+  appearance: textfield;
+}
+
+.size-input::-webkit-inner-spin-button,
+.size-input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
 }
 
 .size-input::placeholder {
-  color: #858995;
+  color: var(--muted-2);
 }
 
 .size-input:focus {
-  border-color: #555a68;
+  border-color: #4a4d57;
 }
 
+.size-unit {
+  position: absolute;
 
-/* -------------------------------------------------- */
-/* QUALITY SETTINGS */
-/* -------------------------------------------------- */
+  right: 14px;
+  top: 50%;
 
-.quality-section {
-  margin-top: 38px;
+  transform: translateY(-50%);
+
+  color: var(--muted-2);
+
+  font-size: 12px;
+  pointer-events: none;
 }
 
-.configuration-title {
-  margin-bottom: 6px;
-  font-size: 24px;
-  font-weight: 600;
-}
+/* ---------------- QUALITY ---------------- */
 
-.description {
-  margin-bottom: 22px;
-  color: #85858d;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.quality-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.quality-card {
+  padding: 8px;
 }
 
 .quality-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px 16px;
-  border: 1px solid #2d2d2d;
-  border-radius: 14px;
-  background: #1b1b1b;
+
+  min-height: 72px;
+
+  padding: 13px 14px;
+
+  border-radius: 15px;
+
+  cursor: pointer;
+
+  transition: background .15s ease;
+}
+
+.quality-row:hover {
+  background: var(--surface-2);
+}
+
+.quality-info {
+  min-width: 0;
 }
 
 .quality-name {
+  display: block;
+
+  font-size: 16px;
+  font-weight: 650;
+
+  letter-spacing: -.01em;
+}
+
+.quality-description {
+  display: block;
+
+  margin-top: 3px;
+
+  color: var(--muted-2);
+
+  font-size: 11px;
+}
+
+/* ---------------- SWITCH ---------------- */
+
+.switch {
+  position: relative;
+
+  flex: 0 0 auto;
+
+  width: 48px;
+  height: 29px;
+
+  margin-left: 16px;
+}
+
+.switch input {
+  position: absolute;
+
+  opacity: 0;
+
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  inset: 0;
+
+  background: #343740;
+
+  border-radius: 999px;
+
+  cursor: pointer;
+
+  transition: background .2s ease;
+}
+
+.slider::before {
+  content: "";
+
+  position: absolute;
+
+  width: 23px;
+  height: 23px;
+
+  left: 3px;
+  top: 3px;
+
+  background: #8f929a;
+
+  border-radius: 50%;
+
+  transition:
+    transform .2s ease,
+    background .2s ease;
+}
+
+.switch input:checked + .slider {
+  background: #f1f1f2;
+}
+
+.switch input:checked + .slider::before {
+  transform: translateX(19px);
+  background: #111216;
+}
+
+/* ---------------- RESULT ---------------- */
+
+.configuration {
+  display: none;
+}
+
+.configuration.visible {
+  display: block;
+}
+
+.manifest-card {
+  padding: 14px;
+}
+
+.manifest-box {
+  padding: 15px;
+
+  background: var(--surface-2);
+
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+}
+
+.manifest-label {
+  display: block;
+
+  margin-bottom: 8px;
+
+  color: var(--muted-2);
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.manifest-row {
+  display: flex;
+  gap: 9px;
+}
+
+.manifest-input {
+  min-width: 0;
+  flex: 1;
+
+  height: 48px;
+
+  padding: 0 13px;
+
+  background: var(--surface-3);
+
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+
+  outline: none;
+
+  color: var(--muted);
+
+  font-size: 12px;
+}
+
+.copy-button {
+  flex: 0 0 auto;
+
+  height: 48px;
+
+  padding: 0 16px;
+
+  background: #30333b;
+
+  border: 1px solid #3b3e47;
+  border-radius: 12px;
+
+  color: var(--text);
+
+  font-size: 13px;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+.install-button {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 17px;
-}
+  justify-content: center;
 
-.quality-checkbox {
-  width: 20px;
-  height: 20px;
-  accent-color: #fff;
-}
-
-.move-buttons {
-  display: flex;
-  gap: 7px;
-}
-
-.move-button {
-  width: 44px;
-  height: 40px;
-  padding: 0;
-  border: 1px solid #333;
-  border-radius: 9px;
-  background: #292929;
-  color: #fff;
-  font-size: 18px;
-  cursor: pointer;
-}
-
-.move-button:disabled {
-  opacity: .25;
-  cursor: default;
-}
-
-
-/* -------------------------------------------------- */
-/* RESULT */
-/* -------------------------------------------------- */
-
-#result {
-  margin-top: 36px;
-}
-
-.result-label {
-  display: block;
-  margin-bottom: 10px;
-  color: #bbb;
-}
-
-.result-row {
-  display: flex;
-  gap: 10px;
-}
-
-#manifestUrl {
-  flex: 1;
-  min-width: 0;
-  padding: 17px 18px;
-  border: 1px solid #333;
-  border-radius: 14px;
-  background: #1b1b1b;
-  color: #fff;
-  font-size: 15px;
-}
-
-#copyButton {
-  padding: 0 20px;
-  border: 1px solid #333;
-  border-radius: 14px;
-  background: #292929;
-  color: #fff;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-#installButton {
   width: 100%;
-  margin-top: 14px;
-  padding: 16px 20px;
-  display: block;
-  border: 0;
-  border-radius: 14px;
-  background: #fff;
-  color: #111;
-  text-align: center;
+  height: 52px;
+
+  margin-top: 10px;
+
+  border-radius: 13px;
+
+  background: var(--accent);
+  color: var(--accent-text);
+
   text-decoration: none;
-  font-size: 17px;
-  font-weight: 600;
+
+  font-size: 14px;
+  font-weight: 700;
 }
 
-#installButton.disabled {
-  background: #333;
-  color: #777;
-  pointer-events: none;
-  cursor: default;
+/* ---------------- FOOTER ---------------- */
+
+.footer {
+  margin-top: 48px;
+
+  color: var(--muted-2);
+
+  font-size: 11px;
+  line-height: 1.6;
+
+  text-align: center;
 }
 
-.note {
-  margin-top: 16px;
-  color: #777;
-  line-height: 1.5;
-  font-size: 13px;
-}
+/* ---------------- MOBILE ---------------- */
 
-@media (max-width: 600px) {
-
-  body {
-    padding: 28px 16px;
+@media (max-width: 520px) {
+  .page {
+    width: min(100% - 24px, 680px);
+    padding-top: 38px;
   }
 
-  h1 {
-    font-size: 30px;
+  .hero {
+    margin-bottom: 34px;
   }
 
-  .size-fields {
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+  .title {
+    font-size: 36px;
   }
 
-  .filter-option {
-    padding: 16px;
+  .section {
+    margin-top: 32px;
   }
 
-  .size-input {
-    padding: 0 14px;
+  .section-title {
+    font-size: 23px;
   }
 
-  .result-row {
+  .card {
+    border-radius: 19px;
+  }
+
+  .generate-row {
+    align-items: stretch;
     flex-direction: column;
   }
 
-  #copyButton {
-    min-height: 48px;
+  .generate-button {
+    width: 100%;
   }
 
+  .status {
+    min-height: 16px;
+  }
+
+  .manifest-row {
+    flex-direction: column;
+  }
+
+  .copy-button {
+    width: 100%;
+  }
 }
-
 </style>
-
 </head>
 
 <body>
 
-<div class="container">
+<main class="page">
 
-<h1>
-ShowBox Stremio Addon
-</h1>
+  <!-- HERO -->
 
-<div class="subtitle">
-Enter your FebBox UI token to generate your addon.
-</div>
+  <header class="hero">
+    <div class="eyebrow">STREMIO ADDON</div>
 
-<label
-  class="title"
-  for="tokenInput"
->
-ShowBox UI Token
-</label>
+    <h1 class="title">
+      ShowBox
+    </h1>
 
-<input
-  id="tokenInput"
-  type="password"
-  autocomplete="off"
-  autocapitalize="none"
-  spellcheck="false"
-  placeholder="Enter your ShowBox UI token"
->
-
-<button
-  id="generateButton"
-  type="button"
->
-Generate
-</button>
-
-<div id="checkStatus"></div>
-
-<div id="configuration">
-
-<section>
-
-<div class="section-title">
-Filtering
-</div>
-
-<div class="section-description">
-Drop streams you never want to see.
-</div>
-
-<div class="filter-card">
-
-<div class="filter-heading">
-
-<span class="filter-icon">
-▽
-</span>
-
-<span>
-FILE SIZE
-</span>
-
-</div>
-
-<div class="filter-option">
-
-<div class="filter-option-title">
-
-<span>
-Keep streams between
-</span>
-
-<button
-  type="button"
-  class="help-button"
-  title="Leave either field empty for no limit."
->
-?
-</button>
-
-</div>
-
-<div class="size-fields">
-
-<div class="size-field">
-
-<label for="minSize">
-Min (GB)
-</label>
-
-<input
-  id="minSize"
-  class="size-input"
-  type="number"
-  min="0"
-  step="0.1"
-  placeholder="No minimum"
->
-
-</div>
-
-<div class="size-field">
-
-<label for="maxSize">
-Max (GB)
-</label>
-
-<input
-  id="maxSize"
-  class="size-input"
-  type="number"
-  min="0"
-  step="0.1"
-  placeholder="No maximum"
->
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</section>
+    <p class="subtitle">
+      Generate a personal ShowBox addon using your FebBox UI token.
+    </p>
+  </header>
 
 
-<section class="quality-section">
+  <!-- TOKEN -->
 
-<div class="configuration-title">
-Quality settings
-</div>
+  <section class="section">
 
-<div class="description">
-Enable the qualities you want. Move them up or down to set their priority.
-</div>
+    <div class="section-header">
+      <h2 class="section-title">
+        Configuration
+      </h2>
 
-<div
-  id="qualityList"
-  class="quality-list"
->
-${qualityRows()}
-</div>
+      <p class="section-description">
+        Enter your token to generate your private addon manifest.
+      </p>
+    </div>
 
-</section>
+    <div class="card token-card">
+
+      <label
+        class="token-label"
+        for="tokenInput"
+      >
+        FEBBOX UI TOKEN
+      </label>
+
+      <input
+        id="tokenInput"
+        class="token-input"
+        type="password"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="Paste your UI token"
+      >
+
+      <div class="generate-row">
+
+        <button
+          id="generateButton"
+          class="generate-button"
+          type="button"
+        >
+          Generate addon
+        </button>
+
+        <div
+          id="checkStatus"
+          class="status"
+        ></div>
+
+      </div>
+
+    </div>
+
+  </section>
 
 
-<div id="result">
+  <!-- CONFIGURATION -->
 
-<span class="result-label">
-Manifest URL
-</span>
+  <div
+    id="configuration"
+    class="configuration"
+  >
 
-<div class="result-row">
+    <!-- FILTERING -->
 
-<input
-  id="manifestUrl"
-  type="text"
-  readonly
->
+    <section class="section">
 
-<button
-  id="copyButton"
-  type="button"
->
-Copy
-</button>
+      <div class="section-header">
+        <h2 class="section-title">
+          Filtering
+        </h2>
 
-</div>
+        <p class="section-description">
+          Choose which streams should appear in your addon.
+        </p>
+      </div>
 
-<a
-  id="installButton"
-  class="disabled"
-  href="#"
->
-Install in Stremio
-</a>
+      <div class="card filter-card">
 
-<div class="note">
-On iOS, if the Install button does not open Stremio,
-use Copy and paste the manifest URL into Stremio's Add Addon field.
-</div>
+        <div class="filter-heading">
+          FILE SIZE
+        </div>
 
-</div>
+        <div class="filter-option">
 
-</div>
+          <h3 class="filter-option-title">
+            Keep streams between
+          </h3>
 
-</div>
+          <p class="filter-option-description">
+            Leave either field empty for no limit.
+          </p>
 
-<script src="/homepage.js"></script>
+          <div class="size-fields">
+
+            <div class="size-field">
+
+              <input
+                id="minSizeInput"
+                class="size-input"
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="No minimum"
+                inputmode="decimal"
+              >
+
+              <span class="size-unit">
+                GB
+              </span>
+
+            </div>
+
+            <div class="size-field">
+
+              <input
+                id="maxSizeInput"
+                class="size-input"
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="No maximum"
+                inputmode="decimal"
+              >
+
+              <span class="size-unit">
+                GB
+              </span>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- QUALITY -->
+
+    <section class="section quality-section">
+
+      <div class="section-header">
+        <h2 class="section-title">
+          Quality
+        </h2>
+
+        <p class="section-description">
+          Select the video qualities you want available.
+        </p>
+      </div>
+
+      <div class="card quality-card">
+        ${qualityRows()}
+      </div>
+
+    </section>
+
+
+    <!-- MANIFEST -->
+
+    <section class="section">
+
+      <div class="section-header">
+        <h2 class="section-title">
+          Install
+        </h2>
+
+        <p class="section-description">
+          Add the generated manifest to Stremio.
+        </p>
+      </div>
+
+      <div class="card manifest-card">
+
+        <div class="manifest-box">
+
+          <label
+            class="manifest-label"
+            for="manifestUrl"
+          >
+            MANIFEST URL
+          </label>
+
+          <div class="manifest-row">
+
+            <input
+              id="manifestUrl"
+              class="manifest-input"
+              type="text"
+              readonly
+              placeholder="Generate your addon first"
+            >
+
+            <button
+              id="copyButton"
+              class="copy-button"
+              type="button"
+            >
+              Copy
+            </button>
+
+          </div>
+
+        </div>
+
+        <a
+          id="installButton"
+          class="install-button"
+          href="#"
+        >
+          Install in Stremio
+        </a>
+
+      </div>
+
+    </section>
+
+  </div>
+
+
+  <footer class="footer">
+    Your token is stored only inside the generated addon configuration.
+  </footer>
+
+</main>
+
+${homepageScript}
 
 </body>
+</html>
+`;
 
-</html>`;
-
-
-  return new Response(
-    html,
-    {
+    return {
+      statusCode: 200,
       headers: {
-        "Content-Type":
-          "text/html; charset=utf-8",
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+      body: homepage,
+    };
+  }
 
-        "Cache-Control":
-          "no-store"
-      }
-    }
-  );
+  /*
+   * Generic manifest route.
+   * This is kept for Stremio's manifest request.
+   */
 
-};
+  const match = path.match(/^\\/([^/]+)\\/manifest\\.json$/);
 
+  if (match) {
+    const encodedConfig = match[1];
 
-export const config = {
+    return {
+      statusCode: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+      body: JSON.stringify({
+        id: "showbox.stremio.addon",
+        version: "1.0.0",
+        name: "ShowBox",
+        description: "ShowBox Stremio addon",
+        resources: ["stream"],
+        types: ["movie", "series"],
+        catalogs: [],
+        idPrefixes: ["tt"],
+        behaviorHints: {
+          configurable: true,
+        },
+        config: [
+          {
+            key: "uiToken",
+            type: "password",
+            title: "ShowBox UI Token",
+            required: true,
+          },
+        ],
+      }),
+    };
+  }
 
-  path: [
-    "/",
-    "/homepage.js",
-    "/manifest.json",
-    "/:config/manifest.json"
-  ]
-
-};
+  return {
+    statusCode: 404,
+    headers: {
+      "Content-Type": "text/plain",
+    },
+    body: "Not found",
+  };
+}
