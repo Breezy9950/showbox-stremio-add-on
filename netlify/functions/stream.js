@@ -36,6 +36,8 @@ async function imdbToTmdb(imdbId, type) {
 }
 
 export default async (req, context) => {
+  console.log("[ShowBox] STREAM TEST v2");
+
   try {
     const { type, id, config } = context.params;
 
@@ -70,12 +72,12 @@ export default async (req, context) => {
     const tmdbId = await imdbToTmdb(imdbId, type);
 
     console.log("[ShowBox] TMDB conversion:", {
-  type,
-  imdbId,
-  season,
-  episode,
-  tmdbId
-});
+      type,
+      imdbId,
+      season,
+      episode,
+      tmdbId
+    });
 
     return new Response(
       JSON.stringify({
@@ -101,6 +103,8 @@ export default async (req, context) => {
     );
 
   } catch (error) {
+    console.log("[ShowBox] ERROR:", error.message);
+
     return new Response(
       JSON.stringify({
         test: true,
