@@ -2710,7 +2710,7 @@ function applyQualitySettings(
 // =========================================================
 
 const DEFAULT_STREAM_FILTERS = {
-  cam: true
+  cam: false
 };
 
 
@@ -2730,8 +2730,7 @@ function normalizeStreamFilterConfig(
    * Old addon configurations don't have
    * stream filters.
    *
-   * Preserve their previous behavior by
-   * keeping CAM enabled.
+   * Default: block CAM / Telecine streams.
    */
 
   if (
@@ -2749,7 +2748,7 @@ function normalizeStreamFilterConfig(
   return {
 
     cam:
-      filters.cam !== false
+      filters.cam === true
 
   };
 }
@@ -2772,6 +2771,8 @@ function isCamOrTelecine(
 
   return (
     /\bTELECINE\b/.test(text) ||
+    /\bTELESYNC\b/.test(text) ||
+    /\bCAMRIP\b/.test(text) ||
     /\bCAM\b/.test(text)
   );
 }
@@ -2796,10 +2797,11 @@ function applyStreamFilters(
    * Filter the original FebBox file
    * metadata before streams are built.
    *
-   * This means the filtering uses the
-   * actual source filename rather than
-   * trying to infer the source later from
-   * the generated Stremio title.
+   * cam === false:
+   *     block CAM / Telecine
+   *
+   * cam === true:
+   *     allow CAM / Telecine
    */
 
   const filtered =
