@@ -478,28 +478,6 @@ export default async (request) => {
 
 
   /* -------------------------------------------------- */
-  /* EXTERNAL HOMEPAGE JAVASCRIPT */
-  /* -------------------------------------------------- */
-
-  if (pathname === "/homepage.js") {
-
-    return new Response(
-      homepageScript(),
-      {
-        headers: {
-          "Content-Type":
-            "application/javascript; charset=utf-8",
-
-          "Cache-Control":
-            "no-store"
-        }
-      }
-    );
-
-  }
-
-
-  /* -------------------------------------------------- */
   /* MANIFEST */
   /* -------------------------------------------------- */
 
@@ -563,7 +541,10 @@ export default async (request) => {
       {
         headers: {
           "Content-Type":
-            "application/json"
+            "application/json",
+
+          "Cache-Control":
+            "no-store"
         }
       }
 
@@ -1614,7 +1595,9 @@ use Copy and paste the manifest URL into Stremio's Add Addon field.
 </div>
 
 
-<script src="/homepage.js"></script>
+<script>
+${homepageScript()}
+</script>
 
 </body>
 
@@ -1641,7 +1624,6 @@ export const config = {
 
   path: [
     "/",
-    "/homepage.js",
     "/manifest.json",
     "/:config/manifest.json"
   ]
