@@ -3460,6 +3460,15 @@ export default async (
       `[ShowBox][${requestId}] ShowBox ID:`,
       showboxId
     );
+    
+    console.log(
+  "[ShowBox] ShowBox request URL:",
+  requestUrl.replace(
+    encodeURIComponent(token || ""),
+    "***"
+  )
+);
+
 
 
     if (!showboxId) {
