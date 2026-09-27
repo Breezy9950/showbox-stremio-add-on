@@ -300,36 +300,91 @@ const SHOWBOX_SEARCH_HEADERS = {
 };
 
 
+// ---------------------------------------------------------
+// Parse ShowBox search result
+// ---------------------------------------------------------
+
 function parseShowBoxSearchHref(
   html
 ) {
 
-  const patterns = [
-    /class="film-name[^"]*"[^>]*>\s*<a[^>]+href="([^"]+)"/i,
-    /<a[^>]+href="([^"]+)"[^>]*class="[^"]*film-name[^"]*"/i
-  ];
+  /*
+   * ShowBox search-page markup can change.
+   * Do not depend on a specific CSS class.
+   *
+   * Look for actual movie / TV detail links.
+   */
+
+  const hrefMatches =
+    html.match(
+      /href=["']([^"']+)["']/gi
+    ) || [];
 
 
   for (
-    const pattern of patterns
+    const rawMatch of hrefMatches
   ) {
 
     const match =
-      html.match(
-        pattern
+      rawMatch.match(
+        /href=["']([^"']+)["']/i
       );
 
 
     if (
-      match?.[1]
+      !match?.[1]
+    ) {
+      continue;
+    }
+
+
+    const href =
+      match[1];
+
+
+    /*
+     * Accept ShowBox media detail paths.
+     *
+     * Examples:
+     *
+     * /movie/m-spider-man-brand-new-day-2026
+     * /tv/t-spider-noir-2026
+     */
+
+    if (
+      !/^\/(?:movie|tv)\/[^/?#]+/i.test(
+        href
+      )
     ) {
 
-      return new URL(
-        match[1],
-        SHOWBOX_WEB_API
-      ).href;
+      continue;
 
     }
+
+
+    return new URL(
+      href,
+      SHOWBOX_WEB_API
+    ).href;
+
+  }
+
+
+  /*
+   * Fallback for absolute ShowBox URLs.
+   */
+
+  const absoluteMatch =
+    html.match(
+      /https?:\/\/(?:www\.)?showbox\.media\/(?:movie|tv)\/[^"'<>?\s]+/i
+    );
+
+
+  if (
+    absoluteMatch?.[0]
+  ) {
+
+    return absoluteMatch[0];
 
   }
 
@@ -1403,6 +1458,16 @@ function getTechnicalMetadata(
     );
 
   } else if (
+    /\bTELESYNC\b/.test(
+      upper
+    )
+  ) {
+
+    result.push(
+      "TELESYNC"
+    );
+
+  } else if (
     /\bTELECINE\b/.test(
       upper
     ) ||
@@ -2308,13 +2373,6 @@ function normalizeQualityConfig(
   config
 ) {
 
-  /*
-   * Old configured addon URLs don't have
-   * a qualities property.
-   *
-   * Preserve their previous behavior.
-   */
-
   if (
     !Array.isArray(
       config?.qualities
@@ -2393,11 +2451,6 @@ function normalizeQualityConfig(
 
   }
 
-
-  /*
-   * Append any default qualities missing
-   * from the configuration.
-   */
 
   for (
     const quality of DEFAULT_QUALITIES
@@ -2552,11 +2605,6 @@ function getStreamQuality(
     );
 
 
-  /*
-   * The quality is normally the first part
-   * of the technical line.
-   */
-
   const firstLine =
     title.split(
       "\n"
@@ -2597,11 +2645,6 @@ function applyQualitySettings(
     );
 
 
-  /*
-   * Old configuration URLs don't have
-   * quality settings.
-   */
-
   if (
     !qualityConfig.configured
   ) {
@@ -2621,11 +2664,6 @@ function applyQualitySettings(
           );
 
 
-        /*
-         * Keep streams whose quality cannot
-         * be identified.
-         */
-
         if (!quality) {
           return true;
         }
@@ -2638,14 +2676,6 @@ function applyQualitySettings(
       }
     );
 
-
-  /*
-   * Stable sort:
-   * recognized qualities follow the user's
-   * configured priority.
-   *
-   * Unknown qualities stay after them.
-   */
 
   filtered.sort(
     (a, b) => {
@@ -2726,14 +2756,6 @@ function normalizeStreamFilterConfig(
     config?.filters;
 
 
-  /*
-   * Old addon configurations don't have
-   * stream filters.
-   *
-   * Preserve their previous behavior by
-   * keeping CAM enabled.
-   */
-
   if (
     !filters ||
     typeof filters !== "object"
@@ -2771,6 +2793,7 @@ function isCamOrTelecine(
 
 
   return (
+    /\bTELESYNC\b/.test(text) ||
     /\bTELECINE\b/.test(text) ||
     /\bCAM\b/.test(text)
   );
@@ -2791,16 +2814,6 @@ function applyStreamFilters(
       config
     );
 
-
-  /*
-   * Filter the original FebBox file
-   * metadata before streams are built.
-   *
-   * This means the filtering uses the
-   * actual source filename rather than
-   * trying to infer the source later from
-   * the generated Stremio title.
-   */
 
   const filtered =
     qualityResults.filter(
@@ -2854,7 +2867,6 @@ function applyStreamFilters(
 // =========================================================
 // FILE SIZE CONFIGURATION
 // =========================================================
-
 
 // ---------------------------------------------------------
 // Parse file size into GB
@@ -2987,11 +2999,6 @@ function applyFileSizeSettings(
     config?.fileSize;
 
 
-  /*
-   * No file-size configuration means
-   * preserve the existing behavior.
-   */
-
   if (
     !fileSize ||
     (
@@ -3048,11 +3055,6 @@ function applyFileSizeSettings(
             stream.size
           );
 
-
-        /*
-         * If the size is unavailable or
-         * cannot be parsed, keep the stream.
-         */
 
         if (
           sizeGb === null
