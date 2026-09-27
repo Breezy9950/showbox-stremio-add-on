@@ -358,6 +358,14 @@ async function getShowBoxData(
     }
   );
 
+  console.log(
+  "[ShowBox] ShowBox request URL:",
+  requestUrl.replace(
+    encodeURIComponent(token || ""),
+    "***"
+  )
+);
+
 
   if (!response.ok) {
 
