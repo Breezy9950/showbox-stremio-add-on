@@ -1,13 +1,14 @@
 import CryptoJS from "crypto-js";
 
 const TMDB_API_KEY =
+  process.env.TMDB_API_KEY ||
   "439c478a771f35c05022f9feabcca01c";
 
 const TMDB_BASE_URL =
   "https://api.themoviedb.org/3";
 
-const SHOWBOX_API =
-  "https://febapi.nuvioapp.space/api/media";
+const SHOWBOX_WEB_API =
+  "https://showbox.media";
 
 const WORKING_HEADERS = {
   "User-Agent":
@@ -28,7 +29,9 @@ const WORKING_HEADERS = {
 // Base64URL
 // ---------------------------------------------------------
 
-function decodeBase64Url(value) {
+function decodeBase64Url(
+  value
+) {
 
   let base64 =
     value
@@ -38,7 +41,9 @@ function decodeBase64Url(value) {
   while (
     base64.length % 4
   ) {
+
     base64 += "=";
+
   }
 
   return Buffer
@@ -54,7 +59,9 @@ function decodeBase64Url(value) {
 // Parse configured Stremio config
 // ---------------------------------------------------------
 
-function parseConfig(rawConfig) {
+function parseConfig(
+  rawConfig
+) {
 
   try {
 
@@ -77,6 +84,7 @@ function parseConfig(rawConfig) {
     return {};
 
   }
+
 }
 
 
@@ -89,13 +97,17 @@ function parseSingleToken(
 ) {
 
   if (!token) {
+
     return null;
+
   }
 
   if (
     !token.startsWith("eyJ")
   ) {
+
     return token;
+
   }
 
   try {
@@ -115,7 +127,9 @@ function parseSingleToken(
       !decoded ||
       !decoded.encrypt_data
     ) {
+
       return token;
+
     }
 
 
@@ -136,8 +150,10 @@ function parseSingleToken(
         key,
         {
           iv,
+
           mode:
             CryptoJS.mode.CBC,
+
           padding:
             CryptoJS.pad.Pkcs7
         }
@@ -157,10 +173,13 @@ function parseSingleToken(
       result &&
       result.uid
     ) {
+
       return String(
         result.uid
       );
+
     }
+
 
     return token;
 
@@ -174,6 +193,7 @@ function parseSingleToken(
     return token;
 
   }
+
 }
 
 
@@ -258,125 +278,372 @@ async function imdbToTmdb(
   return String(
     result.id
   );
+
 }
 
 
 // ---------------------------------------------------------
-// TMDB title information
+// ShowBox web search
 // ---------------------------------------------------------
 
-async function getTMDBDetails(
-  tmdbId,
-  type
+function parseShowBoxSearchHrefs(
+  html
 ) {
 
-  try {
-
-    const endpoint =
-      type === "series"
-        ? `/tv/${tmdbId}`
-        : `/movie/${tmdbId}`;
+  const hrefs = [];
 
 
-    const response =
-      await fetch(
-        `${TMDB_BASE_URL}${endpoint}?api_key=${TMDB_API_KEY}`
-      );
+  const patterns = [
+
+    /class="film-name[^"]*"[^>]*>\s*<a[^>]+href="([^"]+)"/gi,
+
+    /<a[^>]+href="([^"]+)"[^>]*class="[^"]*film-name[^"]*"/gi
+
+  ];
 
 
-    if (!response.ok) {
-      return null;
+  for (
+    const pattern
+    of patterns
+  ) {
+
+    let match;
+
+
+    while (
+      (match =
+        pattern.exec(
+          html
+        )) !== null
+    ) {
+
+      if (
+        !match[1]
+      ) {
+
+        continue;
+
+      }
+
+
+      try {
+
+        const href =
+          new URL(
+            match[1],
+            SHOWBOX_WEB_API
+          ).href;
+
+
+        if (
+          !hrefs.includes(
+            href
+          )
+        ) {
+
+          hrefs.push(
+            href
+          );
+
+        }
+
+      } catch {
+
+        // Ignore malformed result links.
+
+      }
+
     }
 
+  }
 
-    return await response.json();
 
-  } catch {
+  return hrefs;
+
+}
+
+
+// ---------------------------------------------------------
+// HTML helpers
+// ---------------------------------------------------------
+
+function decodeHtmlEntities(
+  value
+) {
+
+  return String(
+    value || ""
+  )
+
+    .replace(
+      /&amp;/gi,
+      "&"
+    )
+
+    .replace(
+      /&quot;/gi,
+      '"'
+    )
+
+    .replace(
+      /&#39;|&apos;/gi,
+      "'"
+    )
+
+    .replace(
+      /&lt;/gi,
+      "<"
+    )
+
+    .replace(
+      /&gt;/gi,
+      ">"
+    )
+
+    .replace(
+      /&#(\d+);/g,
+      (_, code) => {
+
+        try {
+
+          return String.fromCodePoint(
+            Number(code)
+          );
+
+        } catch {
+
+          return "";
+
+        }
+
+      }
+    );
+
+}
+
+
+function stripHtml(
+  value
+) {
+
+  return decodeHtmlEntities(
+    String(
+      value || ""
+    )
+      .replace(
+        /<[^>]*>/g,
+        " "
+      )
+  )
+    .replace(
+      /\s+/g,
+      " "
+    )
+    .trim();
+
+}
+
+
+// ---------------------------------------------------------
+// ShowBox detail parser
+// ---------------------------------------------------------
+
+function parseShowBoxHeadingInfo(
+  html
+) {
+
+  const match =
+    html.match(
+      /class="heading-name[^"]*"[^>]*>[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i
+    );
+
+
+  if (!match) {
 
     return null;
 
   }
+
+
+  const id =
+    match[1]
+      .split("?")[0]
+      .split("#")[0]
+      .split("/")
+      .filter(Boolean)
+      .pop();
+
+
+  if (
+    !/^\d+$/.test(
+      id || ""
+    )
+  ) {
+
+    return null;
+
+  }
+
+
+  return {
+
+    id,
+
+    title:
+      stripHtml(
+        match[2]
+      )
+
+  };
+
 }
 
 
 // ---------------------------------------------------------
-// ShowBox API
+// Search ShowBox media ID
 // ---------------------------------------------------------
 
-async function getShowBoxData(
-  tmdbId,
-  type,
-  season,
-  episode,
-  token
+async function searchShowBoxMediaId(
+  tmdbId
 ) {
 
-  let requestUrl;
-
-
-  if (
-    type === "series"
-  ) {
-
-    requestUrl =
-      `${SHOWBOX_API}/tv/${tmdbId}/${season}/${episode}?cookie=${encodeURIComponent(token)}`;
-
-  } else {
-
-    requestUrl =
-      `${SHOWBOX_API}/movie/${tmdbId}/oss=USA7?cookie=${encodeURIComponent(token)}`
-
-  }
-
-
   console.log(
-    "[ShowBox] ShowBox request:",
-    {
-      type,
-      tmdbId,
-      season,
-      episode
-    }
+    "[ShowBox] Web search for TMDB:",
+    tmdbId
   );
 
 
-  const response =
+  const searchResponse =
     await fetch(
-      requestUrl,
+      `${SHOWBOX_WEB_API}/search?keyword=${encodeURIComponent(tmdbId)}`,
       {
-        headers:
-          WORKING_HEADERS
+        headers: {
+
+          "Accept":
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+
+          "Accept-Language":
+            "en",
+
+          "User-Agent":
+            WORKING_HEADERS[
+              "User-Agent"
+            ]
+
+        }
       }
     );
 
 
-  console.log(
-    "[ShowBox] ShowBox response:",
-    {
-      status:
-        response.status
-    }
-  );
-
-  console.log(
-  "[ShowBox] ShowBox request URL:",
-  requestUrl.replace(
-    encodeURIComponent(token || ""),
-    "***"
-  )
-);
-
-
-  if (!response.ok) {
+  if (
+    !searchResponse.ok
+  ) {
 
     throw new Error(
-      `ShowBox API HTTP ${response.status}`
+      `ShowBox web search failed: HTTP ${searchResponse.status}`
     );
 
   }
 
 
-  return await response.json();
+  const searchHtml =
+    await searchResponse.text();
+
+
+  const detailUrls =
+    parseShowBoxSearchHrefs(
+      searchHtml
+    );
+
+
+  if (
+    !detailUrls.length
+  ) {
+
+    throw new Error(
+      `ShowBox search returned no result for TMDB ID ${tmdbId}`
+    );
+
+  }
+
+
+  // Only use the first ShowBox search result.
+  const detailUrl =
+    detailUrls[0];
+
+
+  console.log(
+    "[ShowBox] First search result:",
+    detailUrl
+  );
+
+
+  const detailResponse =
+    await fetch(
+      detailUrl,
+      {
+        headers: {
+
+          "Accept":
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+
+          "Accept-Language":
+            "en",
+
+          "User-Agent":
+            WORKING_HEADERS[
+              "User-Agent"
+            ]
+
+        }
+      }
+    );
+
+
+  if (
+    !detailResponse.ok
+  ) {
+
+    throw new Error(
+      `ShowBox detail request failed: HTTP ${detailResponse.status}`
+    );
+
+  }
+
+
+  const detailHtml =
+    await detailResponse.text();
+
+
+  const info =
+    parseShowBoxHeadingInfo(
+      detailHtml
+    );
+
+
+  if (!info) {
+
+    throw new Error(
+      "ShowBox media ID not found on first result detail page"
+    );
+
+  }
+
+
+  console.log(
+    "[ShowBox] Direct ShowBox media result:",
+    {
+      id:
+        info.id,
+
+      title:
+        info.title
+    }
+  );
+
+
+  return info.id;
+
 }
 
 
@@ -403,13 +670,16 @@ async function febboxShare(
     "[ShowBox] FebBox share request:",
     {
       boxType,
+
       showboxId
     }
   );
 
 
   const response =
-    await fetch(url);
+    await fetch(
+      url
+    );
 
 
   const text =
@@ -434,7 +704,9 @@ async function febboxShare(
   try {
 
     data =
-      JSON.parse(text);
+      JSON.parse(
+        text
+      );
 
   } catch {
 
@@ -474,7 +746,9 @@ async function febboxShare(
     data.data.share_link;
 
 
-  if (!shareLink) {
+  if (
+    !shareLink
+  ) {
 
     throw new Error(
       "FebBox share link missing"
@@ -501,6 +775,7 @@ async function febboxShare(
 
 
   return shareKey;
+
 }
 
 
@@ -521,8 +796,10 @@ async function febboxFileList(
       url,
       {
         headers: {
+
           "Accept-Language":
             "en"
+
         }
       }
     );
@@ -553,7 +830,9 @@ async function febboxFileList(
   try {
 
     data =
-      JSON.parse(text);
+      JSON.parse(
+        text
+      );
 
   } catch {
 
@@ -570,7 +849,9 @@ async function febboxFileList(
     Array.isArray(
       data.data.file_list
     )
+
       ? data.data.file_list
+
       : [];
 
 
@@ -602,6 +883,7 @@ async function febboxFileList(
 
 
   return files;
+
 }
 
 
@@ -623,8 +905,10 @@ async function febboxSeasonFileList(
       url,
       {
         headers: {
+
           "Accept-Language":
             "en"
+
         }
       }
     );
@@ -652,7 +936,9 @@ async function febboxSeasonFileList(
   try {
 
     data =
-      JSON.parse(text);
+      JSON.parse(
+        text
+      );
 
   } catch {
 
@@ -679,11 +965,12 @@ async function febboxSeasonFileList(
 
 
   return data.data.file_list;
+
 }
 
 
 // ---------------------------------------------------------
-// Find ALL matching FebBox files
+// Find all matching FebBox files
 // ---------------------------------------------------------
 
 async function findFebboxFiles(
@@ -716,7 +1003,9 @@ async function findFebboxFiles(
       );
 
 
-    if (!files.length) {
+    if (
+      !files.length
+    ) {
 
       throw new Error(
         "Movie file not found"
@@ -729,17 +1018,20 @@ async function findFebboxFiles(
       "[ShowBox] Movie files found:",
       files.map(
         file => ({
+
           name:
             file.file_name,
 
           fid:
             file.fid
+
         })
       )
     );
 
 
     return files;
+
   }
 
 
@@ -756,15 +1048,18 @@ async function findFebboxFiles(
     rootFiles.find(
       item =>
         item &&
+        item.fid &&
         item.file_name &&
         item.file_name
           .toLowerCase()
           .trim() ===
-          expectedSeason
+        expectedSeason
     );
 
 
-  if (!seasonFolder) {
+  if (
+    !seasonFolder
+  ) {
 
     throw new Error(
       `Season folder not found: ${expectedSeason}`
@@ -774,7 +1069,7 @@ async function findFebboxFiles(
 
 
   console.log(
-    "[ShowBox] FebBox season folder:",
+    "[ShowBox] Season folder found:",
     {
       name:
         seasonFolder.file_name,
@@ -785,66 +1080,47 @@ async function findFebboxFiles(
   );
 
 
-  const files =
+  const episodeFiles =
     await febboxSeasonFileList(
       shareKey,
       seasonFolder
     );
 
 
-  const s2 =
-    String(season)
-      .padStart(2, "0");
+  const normalizedEpisode =
+    String(
+      episode
+    ).padStart(
+      2,
+      "0"
+    );
 
 
-  const e2 =
-    String(episode)
-      .padStart(2, "0");
+  const episodePattern =
+    new RegExp(
+      `(?:^|[^0-9])${normalizedEpisode}(?:[^0-9]|$)|episode\\s*${episode}\\b`,
+      "i"
+    );
 
 
-  const lowerS =
-    String(season);
-
-  const lowerE =
-    String(episode);
-
-
-  const matchingFiles =
-    files.filter(
-      item => {
-
-        if (
-          !item ||
-          !item.file_name
-        ) {
-          return false;
-        }
-
-
-        const name =
+  const files =
+    episodeFiles.filter(
+      item =>
+        item &&
+        item.fid &&
+        item.file_name &&
+        episodePattern.test(
           item.file_name
-            .toLowerCase();
-
-
-        return (
-          name.includes(
-            `s${s2}e${e2}`
-          ) ||
-          name.includes(
-            `s${lowerS}e${lowerE}`
-          )
-        );
-
-      }
+        )
     );
 
 
   if (
-    !matchingFiles.length
+    !files.length
   ) {
 
     throw new Error(
-      `Episode not found: S${season}E${episode}`
+      `Episode file not found: S${season}E${episode}`
     );
 
   }
@@ -852,19 +1128,22 @@ async function findFebboxFiles(
 
   console.log(
     "[ShowBox] Episode files found:",
-    matchingFiles.map(
+    files.map(
       file => ({
+
         name:
           file.file_name,
 
         fid:
           file.fid
+
       })
     )
   );
 
 
-  return matchingFiles;
+  return files;
+
 }
 
 
@@ -874,67 +1153,30 @@ async function findFebboxFiles(
 
 async function febboxQualityList(
   file,
-  shareKey,
-  token
+  shareKey
 ) {
 
-  const cookieHeader =
-    token.startsWith("ui=")
-      ? token
-      : `ui=${token}`;
-
-
-  console.log(
-    "[ShowBox] Token diagnostics:",
-    {
-      length:
-        token.length,
-
-      startsWithUi:
-        token.startsWith("ui="),
-
-      startsWithJwt:
-        token.startsWith("eyJ"),
-
-      cookieLength:
-        cookieHeader.length
-    }
-  );
-
-
-  const qualityUrl =
-    `https://www.febbox.com/console/video_quality_list?fid=${file.fid}&share_key=${shareKey}`;
-
-
-  console.log(
-    "[ShowBox] FebBox quality request:",
-    {
-      fid:
-        file.fid
-    }
-  );
+  const url =
+    `https://www.febbox.com/mbp/file/detail?fid=${file.fid}&share_key=${shareKey}`;
 
 
   const response =
     await fetch(
-      qualityUrl,
+      url,
       {
         headers: {
-          Cookie:
-            cookieHeader
+
+          "Accept-Language":
+            "en",
+
+          "User-Agent":
+            WORKING_HEADERS[
+              "User-Agent"
+            ]
+
         }
       }
     );
-
-
-  const contentType =
-    response.headers.get(
-      "content-type"
-    ) || "";
-
-
-  const finalUrl =
-    response.url;
 
 
   const text =
@@ -942,17 +1184,16 @@ async function febboxQualityList(
 
 
   console.log(
-    "[ShowBox] FebBox quality response:",
+    "[ShowBox] FebBox quality request:",
     {
+      fid:
+        file.fid,
+
       status:
         response.status,
 
-      contentType,
-
       bodyLength:
-        text.length,
-
-      finalUrl
+        text.length
     }
   );
 
@@ -963,52 +1204,54 @@ async function febboxQualityList(
   try {
 
     data =
-      JSON.parse(text);
-
-
-    console.log(
-      "[ShowBox] FebBox quality JSON:",
-      JSON.stringify(data)
-    );
+      JSON.parse(
+        text
+      );
 
   } catch {
 
-    data =
-      null;
-
-  }
-
-
-  if (
-    data &&
-    data.html
-  ) {
-
-    return parseFebboxHtml(
-      data.html,
-      file
+    throw new Error(
+      "FebBox quality response was not JSON"
     );
 
   }
 
 
   if (
-    text.includes(
-      "file_quality"
-    )
+    data.code !== 1 ||
+    !data.data
   ) {
 
-    return parseFebboxHtml(
-      text,
-      file
+    throw new Error(
+      "FebBox quality request failed"
     );
 
   }
 
 
-  throw new Error(
-    "FebBox quality response missing HTML"
+  const qualityHtml =
+    data.data.html ||
+    data.data.content ||
+    data.data.url ||
+    "";
+
+
+  if (
+    !qualityHtml
+  ) {
+
+    throw new Error(
+      "FebBox quality HTML missing"
+    );
+
+  }
+
+
+  return parseFebboxQualityHtml(
+    qualityHtml,
+    file
   );
+
 }
 
 
@@ -1016,89 +1259,79 @@ async function febboxQualityList(
 // Parse FebBox quality HTML
 // ---------------------------------------------------------
 
-function parseFebboxHtml(
+function parseFebboxQualityHtml(
   html,
   file
 ) {
 
-  const streams = [];
+  const results = [];
 
 
-  const blocks =
-    html.split(
-      /(?=<div[^>]*class=["'][^"']*file_quality[^"']*["'][^>]*>)/i
+  const sourceText =
+    String(
+      html || ""
     );
 
 
-  for (
-    const block of blocks
+  const linkPattern =
+    /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+
+
+  let match;
+
+
+  while (
+    (match =
+      linkPattern.exec(
+        sourceText
+      )) !== null
   ) {
 
+    const url =
+      decodeHtmlEntities(
+        match[1]
+      );
+
+
+    const label =
+      stripHtml(
+        match[2]
+      );
+
+
     if (
-      !block.includes(
-        "file_quality"
+      !url ||
+      !/^https?:\/\//i.test(
+        url
       )
     ) {
+
       continue;
+
     }
 
 
-    const urlMatch =
-      block.match(
-        /data-url=["']([^"']+)["']/i
-      );
+    if (
+      !label
+    ) {
 
-
-    if (!urlMatch) {
       continue;
+
     }
 
 
-    const qualityMatch =
-      block.match(
-        /data-quality=["']([^"']+)["']/i
-      );
-
-
-    const sizeMatch =
-      block.match(
-        /class=["'][^"']*\bsize\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i
-      );
-
-
-    const streamUrl =
-      urlMatch[1];
-
-
-    const quality =
-      qualityMatch
-        ? qualityMatch[1]
-        : "";
-
-
-    const size =
-      sizeMatch
-        ? sizeMatch[1]
-            .replace(
-              /<[^>]+>/g,
-              ""
-            )
-            .trim()
-        : "";
-
-
-    streams.push({
-
-      url:
-        streamUrl,
-
-      quality,
-
-      size,
+    results.push({
 
       fileName:
-        file.file_name ||
-        "",
+        file.file_name,
+
+      fileId:
+        file.fid,
+
+      quality:
+        label,
+
+      url,
 
       sourceFile:
         file
@@ -1108,416 +1341,405 @@ function parseFebboxHtml(
   }
 
 
-  console.log(
-    "[ShowBox] Parsed FebBox qualities:",
-    streams.length
-  );
+  // -------------------------------------------------------
+  // Also support direct URL attributes used by FebBox.
+  // -------------------------------------------------------
+
+  const urlPattern =
+    /(?:url|play_url|download_url|file_url|src)=["']([^"']+)["']/gi;
 
 
-  return streams;
+  while (
+    (match =
+      urlPattern.exec(
+        sourceText
+      )) !== null
+  ) {
+
+    const url =
+      decodeHtmlEntities(
+        match[1]
+      );
+
+
+    if (
+      !url ||
+      !/^https?:\/\//i.test(
+        url
+      )
+    ) {
+
+      continue;
+
+    }
+
+
+    if (
+      results.some(
+        item =>
+          item.url ===
+          url
+      )
+    ) {
+
+      continue;
+
+    }
+
+
+    results.push({
+
+      fileName:
+        file.file_name,
+
+      fileId:
+        file.fid,
+
+      quality:
+        "ORG",
+
+      url,
+
+      sourceFile:
+        file
+
+    });
+
+  }
+
+
+  return results;
+
 }
 
 
 // ---------------------------------------------------------
-// Quality label
+// Quality helpers
 // ---------------------------------------------------------
+
+const QUALITY_ORDER = [
+
+  "ORG",
+
+  "4K",
+
+  "1440p",
+
+  "1080p",
+
+  "720p",
+
+  "480p",
+
+  "360p"
+
+];
+
+
+function normalizeQualityConfig(
+  config
+) {
+
+  const quality =
+    config?.quality;
+
+
+  if (
+    !quality ||
+    typeof quality !==
+      "object"
+  ) {
+
+    return {
+
+      enabled: [
+        ...QUALITY_ORDER
+      ],
+
+      priority: [
+        ...QUALITY_ORDER
+      ]
+
+    };
+
+  }
+
+
+  const enabled =
+    Array.isArray(
+      quality.enabled
+    )
+
+      ? quality.enabled.filter(
+          value =>
+            QUALITY_ORDER.includes(
+              value
+            )
+        )
+
+      : [
+          ...QUALITY_ORDER
+        ];
+
+
+  const priority =
+    Array.isArray(
+      quality.priority
+    )
+
+      ? quality.priority.filter(
+          value =>
+            QUALITY_ORDER.includes(
+              value
+            )
+        )
+
+      : [
+          ...QUALITY_ORDER
+        ];
+
+
+  const finalPriority = [
+
+    ...priority,
+
+    ...QUALITY_ORDER.filter(
+      value =>
+        !priority.includes(
+          value
+        )
+    )
+
+  ];
+
+
+  return {
+
+    enabled,
+
+    priority:
+      finalPriority
+
+  };
+
+}
+
 
 function getQualityLabel(
-  quality,
-  fileName
-) {
-
-  const value =
-    String(
-      quality ||
-      fileName ||
-      ""
-    ).toLowerCase();
-
-
-  if (
-    value.includes("2160") ||
-    value.includes("4k")
-  ) {
-    return "4K";
-  }
-
-
-  if (
-    value.includes("1440")
-  ) {
-    return "1440p";
-  }
-
-
-  if (
-    value.includes("1080")
-  ) {
-    return "1080p";
-  }
-
-
-  if (
-    value.includes("720")
-  ) {
-    return "720p";
-  }
-
-
-  if (
-    value.includes("480")
-  ) {
-    return "480p";
-  }
-
-
-  if (
-    value.includes("360")
-  ) {
-    return "360p";
-  }
-
-
-  if (
-    String(quality)
-      .toUpperCase()
-      === "ORG"
-  ) {
-    return "ORG";
-  }
-
-
-  return quality || "";
-}
-
-
-// ---------------------------------------------------------
-// Clean filename
-// ---------------------------------------------------------
-
-function cleanFilename(
-  value
-) {
-
-  return String(
-    value || ""
-  )
-    .replace(
-      /\.[a-z0-9]{2,5}$/i,
-      ""
-    )
-    .replace(
-      /[_]+/g,
-      " "
-    );
-}
-
-
-// ---------------------------------------------------------
-// Technical metadata
-// ---------------------------------------------------------
-
-function getTechnicalMetadata(
   fileName,
   quality
 ) {
 
-  const name =
-    cleanFilename(
-      fileName
-    );
+  const text =
+    `${fileName || ""} ${quality || ""}`
+      .toUpperCase();
 
-
-  const upper =
-    name.toUpperCase();
-
-
-  const result = [];
-
-
-  // -------------------------------------------------------
-  // Source / release type
-  // -------------------------------------------------------
 
   if (
-    /\bWEB[- .]?DL\b/.test(
-      upper
-    ) ||
-    /\bWEBDL\b/.test(
-      upper
-    )
+    /\b4K\b/.test(text) ||
+    /\b2160P\b/.test(text) ||
+    /\bUHD\b/.test(text)
   ) {
 
-    result.push(
-      "WEB-DL"
-    );
-
-  } else if (
-    /\bWEB[- .]?RIP\b/.test(
-      upper
-    ) ||
-    /\bWEBRIP\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "WEB-RIP"
-    );
-
-  } else if (
-    /\bBLU[- .]?RAY\b/.test(
-      upper
-    ) ||
-    /\bBLURAY\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "BluRay"
-    );
-
-  } else if (
-    /\bBDRIP\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "BDRip"
-    );
-
-  } else if (
-    /\bTELESYNC\b/.test(
-      upper
-    ) ||
-    /\bTS\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "TELESYNC"
-    );
-
-  } else if (
-    /\bTELECINE\b/.test(
-      upper
-    ) ||
-    /\bTC\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "TELECINE"
-    );
-
-  } else if (
-    /\bCAM\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "CAM"
-    );
-
-  }
-
-
-  // -------------------------------------------------------
-  // Dynamic range
-  // -------------------------------------------------------
-
-  if (
-    /\bDOLBY[ ._-]?VISION\b/.test(
-      upper
-    ) ||
-    /\bDV\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "DV"
-    );
-
-  } else if (
-    /\bHDR10\+\b/.test(
-      upper
-    ) ||
-    /\bHDR10PLUS\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "HDR10+"
-    );
-
-  } else if (
-    /\bHDR10\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "HDR10"
-    );
-
-  } else if (
-    /\bHDR\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "HDR"
-    );
-
-  } else if (
-    /\bHLG\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "HLG"
-    );
-
-  }
-
-
-  // -------------------------------------------------------
-  // Audio codec
-  // -------------------------------------------------------
-
-  if (
-    /\bATMOS\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "Atmos"
-    );
+    return "4K";
 
   }
 
 
   if (
-    /\bDDP[ ._-]?7[ ._-]?1\b/.test(
-      upper
-    )
+    /\b1440P\b/.test(text) ||
+    /\b2K\b/.test(text)
   ) {
 
-    result.push(
-      "DDP7.1"
-    );
-
-  } else if (
-    /\bDDP[ ._-]?5[ ._-]?1\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "DDP5.1"
-    );
-
-  } else if (
-    /\bDD[ ._-]?5[ ._-]?1\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "DD5.1"
-    );
-
-  } else if (
-    /\bDTS[- .]?(HD|X)?\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "DTS"
-    );
-
-  } else if (
-    /\bAAC\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "AAC"
-    );
+    return "1440p";
 
   }
 
-
-  // -------------------------------------------------------
-  // Video codec
-  // -------------------------------------------------------
 
   if (
-    /\bHEVC\b/.test(
-      upper
-    ) ||
-    /\bH[ ._-]?265\b/.test(
-      upper
-    ) ||
-    /\bX265\b/.test(
-      upper
-    )
+    /\b1080P\b/.test(text) ||
+    /\bFHD\b/.test(text)
   ) {
 
-    result.push(
-      "H.265"
-    );
-
-  } else if (
-    /\bAVC\b/.test(
-      upper
-    ) ||
-    /\bH[ ._-]?264\b/.test(
-      upper
-    ) ||
-    /\bX264\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "H.264"
-    );
-
-  } else if (
-    /\bAV1\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "AV1"
-    );
+    return "1080p";
 
   }
 
 
-  return result;
+  if (
+    /\b720P\b/.test(text) ||
+    /\bHD\b/.test(text)
+  ) {
+
+    return "720p";
+
+  }
+
+
+  if (
+    /\b480P\b/.test(text)
+  ) {
+
+    return "480p";
+
+  }
+
+
+  if (
+    /\b360P\b/.test(text)
+  ) {
+
+    return "360p";
+
+  }
+
+
+  return "ORG";
+
 }
 
 
+function applyQualitySettings(
+  streams,
+  config
+) {
+
+  const settings =
+    normalizeQualityConfig(
+      config
+    );
+
+
+  const enabled =
+    new Set(
+      settings.enabled
+    );
+
+
+  const priorityMap =
+    new Map(
+      settings.priority.map(
+        (
+          quality,
+          index
+        ) => [
+
+          quality,
+
+          index
+
+        ]
+      )
+    );
+
+
+  const filtered =
+    streams.filter(
+      stream =>
+        enabled.has(
+          stream.quality
+        )
+    );
+
+
+  filtered.sort(
+    (a, b) => {
+
+      const aRank =
+        priorityMap.has(
+          a.quality
+        )
+
+          ? priorityMap.get(
+              a.quality
+            )
+
+          : 999;
+
+
+      const bRank =
+        priorityMap.has(
+          b.quality
+        )
+
+          ? priorityMap.get(
+              b.quality
+            )
+
+          : 999;
+
+
+      return (
+        aRank -
+        bRank
+      );
+
+    }
+  );
+
+
+  return filtered;
+
+}
+
 // ---------------------------------------------------------
-// Normalize language value
+// File size settings
 // ---------------------------------------------------------
 
-function normalizeLanguageValue(
+function normalizeFileSizeConfig(
+  config
+) {
+
+  const fileSize =
+    config?.fileSize;
+
+
+  if (
+    !fileSize ||
+    typeof fileSize !==
+      "object"
+  ) {
+
+    return {
+
+      enabled:
+        false,
+
+      maxGb:
+        0
+
+    };
+
+  }
+
+
+  const maxGb =
+    Number(
+      fileSize.maxGb
+    );
+
+
+  return {
+
+    enabled:
+      fileSize.enabled === true,
+
+    maxGb:
+      Number.isFinite(
+        maxGb
+      ) &&
+      maxGb > 0
+
+        ? maxGb
+
+        : 0
+
+  };
+
+}
+
+
+function parseFileSizeBytes(
   value
 ) {
 
@@ -1525,1162 +1747,114 @@ function normalizeLanguageValue(
     value === null ||
     value === undefined
   ) {
-    return [];
-  }
 
-
-  if (
-    Array.isArray(value)
-  ) {
-
-    return value.flatMap(
-      item =>
-        normalizeLanguageValue(
-          item
-        )
-    );
+    return null;
 
   }
 
 
   if (
-    typeof value === "object"
-  ) {
-
-    return [
-      value.name,
-      value.language,
-      value.lang,
-      value.iso_639_1
-    ]
-      .filter(Boolean)
-      .flatMap(
-        item =>
-          normalizeLanguageValue(
-            item
-          )
-      );
-
-  }
-
-
-  return String(value)
-    .split(
-      /[,|/]+/
+    typeof value ===
+      "number" &&
+    Number.isFinite(
+      value
     )
-    .map(
-      item =>
-        item.trim()
-    )
-    .filter(Boolean);
-}
-
-
-// ---------------------------------------------------------
-// Detect explicit languages from an object
-// ---------------------------------------------------------
-
-function getLanguagesFromObject(
-  object,
-  keys
-) {
-
-  if (
-    !object ||
-    typeof object !== "object"
-  ) {
-    return [];
-  }
-
-
-  for (
-    const key of keys
   ) {
 
-    if (
-      object[key] !== undefined &&
-      object[key] !== null &&
-      object[key] !== ""
-    ) {
-
-      const values =
-        normalizeLanguageValue(
-          object[key]
-        );
-
-
-      if (
-        values.length
-      ) {
-
-        return values;
-
-      }
-
-    }
-
-  }
-
-
-  return [];
-}
-
-
-// ---------------------------------------------------------
-// Detect explicit languages in filenames
-// ---------------------------------------------------------
-
-function getLanguagesFromFilename(
-  fileName
-) {
-
-  const text =
-    String(
-      fileName || ""
-    ).toLowerCase();
-
-
-  const languages = [];
-
-
-  const known = [
-
-    ["english", "English"],
-    ["eng", "English"],
-
-    ["spanish", "Spanish"],
-    ["spa", "Spanish"],
-    ["español", "Spanish"],
-
-    ["french", "French"],
-    ["fra", "French"],
-    ["fre", "French"],
-
-    ["german", "German"],
-    ["deu", "German"],
-    ["ger", "German"],
-
-    ["italian", "Italian"],
-    ["ita", "Italian"],
-
-    ["portuguese", "Portuguese"],
-    ["por", "Portuguese"],
-
-    ["japanese", "Japanese"],
-    ["jpn", "Japanese"],
-
-    ["korean", "Korean"],
-    ["kor", "Korean"],
-
-    ["hindi", "Hindi"],
-    ["hin", "Hindi"],
-
-    ["tamil", "Tamil"],
-    ["telugu", "Telugu"],
-    ["malayalam", "Malayalam"],
-    ["marathi", "Marathi"],
-
-    ["arabic", "Arabic"],
-
-    ["russian", "Russian"],
-    ["rus", "Russian"]
-
-  ];
-
-
-  for (
-    const [
-      token,
-      label
-    ] of known
-  ) {
-
-    const regex =
-      new RegExp(
-        `(?:^|[ ._\\-()])${token}(?:$|[ ._\\-()])`,
-        "i"
-      );
-
-
-    if (
-      regex.test(text) &&
-      !languages.includes(label)
-    ) {
-
-      languages.push(
-        label
-      );
-
-    }
-
-  }
-
-
-  return languages;
-}
-
-
-// ---------------------------------------------------------
-// Audio / subtitle information
-// ---------------------------------------------------------
-
-function getAudioLanguages(
-  item
-) {
-
-  const object =
-    item.sourceFile ||
-    item.link ||
-    item;
-
-
-  const explicit =
-    getLanguagesFromObject(
-      object,
-      [
-        "audio",
-        "audio_language",
-        "audioLanguage",
-        "audio_languages",
-        "audioLanguages",
-        "language",
-        "languages",
-        "lang"
-      ]
-    );
-
-
-  if (
-    explicit.length
-  ) {
-
-    return explicit;
-
-  }
-
-
-  return getLanguagesFromFilename(
-    item.fileName
-  );
-}
-
-
-function getSubtitleLanguages(
-  item
-) {
-
-  const object =
-    item.sourceFile ||
-    item.link ||
-    item;
-
-
-  const explicit =
-    getLanguagesFromObject(
-      object,
-      [
-        "subtitle",
-        "subtitles",
-        "subtitle_language",
-        "subtitleLanguage",
-        "subtitle_languages",
-        "subtitleLanguages",
-        "caption",
-        "captions"
-      ]
-    );
-
-
-  if (
-    explicit.length
-  ) {
-
-    return explicit;
+    return value;
 
   }
 
 
   const text =
     String(
-      item.fileName || ""
-    ).toLowerCase();
-
-
-  if (
-    /\bno[\s._-]?subs?\b/.test(
-      text
-    ) ||
-    /\bnosub\b/.test(
-      text
-    ) ||
-    /\bwithout[\s._-]?subs?\b/.test(
-      text
-    )
-  ) {
-
-    return [
-      "No included subtitles"
-    ];
-
-  }
-
-
-  return getLanguagesFromFilename(
-    item.fileName
-  );
-}
-
-
-// ---------------------------------------------------------
-// Title
-// ---------------------------------------------------------
-
-function buildTitle(
-  tmdbDetails,
-  type
-) {
-
-  if (!tmdbDetails) {
-    return "";
-  }
-
-
-  if (
-    type === "series"
-  ) {
-
-    return (
-      tmdbDetails.name ||
-      tmdbDetails.original_name ||
-      ""
-    );
-
-  }
-
-
-  const title =
-    tmdbDetails.title ||
-    tmdbDetails.original_title ||
-    "";
-
-
-  const releaseDate =
-    tmdbDetails.release_date ||
-    "";
-
-
-  const year =
-    releaseDate
-      ? releaseDate.slice(0, 4)
-      : "";
-
-
-  if (
-    title &&
-    year
-  ) {
-
-    return `${title} (${year})`;
-
-  }
-
-
-  return title;
-}
-
-
-// ---------------------------------------------------------
-// Stream technical line
-// ---------------------------------------------------------
-
-function buildTechnicalLine(
-  item
-) {
-
-  const quality =
-    getQualityLabel(
-      item.quality,
-      item.fileName
-    );
-
-
-  const metadata =
-    getTechnicalMetadata(
-      item.fileName,
-      item.quality
-    );
-
-
-  const parts = [];
-
-
-  if (
-    quality
-  ) {
-
-    parts.push(
-      quality
-    );
-
-  }
-
-
-  for (
-    const value of metadata
-  ) {
-
-    if (
-      !parts.includes(value)
-    ) {
-
-      parts.push(
-        value
-      );
-
-    }
-
-  }
-
-
-  return parts.join(
-    " • "
-  );
-}
-
-
-// ---------------------------------------------------------
-// Build stream title
-// ---------------------------------------------------------
-
-function buildStreamTitle(
-  item,
-  tmdbDetails,
-  type,
-  season,
-  episode
-) {
-
-  const lines = [];
-
-
-  const title =
-    buildTitle(
-      tmdbDetails,
-      type
-    );
-
-
-  if (
-    title
-  ) {
-
-    lines.push(
-      title
-    );
-
-  }
-
-
-  if (
-    type === "series" &&
-    Number.isFinite(season) &&
-    Number.isFinite(episode)
-  ) {
-
-    lines.push(
-      `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`
-    );
-
-  }
-
-
-  const technical =
-    buildTechnicalLine(
-      item
-    );
-
-
-  if (
-    technical
-  ) {
-
-    lines.push(
-      technical
-    );
-
-  }
-
-
-  if (
-    item.size
-  ) {
-
-    lines.push(
-      item.size
-    );
-
-  }
-
-
-  const audioLanguages =
-    getAudioLanguages(
-      item
-    );
-
-
-  if (
-    audioLanguages.length
-  ) {
-
-    lines.push(
-      `Audio: ${audioLanguages.join(", ")}`
-    );
-
-  }
-
-
-  const subtitleLanguages =
-    getSubtitleLanguages(
-      item
-    );
-
-
-  if (
-    subtitleLanguages.length
-  ) {
-
-    lines.push(
-      `Subtitles: ${subtitleLanguages.join(", ")}`
-    );
-
-  }
-
-
-  return lines.join(
-    "\n"
-  );
-}
-
-
-// ---------------------------------------------------------
-// Build FebBox streams
-// ---------------------------------------------------------
-
-function buildFebboxStreams(
-  qualityResults,
-  tmdbDetails,
-  type,
-  season,
-  episode
-) {
-
-  return qualityResults.map(
-    item => ({
-
-      name:
-        getQualityLabel(
-          item.quality,
-          item.fileName
-        ) ||
-        "ShowBox",
-
-
-      title:
-        buildStreamTitle(
-          item,
-          tmdbDetails,
-          type,
-          season,
-          episode
-        ),
-
-
-      url:
-        item.url,
-
-
-      size:
-        item.size,
-
-
-      behaviorHints: {
-        bingeGroup:
-          "showbox"
-      },
-
-
-      headers: {
-
-        Accept:
-          "*/*",
-
-        "Accept-Language":
-          "en-US,en;q=0.8",
-
-        Connection:
-          "keep-alive",
-
-        Range:
-          "bytes=0-",
-
-        Referer:
-          "https://www.febbox.com/",
-
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
-      }
-
-    })
-  );
-}
-
-
-// ---------------------------------------------------------
-// Extract ShowBox versions
-// ---------------------------------------------------------
-
-function getShowBoxVersions(
-  showboxData
-) {
-
-  if (
-    Array.isArray(
-      showboxData?.versions
-    )
-  ) {
-
-    return showboxData.versions;
-
-  }
-
-
-  if (
-    Array.isArray(
-      showboxData?.data?.versions
-    )
-  ) {
-
-    return showboxData.data.versions;
-
-  }
-
-
-  return [];
-}
-
-
-// ---------------------------------------------------------
-// Extract ShowBox version/link streams
-// ---------------------------------------------------------
-
-function extractShowBoxStreams(
-  showboxData,
-  tmdbDetails,
-  type,
-  season,
-  episode
-) {
-
-  const versions =
-    getShowBoxVersions(
-      showboxData
-    );
-
-
-  const streams = [];
-
-
-  for (
-    const version of versions
-  ) {
-
-    if (
-      !version ||
-      !Array.isArray(
-        version.links
-      )
-    ) {
-
-      continue;
-
-    }
-
-
-    for (
-      const link of version.links
-    ) {
-
-      if (
-        !link ||
-        !link.url
-      ) {
-
-        continue;
-
-      }
-
-
-      const fileName =
-        link.file_name ||
-        link.filename ||
-        link.fileName ||
-        link.name ||
-        version.file_name ||
-        version.filename ||
-        version.fileName ||
-        version.name ||
-        "";
-
-
-      const quality =
-        link.quality ||
-        version.quality ||
-        "";
-
-
-      const size =
-        link.size ||
-        version.size ||
-        "";
-
-
-      const item = {
-
-        url:
-          link.url,
-
-        quality,
-
-        size,
-
-        fileName,
-
-        link,
-
-        sourceFile:
-          link
-
-      };
-
-
-      streams.push({
-
-        name:
-          getQualityLabel(
-            quality,
-            fileName
-          ) ||
-          "ShowBox",
-
-
-        title:
-          buildStreamTitle(
-            item,
-            tmdbDetails,
-            type,
-            season,
-            episode
-          ),
-
-
-        url:
-          link.url,
-
-
-        size:
-          size,
-
-
-        behaviorHints: {
-          bingeGroup:
-            "showbox"
-        }
-
-      });
-
-    }
-
-  }
-
-
-  console.log(
-    "[ShowBox] ShowBox version streams:",
-    streams.length
-  );
-
-
-  return streams;
-}
-
-
-// ---------------------------------------------------------
-// Remove duplicate URLs
-// ---------------------------------------------------------
-
-function dedupeStreams(
-  streams
-) {
-
-  const seen =
-    new Set();
-
-
-  return streams.filter(
-    stream => {
-
-      if (
-        !stream ||
-        !stream.url
-      ) {
-
-        return false;
-
-      }
-
-
-      if (
-        seen.has(
-          stream.url
-        )
-      ) {
-
-        return false;
-
-      }
-
-
-      seen.add(
-        stream.url
-      );
-
-
-      return true;
-
-    }
-  );
-}
-
-
-// =========================================================
-// QUALITY CONFIGURATION
-// =========================================================
-
-const DEFAULT_QUALITIES = [
-  "ORG",
-  "4K",
-  "1440p",
-  "1080p",
-  "720p",
-  "480p",
-  "360p"
-];
-
-
-// ---------------------------------------------------------
-// Normalize quality configuration
-// ---------------------------------------------------------
-
-function normalizeQualityConfig(
-  config
-) {
-
-  /*
-   * Old configured addon URLs don't have
-   * a qualities property.
-   *
-   * Preserve their previous behavior.
-   */
-
-  if (
-    !Array.isArray(
-      config?.qualities
-    )
-  ) {
-
-    return {
-
-      enabled:
-        new Set(
-          DEFAULT_QUALITIES
-        ),
-
-      priority:
-        DEFAULT_QUALITIES.slice(),
-
-      configured:
-        false
-
-    };
-
-  }
-
-
-  const priority = [];
-
-  const enabled =
-    new Set();
-
-
-  for (
-    const item of config.qualities
-  ) {
-
-    if (
-      !item ||
-      !item.name
-    ) {
-
-      continue;
-
-    }
-
-
-    const name =
-      getCanonicalQuality(
-        item.name
-      );
-
-
-    if (!name) {
-      continue;
-    }
-
-
-    if (
-      !priority.includes(name)
-    ) {
-
-      priority.push(
-        name
-      );
-
-    }
-
-
-    if (
-      item.enabled === true
-    ) {
-
-      enabled.add(
-        name
-      );
-
-    }
-
-  }
-
-
-  /*
-   * Append any default qualities missing
-   * from the configuration.
-   */
-
-  for (
-    const quality of DEFAULT_QUALITIES
-  ) {
-
-    if (
-      !priority.includes(
-        quality
-      )
-    ) {
-
-      priority.push(
-        quality
-      );
-
-    }
-
-  }
-
-
-  return {
-
-    enabled,
-
-    priority,
-
-    configured:
-      true
-
-  };
-}
-
-
-// ---------------------------------------------------------
-// Canonical quality name
-// ---------------------------------------------------------
-
-function getCanonicalQuality(
-  value
-) {
-
-  const text =
-    String(
-      value || ""
+      value
     )
       .trim()
-      .toLowerCase();
+      .toUpperCase();
+
+
+  const match =
+    text.match(
+      /([\d.]+)\s*(TB|GB|MB|KB|B)?/
+    );
 
 
   if (
-    text === "org" ||
-    text === "original"
+    !match
   ) {
 
-    return "ORG";
+    return null;
 
   }
 
 
+  const amount =
+    Number(
+      match[1]
+    );
+
+
   if (
-    text === "4k" ||
-    text === "2160p" ||
-    text === "2160"
+    !Number.isFinite(
+      amount
+    )
   ) {
 
-    return "4K";
+    return null;
 
   }
 
 
-  if (
-    text === "1440p" ||
-    text === "1440"
-  ) {
-
-    return "1440p";
-
-  }
+  const unit =
+    match[2] ||
+    "B";
 
 
-  if (
-    text === "1080p" ||
-    text === "1080"
-  ) {
+  const multipliers = {
 
-    return "1080p";
+    B:
+      1,
 
-  }
+    KB:
+      1024,
 
+    MB:
+      1024 ** 2,
 
-  if (
-    text === "720p" ||
-    text === "720"
-  ) {
+    GB:
+      1024 ** 3,
 
-    return "720p";
+    TB:
+      1024 ** 4
 
-  }
-
-
-  if (
-    text === "480p" ||
-    text === "480"
-  ) {
-
-    return "480p";
-
-  }
+  };
 
 
-  if (
-    text === "360p" ||
-    text === "360"
-  ) {
+  return (
+    amount *
+    multipliers[
+      unit
+    ]
+  );
 
-    return "360p";
-
-  }
-
-
-  return null;
 }
 
 
-// ---------------------------------------------------------
-// Get quality from stream
-// ---------------------------------------------------------
-
-function getStreamQuality(
-  stream
-) {
-
-  if (!stream) {
-    return "";
-  }
-
-
-  const name =
-    getCanonicalQuality(
-      stream.name
-    );
-
-
-  if (name) {
-    return name;
-  }
-
-
-  const title =
-    String(
-      stream.title || ""
-    );
-
-
-  /*
-   * The quality is normally the first part
-   * of the technical line.
-   */
-
-  const firstLine =
-    title.split(
-      "\n"
-    )[2] || "";
-
-
-  const qualityFromTitle =
-    getCanonicalQuality(
-      firstLine
-    );
-
-
-  if (
-    qualityFromTitle
-  ) {
-
-    return qualityFromTitle;
-
-  }
-
-
-  return "";
-}
-
-
-// ---------------------------------------------------------
-// Apply configured quality settings
-// ---------------------------------------------------------
-
-function applyQualitySettings(
+function applyFileSizeSettings(
   streams,
   config
 ) {
 
-  const qualityConfig =
-    normalizeQualityConfig(
+  const settings =
+    normalizeFileSizeConfig(
       config
     );
 
 
-  /*
-   * Old configuration URLs don't have
-   * quality settings.
-   */
-
   if (
-    !qualityConfig.configured
+    !settings.enabled ||
+    !settings.maxGb
   ) {
 
     return streams;
@@ -2688,112 +1862,55 @@ function applyQualitySettings(
   }
 
 
-  const filtered =
-    streams.filter(
-      stream => {
-
-        const quality =
-          getStreamQuality(
-            stream
-          );
+  const maxBytes =
+    settings.maxGb *
+    1024 *
+    1024 *
+    1024;
 
 
-        /*
-         * Keep streams whose quality cannot
-         * be identified.
-         */
+  return streams.filter(
+    stream => {
 
-        if (!quality) {
-          return true;
-        }
-
-
-        return qualityConfig.enabled.has(
-          quality
+      const size =
+        parseFileSizeBytes(
+          stream.fileSize ||
+          stream.size ||
+          stream.sourceFile?.file_size
         );
 
+
+      if (
+        size === null
+      ) {
+
+        return true;
+
       }
-    );
 
 
-  /*
-   * Stable sort:
-   * recognized qualities follow the user's
-   * configured priority.
-   *
-   * Unknown qualities stay after them.
-   */
-
-  filtered.sort(
-    (a, b) => {
-
-      const qa =
-        getStreamQuality(a);
-
-      const qb =
-        getStreamQuality(b);
-
-
-      const ia =
-        qa
-          ? qualityConfig.priority.indexOf(
-              qa
-            )
-          : Infinity;
-
-
-      const ib =
-        qb
-          ? qualityConfig.priority.indexOf(
-              qb
-            )
-          : Infinity;
-
-
-      return ia - ib;
+      return (
+        size <=
+        maxBytes
+      );
 
     }
   );
 
-
-  console.log(
-    "[ShowBox] Quality settings:",
-    {
-
-      enabled:
-        Array.from(
-          qualityConfig.enabled
-        ),
-
-      priority:
-        qualityConfig.priority,
-
-      before:
-        streams.length,
-
-      after:
-        filtered.length
-
-    }
-  );
-
-
-  return filtered;
 }
 
 
-// =========================================================
-// STREAM FILTER CONFIGURATION
-// =========================================================
+// ---------------------------------------------------------
+// Stream filters
+// ---------------------------------------------------------
 
 const DEFAULT_STREAM_FILTERS = {
-  cam: true
+
+  cam:
+    true
+
 };
 
-
-// ---------------------------------------------------------
-// Normalize stream filter configuration
-// ---------------------------------------------------------
 
 function normalizeStreamFilterConfig(
   config
@@ -2805,11 +1922,14 @@ function normalizeStreamFilterConfig(
 
   if (
     !filters ||
-    typeof filters !== "object"
+    typeof filters !==
+      "object"
   ) {
 
     return {
+
       ...DEFAULT_STREAM_FILTERS
+
     };
 
   }
@@ -2818,15 +1938,13 @@ function normalizeStreamFilterConfig(
   return {
 
     cam:
-      filters.cam !== false
+      filters.cam !==
+      false
 
   };
+
 }
 
-
-// ---------------------------------------------------------
-// Detect CAM / Telecine
-// ---------------------------------------------------------
 
 function isCamOrTelecine(
   fileName
@@ -2835,21 +1953,27 @@ function isCamOrTelecine(
   const text =
     String(
       fileName || ""
-    )
-      .toUpperCase();
+    ).toUpperCase();
 
 
   return (
-    /\bTELESYNC\b/.test(text) ||
-    /\bTELECINE\b/.test(text) ||
-    /\bCAM\b/.test(text)
+
+    /\bTELESYNC\b/.test(
+      text
+    ) ||
+
+    /\bTELECINE\b/.test(
+      text
+    ) ||
+
+    /\bCAM\b/.test(
+      text
+    )
+
   );
+
 }
 
-
-// ---------------------------------------------------------
-// Apply stream filters
-// ---------------------------------------------------------
 
 function applyStreamFilters(
   qualityResults,
@@ -2908,286 +2032,608 @@ function applyStreamFilters(
 
 
   return filtered;
+
 }
 
 
-// =========================================================
-// FILE SIZE CONFIGURATION
-// =========================================================
-
-
 // ---------------------------------------------------------
-// Parse file size into GB
+// Technical metadata
 // ---------------------------------------------------------
 
-function parseSizeGb(
-  value
+function getTechnicalMetadata(
+  fileName
 ) {
-
-  if (
-    value === null ||
-    value === undefined
-  ) {
-
-    return null;
-
-  }
-
 
   const text =
     String(
-      value
-    )
-      .trim()
-      .replace(
-        /,/g,
-        ""
-      )
-      .toUpperCase();
+      fileName || ""
+    ).toUpperCase();
 
 
-  if (!text) {
-    return null;
-  }
-
-
-  const match =
-    text.match(
-      /([\d.]+)\s*(TB|GB|MB|KB|B)\b/
-    );
-
-
-  if (!match) {
-    return null;
-  }
-
-
-  const number =
-    Number(
-      match[1]
-    );
+  const tags = [];
 
 
   if (
-    !Number.isFinite(
-      number
+    /\bWEB[- .]?DL\b/.test(
+      text
     )
   ) {
 
-    return null;
+    tags.push(
+      "WEB-DL"
+    );
+
+  } else if (
+    /\bWEB[- .]?RIP\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "WEB-RIP"
+    );
+
+  } else if (
+    /\bBLU[- .]?RAY\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "BluRay"
+    );
+
+  } else if (
+    /\bBDRIP\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "BDRip"
+    );
+
+  } else if (
+    /\bTELECINE\b/.test(
+      text
+    ) ||
+    /\bTC\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "Telecine"
+    );
+
+  } else if (
+    /\bCAM\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "CAM"
+    );
 
   }
-
-
-  const unit =
-    match[2];
 
 
   if (
-    unit === "TB"
+    /\bDOLBY[ ._-]?VISION\b/.test(
+      text
+    ) ||
+    /\bDV\b/.test(
+      text
+    )
   ) {
 
-    return number * 1024;
+    tags.push(
+      "DV"
+    );
+
+  } else if (
+    /\bHDR10\+\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "HDR10+"
+    );
+
+  } else if (
+    /\bHDR10\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "HDR10"
+    );
+
+  } else if (
+    /\bHDR\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "HDR"
+    );
+
+  } else if (
+    /\bHLG\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "HLG"
+    );
 
   }
 
 
   if (
-    unit === "GB"
+    /\bATMOS\b/.test(
+      text
+    )
   ) {
 
-    return number;
+    tags.push(
+      "Atmos"
+    );
+
+  } else if (
+    /\bDDP[ ._-]?7[ ._-]?1\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "DDP7.1"
+    );
+
+  } else if (
+    /\bDDP[ ._-]?5[ ._-]?1\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "DDP5.1"
+    );
+
+  } else if (
+    /\bDD[ ._-]?5[ ._-]?1\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "DD5.1"
+    );
+
+  } else if (
+    /\bDTS\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "DTS"
+    );
+
+  } else if (
+    /\bAAC\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "AAC"
+    );
 
   }
 
 
   if (
-    unit === "MB"
+    /\bH\.?265\b/.test(
+      text
+    ) ||
+    /\bX265\b/.test(
+      text
+    ) ||
+    /\bHEVC\b/.test(
+      text
+    )
   ) {
 
-    return number / 1024;
+    tags.push(
+      "H.265"
+    );
+
+  } else if (
+    /\bH\.?264\b/.test(
+      text
+    ) ||
+    /\bX264\b/.test(
+      text
+    ) ||
+    /\bAVC\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "H.264"
+    );
+
+  } else if (
+    /\bAV1\b/.test(
+      text
+    )
+  ) {
+
+    tags.push(
+      "AV1"
+    );
 
   }
 
 
-  if (
-    unit === "KB"
-  ) {
+  return tags;
 
-    return number /
-      (1024 * 1024);
-
-  }
-
-
-  if (
-    unit === "B"
-  ) {
-
-    return number /
-      (1024 * 1024 * 1024);
-
-  }
-
-
-  return null;
 }
 
 
 // ---------------------------------------------------------
-// Apply file-size settings
+// Language detection
 // ---------------------------------------------------------
 
-function applyFileSizeSettings(
-  streams,
-  config
+function getLanguageTags(
+  fileName
 ) {
 
-  const fileSize =
-    config?.fileSize;
+  const text =
+    String(
+      fileName || ""
+    ).toUpperCase();
 
 
-  /*
-   * No file-size configuration means
-   * preserve the existing behavior.
-   */
+  const languages = [];
 
-  if (
-    !fileSize ||
-    (
-      fileSize.minGb === null &&
-      fileSize.maxGb === null
-    )
+
+  const checks = [
+
+    [
+      /\bMULTI\b/,
+      "Multi"
+    ],
+
+    [
+      /\bDUAL[ ._-]?AUDIO\b/,
+      "Dual Audio"
+    ],
+
+    [
+      /\bHINDI\b/,
+      "Hindi"
+    ],
+
+    [
+      /\bTAMIL\b/,
+      "Tamil"
+    ],
+
+    [
+      /\bTELUGU\b/,
+      "Telugu"
+    ],
+
+    [
+      /\bMALAYALAM\b/,
+      "Malayalam"
+    ],
+
+    [
+      /\bKANNADA\b/,
+      "Kannada"
+    ],
+
+    [
+      /\bBENGALI\b/,
+      "Bengali"
+    ],
+
+    [
+      /\bFRENCH\b/,
+      "French"
+    ],
+
+    [
+      /\bGERMAN\b/,
+      "German"
+    ],
+
+    [
+      /\bSPANISH\b/,
+      "Spanish"
+    ],
+
+    [
+      /\bJAPANESE\b/,
+      "Japanese"
+    ],
+
+    [
+      /\bKOREAN\b/,
+      "Korean"
+    ],
+
+    [
+      /\bCHINESE\b/,
+      "Chinese"
+    ]
+
+  ];
+
+
+  for (
+    const [
+      pattern,
+      label
+    ]
+    of checks
   ) {
 
-    return streams;
+    if (
+      pattern.test(
+        text
+      )
+    ) {
+
+      languages.push(
+        label
+      );
+
+    }
 
   }
 
 
-  const minGb =
-    Number.isFinite(
-      Number(
-        fileSize.minGb
-      )
-    )
-      ? Number(
-          fileSize.minGb
-        )
-      : null;
+  return languages;
+
+}
 
 
-  const maxGb =
-    Number.isFinite(
-      Number(
-        fileSize.maxGb
-      )
-    )
-      ? Number(
-          fileSize.maxGb
-        )
-      : null;
+// ---------------------------------------------------------
+// Stream title
+// ---------------------------------------------------------
+
+function buildStreamTitle(
+  result
+) {
+
+  const fileName =
+    result.fileName ||
+    result.sourceFile?.file_name ||
+    "Unknown";
+
+
+  const quality =
+    getQualityLabel(
+      fileName,
+      result.quality
+    );
+
+
+  const technical =
+    getTechnicalMetadata(
+      fileName
+    );
+
+
+  const languages =
+    getLanguageTags(
+      fileName
+    );
+
+
+  const parts = [
+
+    quality
+
+  ];
 
 
   if (
-    minGb === null &&
-    maxGb === null
+    technical.length
   ) {
 
-    return streams;
+    parts.push(
+      ...technical
+    );
 
   }
 
 
-  const filtered =
-    streams.filter(
-      stream => {
+  if (
+    languages.length
+  ) {
 
-        const sizeGb =
-          parseSizeGb(
-            stream.size
+    parts.push(
+      ...languages
+    );
+
+  }
+
+
+  return parts.join(
+    " • "
+  );
+
+}
+
+
+// ---------------------------------------------------------
+// Build FebBox streams
+// ---------------------------------------------------------
+
+function buildFebboxStreams(
+  qualityResults
+) {
+
+  return qualityResults
+
+    .map(
+      result => {
+
+        const fileName =
+          result.fileName ||
+          result.sourceFile?.file_name ||
+          "Unknown";
+
+
+        const quality =
+          getQualityLabel(
+            fileName,
+            result.quality
           );
 
 
-        /*
-         * If the size is unavailable or
-         * cannot be parsed, keep the stream.
-         */
+        return {
 
-        if (
-          sizeGb === null
-        ) {
+          name:
+            "FebBox",
 
-          return true;
+          title:
+            buildStreamTitle(
+              result
+            ),
 
-        }
+          url:
+            result.url,
 
+          quality,
 
-        if (
-          minGb !== null &&
-          sizeGb < minGb
-        ) {
+          fileName,
 
-          return false;
+          fileSize:
+            result.sourceFile?.file_size ||
+            result.sourceFile?.size ||
+            null,
 
-        }
+          sourceFile:
+            result.sourceFile,
 
+          headers: {
 
-        if (
-          maxGb !== null &&
-          sizeGb > maxGb
-        ) {
+            "User-Agent":
+              WORKING_HEADERS[
+                "User-Agent"
+              ]
 
-          return false;
+          }
 
-        }
-
-
-        return true;
+        };
 
       }
+    )
+
+    .filter(
+      stream =>
+        stream.url
     );
 
-
-  console.log(
-    "[ShowBox] File-size settings:",
-    {
-
-      minGb,
-
-      maxGb,
-
-      before:
-        streams.length,
-
-      after:
-        filtered.length
-
-    }
-  );
-
-
-  return filtered;
 }
 
 
-// =========================================================
-// Main handler
-// =========================================================
+// ---------------------------------------------------------
+// Stream dedupe
+// ---------------------------------------------------------
 
-export default async (
-  req,
+function dedupeStreams(
+  streams
+) {
+
+  const seen =
+    new Set();
+
+
+  const result = [];
+
+
+  for (
+    const stream
+    of streams
+  ) {
+
+    const key =
+      [
+
+        stream.url,
+
+        stream.quality,
+
+        stream.fileName
+
+      ]
+      .join(
+        "|"
+      );
+
+
+    if (
+      seen.has(
+        key
+      )
+    ) {
+
+      continue;
+
+    }
+
+
+    seen.add(
+      key
+    );
+
+
+    result.push(
+      stream
+    );
+
+  }
+
+
+  return result;
+
+}
+
+
+// ---------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------
+
+export default async function handler(
+  request,
   context
-) => {
+) {
 
   const requestId =
     Math.random()
       .toString(36)
-      .slice(2, 8);
+      .slice(
+        2,
+        10
+      );
 
 
   console.log(
-    `[ShowBox][${requestId}] ===== START =====`
+    `[ShowBox][${requestId}] Request:`,
+    request.url
   );
 
 
@@ -3195,70 +2641,77 @@ export default async (
 
     const url =
       new URL(
-        req.url
+        request.url
       );
 
 
-    const pathname =
-      url.pathname;
+    const pathParts =
+      url.pathname
+        .split("/")
+        .filter(
+          Boolean
+        );
 
 
-    // -----------------------------------------------------
-    // Extract config + request
-    // -----------------------------------------------------
+    /*
+      Expected:
 
-    const match =
-      pathname.match(
-        /^\/([^/]+)\/stream\/([^/]+)\/(.+)$/
-      );
+      /:config/stream/:type/:id.json
+
+      Example:
+
+      /eyJ.../stream/movie/tt1234567.json
+    */
 
 
-    if (!match) {
+    if (
+      pathParts.length <
+      4
+    ) {
 
-      throw new Error(
-        "Invalid stream request path"
+      return new Response(
+        JSON.stringify({
+
+          streams:
+            []
+
+        }),
+        {
+
+          status:
+            200,
+
+          headers: {
+
+            "Content-Type":
+              "application/json"
+
+          }
+
+        }
       );
 
     }
 
 
     const rawConfig =
-      match[1];
+      pathParts[0];
 
 
     const type =
-      match[2];
+      pathParts[2];
 
 
-    let rawId =
-      decodeURIComponent(
-        match[3]
-      );
+    const rawId =
+      pathParts[3];
 
 
-    console.log(
-      `[ShowBox][${requestId}] Request:`,
-      {
-        type,
-        rawId
-      }
-    );
-
-
-    // -----------------------------------------------------
-    // Remove .json
-    // -----------------------------------------------------
-
-    rawId =
+    const id =
       rawId.replace(
-        /\.json$/,
+        /\.json$/i,
         ""
       );
 
-
-    // -----------------------------------------------------
-    // Parse configuration
-    // -----------------------------------------------------
 
     const config =
       parseConfig(
@@ -3266,101 +2719,106 @@ export default async (
       );
 
 
-    const token =
-      config.uiToken ||
-      "";
-
-
     console.log(
-      `[ShowBox][${requestId}] Token loaded:`,
+      `[ShowBox][${requestId}] Parsed request:`,
       {
-        present:
-          !!token
+
+        type,
+
+        id,
+
+        config
+
       }
     );
 
 
-    if (!token) {
+    // -----------------------------------------------------
+    // IMDb ID
+    // -----------------------------------------------------
 
-      throw new Error(
-        "No ShowBox UI token configured"
-      );
+    const imdbId =
+      id.startsWith(
+        "tt"
+      )
 
-    }
+        ? id
+
+        : `tt${id}`;
+
+
+    let season =
+      null;
+
+
+    let episode =
+      null;
 
 
     // -----------------------------------------------------
-    // Parse IMDb / season / episode
+    // Series season / episode
     // -----------------------------------------------------
-
-    let imdbId;
-
-    let season;
-
-    let episode;
-
 
     if (
-      type === "series"
+      type ===
+      "series"
     ) {
 
-      const parts =
-        rawId.split(":");
-
-
-      imdbId =
-        parts[0];
-
-
-      season =
-        Number(
-          parts[1]
-        );
-
-
-      episode =
-        Number(
-          parts[2]
+      const match =
+        imdbId.match(
+          /tt\d+:(\d+):(\d+)/
         );
 
 
       if (
-        !imdbId ||
-        !Number.isFinite(
-          season
-        ) ||
-        !Number.isFinite(
-          episode
-        )
+        match
       ) {
 
-        throw new Error(
-          `Invalid series ID: ${rawId}`
-        );
+        season =
+          Number(
+            match[1]
+          );
+
+
+        episode =
+          Number(
+            match[2]
+          );
 
       }
 
-
-      console.log(
-        `[ShowBox][${requestId}] Parsed:`,
-        {
-          imdbId,
-          season,
-          episode
-        }
-      );
-
-    } else {
-
-      imdbId =
-        rawId;
+    }
 
 
-      console.log(
-        `[ShowBox][${requestId}] Parsed:`,
-        {
-          imdbId
-        }
+    const cleanImdbId =
+      imdbId.split(
+        ":"
+      )[0];
+
+
+    console.log(
+      `[ShowBox][${requestId}] IMDb:`,
+      cleanImdbId
+    );
+
+
+    // -----------------------------------------------------
+    // Validate series request
+    // -----------------------------------------------------
+
+    if (
+      type ===
+        "series" &&
+      (
+        season ===
+          null ||
+        episode ===
+          null
+      )
+    ) {
+
+      throw new Error(
+        "Series request missing season or episode"
       );
 
     }
@@ -3372,95 +2830,23 @@ export default async (
 
     const tmdbId =
       await imdbToTmdb(
-        imdbId
+        cleanImdbId
       );
 
 
     console.log(
-      `[ShowBox][${requestId}] TMDB:`,
+      `[ShowBox][${requestId}] TMDB ID:`,
       tmdbId
     );
 
 
     // -----------------------------------------------------
-    // Get title metadata
+    // ShowBox search -> media ID
     // -----------------------------------------------------
-
-    const tmdbDetails =
-      await getTMDBDetails(
-        tmdbId,
-        type
-      );
-
-
-    console.log(
-      `[ShowBox][${requestId}] TMDB details:`,
-      {
-        found:
-          !!tmdbDetails,
-
-        title:
-          tmdbDetails?.title ||
-          tmdbDetails?.name ||
-          null
-      }
-    );
-
-
-    // -----------------------------------------------------
-    // Parse ShowBox token
-    // -----------------------------------------------------
-
-    const parsedToken =
-      parseSingleToken(
-        token
-      );
-
-
-    console.log(
-      `[ShowBox][${requestId}] Token ready:`,
-      {
-        tokenParsed:
-          parsedToken !== token
-      }
-    );
-
-
-    // -----------------------------------------------------
-    // ShowBox
-    // -----------------------------------------------------
-
-    const showboxData =
-      await getShowBoxData(
-        tmdbId,
-        type,
-        season,
-        episode,
-        parsedToken
-      );
-
-
-    if (
-      !showboxData ||
-      showboxData.success === false
-    ) {
-
-      throw new Error(
-        "ShowBox API returned failure"
-      );
-
-    }
-
 
     const showboxId =
-      showboxData.id ||
-      showboxData.mid ||
-      (
-        showboxData.data &&
-        (
-          showboxData.data.id ||
-          showboxData.data.mid
-        )
+      await searchShowBoxMediaId(
+        tmdbId
       );
 
 
@@ -3468,38 +2854,17 @@ export default async (
       `[ShowBox][${requestId}] ShowBox ID:`,
       showboxId
     );
-    
-    console.log(
-  "[ShowBox] ShowBox request URL:",
-  requestUrl.replace(
-    encodeURIComponent(token || ""),
-    "***"
-  )
-);
 
 
-
-    if (!showboxId) {
+    if (
+      !showboxId
+    ) {
 
       throw new Error(
         "ShowBox ID missing"
       );
 
     }
-
-
-    // -----------------------------------------------------
-    // ShowBox version/link streams
-    // -----------------------------------------------------
-
-    const showboxStreams =
-      extractShowBoxStreams(
-        showboxData,
-        tmdbDetails,
-        type,
-        season,
-        episode
-      );
 
 
     // -----------------------------------------------------
@@ -3514,7 +2879,7 @@ export default async (
 
 
     // -----------------------------------------------------
-    // Find ALL matching FebBox files
+    // Find movie / episode files
     // -----------------------------------------------------
 
     const files =
@@ -3526,16 +2891,37 @@ export default async (
       );
 
 
-    // -----------------------------------------------------
-    // Get qualities from ALL matching files
-    // -----------------------------------------------------
-
     const allQualityResults =
       [];
 
 
+    // -----------------------------------------------------
+    // Parse configured token
+    //
+    // Kept here because the Stremio config still supports
+    // the ShowBox token. The current FebBox endpoint does
+    // not require it directly.
+    // -----------------------------------------------------
+
+    const parsedToken =
+      parseSingleToken(
+        config?.token
+      );
+
+
+    console.log(
+      `[ShowBox][${requestId}] Token configured:`,
+      !!parsedToken
+    );
+
+
+    // -----------------------------------------------------
+    // Get quality URLs from every matching file
+    // -----------------------------------------------------
+
     for (
-      const file of files
+      const file
+      of files
     ) {
 
       try {
@@ -3543,13 +2929,13 @@ export default async (
         const results =
           await febboxQualityList(
             file,
-            shareKey,
-            parsedToken
+            shareKey
           );
 
 
         for (
-          const result of results
+          const result
+          of results
         ) {
 
           allQualityResults.push(
@@ -3558,19 +2944,20 @@ export default async (
 
         }
 
-      } catch (error) {
+      } catch (
+        error
+      ) {
 
         console.log(
           "[ShowBox] FebBox file failed:",
           {
+
             file:
               file.file_name,
 
-            fid:
-              file.fid,
-
             error:
               error.message
+
           }
         );
 
@@ -3579,9 +2966,18 @@ export default async (
     }
 
 
+    console.log(
+      `[ShowBox][${requestId}] Quality results before filters:`,
+      allQualityResults.length
+    );
+
+
     // -----------------------------------------------------
-    // Apply CAM / Telecine filter
-    // BEFORE building FebBox streams
+    // CAM / Telecine / Telesync filtering
+    //
+    // IMPORTANT:
+    // This was previously defined but never called.
+    // It now runs BEFORE stream construction.
     // -----------------------------------------------------
 
     const filteredQualityResults =
@@ -3592,32 +2988,27 @@ export default async (
 
 
     // -----------------------------------------------------
-    // FebBox streams
+    // Build FebBox streams
     // -----------------------------------------------------
 
     const febboxStreams =
       buildFebboxStreams(
-        filteredQualityResults,
-        tmdbDetails,
-        type,
-        season,
-        episode
+        filteredQualityResults
       );
 
 
     // -----------------------------------------------------
-    // Combine both sources
+    // Dedupe streams
     // -----------------------------------------------------
 
     const streams =
       dedupeStreams([
-        ...febboxStreams,
-        ...showboxStreams
+        ...febboxStreams
       ]);
 
 
     // -----------------------------------------------------
-    // Apply quality settings
+    // Quality settings
     // -----------------------------------------------------
 
     const qualityFilteredStreams =
@@ -3628,7 +3019,7 @@ export default async (
 
 
     // -----------------------------------------------------
-    // Apply file-size settings
+    // File-size settings
     // -----------------------------------------------------
 
     const configuredStreams =
@@ -3638,52 +3029,25 @@ export default async (
       );
 
 
-    if (
-      !configuredStreams.length
-    ) {
-
-      throw new Error(
-        "No streams remain after filtering"
-      );
-
-    }
-
-
-    // -----------------------------------------------------
-    // Final diagnostics
-    // -----------------------------------------------------
-
     console.log(
-      `[ShowBox][${requestId}] Stream breakdown:`,
-      {
-
-        febbox:
-          febboxStreams.length,
-
-        showbox:
-          showboxStreams.length,
-
-        combined:
-          streams.length,
-
-        final:
-          configuredStreams.length
-
-      }
+      `[ShowBox][${requestId}] Final streams:`,
+      configuredStreams.length
     );
 
 
-    console.log(
-      `[ShowBox][${requestId}] ===== END =====`
-    );
-
+    // -----------------------------------------------------
+    // Stremio response
+    // -----------------------------------------------------
 
     return new Response(
       JSON.stringify({
+
         streams:
           configuredStreams
+
       }),
       {
+
         status:
           200,
 
@@ -3692,37 +3056,34 @@ export default async (
           "Content-Type":
             "application/json",
 
-          "Access-Control-Allow-Origin":
-            "*"
+          "Cache-Control":
+            "no-store"
 
         }
+
       }
     );
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
-      `[ShowBox][${requestId}] ===== ERROR =====`
-    );
-
-
-    console.error(
-      `[ShowBox][${requestId}]`,
-      error.message
-    );
-
-
-    console.error(
-      `[ShowBox][${requestId}] ===== END ERROR =====`
+      `[ShowBox][${requestId}] Error:`,
+      error
     );
 
 
     return new Response(
       JSON.stringify({
-        streams: []
+
+        streams:
+          []
+
       }),
       {
+
         status:
           200,
 
@@ -3731,16 +3092,17 @@ export default async (
           "Content-Type":
             "application/json",
 
-          "Access-Control-Allow-Origin":
-            "*"
+          "Cache-Control":
+            "no-store"
 
         }
+
       }
     );
 
   }
 
-};
+}
 
 
 // ---------------------------------------------------------
