@@ -2758,20 +2758,14 @@ function normalizeStreamFilterConfig(
 // Detect CAM / Telecine
 // ---------------------------------------------------------
 
-function isCamOrTelecine(
-  fileName
-) {
-
-  const text =
-    String(
-      fileName || ""
-    )
-      .toUpperCase();
-
+function isCamOrTelecine(fileName) {
+  const text = String(fileName || "").toUpperCase();
 
   return (
     /\bTELECINE\b/.test(text) ||
+    /(?:^|[._\-\s])TC(?:$|[._\-\s])/.test(text) ||
     /\bTELESYNC\b/.test(text) ||
+    /(?:^|[._\-\s])TS(?:$|[._\-\s])/.test(text) ||
     /\bCAMRIP\b/.test(text) ||
     /\bCAM\b/.test(text)
   );
