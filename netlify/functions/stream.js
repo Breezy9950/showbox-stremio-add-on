@@ -1403,7 +1403,7 @@ function getTechnicalMetadata(
     );
 
   } else if (
-    /\bTELESYNC\b/.test(
+    /\bTELECINE\b/.test(
       upper
     ) ||
     /\bTS\b/.test(
@@ -1412,7 +1412,7 @@ function getTechnicalMetadata(
   ) {
 
     result.push(
-      "TELESYNC"
+      "TELECINE"
     );
 
   } else if (
@@ -2772,7 +2772,7 @@ function normalizeStreamFilterConfig(
 // Detect CAM / Telesync
 // ---------------------------------------------------------
 
-function isCamOrTelesync(
+function isCamOrTelecine(
   fileName
 ) {
 
@@ -2784,10 +2784,10 @@ function isCamOrTelesync(
 
 
   return (
-    /\bTELESYNC\b/.test(text) ||
-    /\bTS\b/.test(text) ||
-    /\bCAM\b/.test(text)
-  );
+      return (
+      /\bTELECINE\b/.test(text) ||
+      /\bCAM\b/.test(text)
+    );
 }
 
 
@@ -2828,7 +2828,7 @@ function applyStreamFilters(
 
         if (
           !filters.cam &&
-          isCamOrTelesync(
+          isCamOrTelecine(
             fileName
           )
         ) {
