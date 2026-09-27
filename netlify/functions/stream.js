@@ -2723,8 +2723,7 @@ function applyQualitySettings(
 // =========================================================
 
 const DEFAULT_STREAM_FILTERS = {
-  cam: true,
-  atmos: true
+  cam: true
 };
 
 
@@ -2745,7 +2744,7 @@ function normalizeStreamFilterConfig(
    * stream filters.
    *
    * Preserve their previous behavior by
-   * keeping both filters enabled.
+   * keeping CAM enabled.
    */
 
   if (
@@ -2763,10 +2762,7 @@ function normalizeStreamFilterConfig(
   return {
 
     cam:
-      filters.cam !== false,
-
-    atmos:
-      filters.atmos !== false
+      filters.cam !== false
 
   };
 }
@@ -2792,25 +2788,6 @@ function isCamOrTelesync(
     /\bTS\b/.test(text) ||
     /\bCAM\b/.test(text)
   );
-}
-
-
-// ---------------------------------------------------------
-// Detect Dolby Atmos
-// ---------------------------------------------------------
-
-function isAtmos(
-  fileName
-) {
-
-  const text =
-    String(
-      fileName || ""
-    )
-      .toUpperCase();
-
-
-  return /\bATMOS\b/.test(text);
 }
 
 
@@ -2861,18 +2838,6 @@ function applyStreamFilters(
         }
 
 
-        if (
-          !filters.atmos &&
-          isAtmos(
-            fileName
-          )
-        ) {
-
-          return false;
-
-        }
-
-
         return true;
 
       }
@@ -2885,9 +2850,6 @@ function applyStreamFilters(
 
       cam:
         filters.cam,
-
-      atmos:
-        filters.atmos,
 
       before:
         qualityResults.length,
@@ -3521,7 +3483,7 @@ export default async (
 
 
     // -----------------------------------------------------
-    // Apply CAM / Telesync / Atmos filters
+    // Apply CAM / Telesync filter
     // BEFORE building Stremio streams
     // -----------------------------------------------------
 
@@ -3551,9 +3513,9 @@ export default async (
     // -----------------------------------------------------
 
     const streams =
-       dedupeStreams([
+      dedupeStreams([
         ...febboxStreams
-       ]);
+      ]);
 
 
     // -----------------------------------------------------
