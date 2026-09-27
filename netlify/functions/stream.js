@@ -6,6 +6,24 @@ const TMDB_API_KEY =
 const TMDB_BASE_URL =
   "https://api.themoviedb.org/3";
 
+const SHOWBOX_API =
+  "https://id-mapping-api-showbox-proxy.hf.space/api/media";
+
+const WORKING_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+
+  Accept:
+    "application/json",
+
+  "Accept-Language":
+    "en-US,en;q=0.9",
+
+  "Content-Type":
+    "application/json"
+};
+
+
 // ---------------------------------------------------------
 // Base64URL
 // ---------------------------------------------------------
@@ -282,418 +300,75 @@ async function getTMDBDetails(
 
 
 // ---------------------------------------------------------
-// ShowBox web search: IMDb -> ShowBox media ID
+// ShowBox API
 // ---------------------------------------------------------
 
-const SHOWBOX_WEB_API =
-  "https://showbox.media";
-
-const SHOWBOX_SEARCH_HEADERS = {
-  "Accept":
-    "application/json, text/html, */*",
-
-  "Accept-Language":
-    "en",
-
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
-};
-
-
-// ---------------------------------------------------------
-// Parse ShowBox search result
-// ---------------------------------------------------------
-
-function parseShowBoxSearchHref(
-  html
+async function getShowBoxData(
+  tmdbId,
+  type,
+  season,
+  episode,
+  token
 ) {
 
-  /*
-   * ShowBox search-page markup can change.
-   * Do not depend on a specific CSS class.
-   *
-   * Look for actual movie / TV detail links.
-   */
-
-  const hrefMatches =
-    html.match(
-      /href=["']([^"']+)["']/gi
-    ) || [];
-
-
-  for (
-    const rawMatch of hrefMatches
-  ) {
-
-    const match =
-      rawMatch.match(
-        /href=["']([^"']+)["']/i
-      );
-
-
-    if (
-      !match?.[1]
-    ) {
-      continue;
-    }
-
-
-    const href =
-      match[1];
-
-
-    /*
-     * Accept ShowBox media detail paths.
-     *
-     * Examples:
-     *
-     * /movie/m-spider-man-brand-new-day-2026
-     * /tv/t-spider-noir-2026
-     */
-
-    if (
-      !/^\/(?:movie|tv)\/[^/?#]+/i.test(
-        href
-      )
-    ) {
-
-      continue;
-
-    }
-
-
-    return new URL(
-      href,
-      SHOWBOX_WEB_API
-    ).href;
-
-  }
-
-
-  /*
-   * Fallback for absolute ShowBox URLs.
-   */
-
-  const absoluteMatch =
-    html.match(
-      /https?:\/\/(?:www\.)?showbox\.media\/(?:movie|tv)\/[^"'<>?\s]+/i
-    );
+  let requestUrl;
 
 
   if (
-    absoluteMatch?.[0]
+    type === "series"
   ) {
 
-    return absoluteMatch[0];
+    requestUrl =
+      `${SHOWBOX_API}/tv/${tmdbId}/${season}/${episode}?cookie=${encodeURIComponent(token)}`;
+
+  } else {
+
+    requestUrl =
+      `${SHOWBOX_API}/movie/${tmdbId}?cookie=${encodeURIComponent(token)}`;
 
   }
 
-
-  return null;
-}
-
-
-function parseShowBoxHeadingId(
-  html
-) {
-
-  const match =
-    html.match(
-      /class="heading-name[^"]*"[^>]*>[\s\S]*?<a[^>]+href="([^"]+)"/i
-    );
-
-
-  if (
-    !match?.[1]
-  ) {
-
-    return null;
-
-  }
-
-
-  const id =
-    match[1]
-      .split("/")
-      .filter(Boolean)
-      .pop();
-
-
-  return id || null;
-}
-
-
-async function searchShowBoxMediaId(
-  imdbId
-) {
 
   console.log(
-    "[ShowBox] Web search:",
-    imdbId
+    "[ShowBox] ShowBox request:",
+    {
+      type,
+      tmdbId,
+      season,
+      episode
+    }
   );
 
 
-  const searchUrl =
-    `${SHOWBOX_WEB_API}/search?keyword=${encodeURIComponent(imdbId)}`;
-
-
-  const searchResponse =
+  const response =
     await fetch(
-      searchUrl,
+      requestUrl,
       {
         headers:
-          SHOWBOX_SEARCH_HEADERS
+          WORKING_HEADERS
       }
     );
 
 
   console.log(
-    "[ShowBox] Web search response:",
+    "[ShowBox] ShowBox response:",
     {
       status:
-        searchResponse.status,
-
-      contentType:
-        searchResponse.headers.get(
-          "content-type"
-        ),
-
-      finalUrl:
-        searchResponse.url
+        response.status
     }
   );
 
 
-  if (
-    !searchResponse.ok
-  ) {
+  if (!response.ok) {
 
     throw new Error(
-      `ShowBox web search failed: HTTP ${searchResponse.status}`
+      `ShowBox API HTTP ${response.status}`
     );
 
   }
 
 
-  const searchHtml =
-    await searchResponse.text();
-
-
-  console.log(
-    "[ShowBox] Web search body:",
-    {
-      length:
-        searchHtml.length,
-
-      preview:
-        searchHtml.slice(
-          0,
-          1500
-        )
-    }
-  );
-
-
-  const detailUrl =
-    parseShowBoxSearchHref(
-      searchHtml
-    );
-
-
-  console.log(
-    "[ShowBox] Parsed detail URL:",
-    detailUrl
-  );
-
-
-  if (
-    !detailUrl
-  ) {
-
-    throw new Error(
-      "ShowBox web search result not found"
-    );
-
-  }
-
-
-  console.log(
-    "[ShowBox] Web search detail URL:",
-    detailUrl
-  );
-
-
-  const detailResponse =
-    await fetch(
-      detailUrl,
-      {
-        headers:
-          SHOWBOX_SEARCH_HEADERS
-      }
-    );
-
-
-  console.log(
-    "[ShowBox] Web detail response:",
-    detailResponse.status
-  );
-
-
-  if (
-    !detailResponse.ok
-  ) {
-
-    throw new Error(
-      `ShowBox web detail failed: HTTP ${detailResponse.status}`
-    );
-
-  }
-
-
-  const detailHtml =
-    await detailResponse.text();
-
-
-  console.log(
-    "[ShowBox] Web detail body:",
-    {
-      length:
-        detailHtml.length,
-
-      preview:
-        detailHtml.slice(
-          0,
-          1000
-        )
-    }
-  );
-
-
-  const showboxId =
-    parseShowBoxHeadingId(
-      detailHtml
-    );
-
-
-  if (
-    !showboxId
-  ) {
-
-    throw new Error(
-      "ShowBox media ID not found"
-    );
-
-  }
-
-
-  console.log(
-    "[ShowBox] Verified media ID:",
-    showboxId
-  );
-
-
-  return showboxId;
-}
-
-  console.log(
-    "[ShowBox] Web search response:",
-    searchResponse.status
-  );
-
-
-  if (
-    !searchResponse.ok
-  ) {
-
-    throw new Error(
-      `ShowBox web search failed: HTTP ${searchResponse.status}`
-    );
-
-  }
-
-
-  const searchHtml =
-    await searchResponse.text();
-
-
-  const detailUrl =
-    parseShowBoxSearchHref(
-      searchHtml
-    );
-
-
-  if (
-    !detailUrl
-  ) {
-
-    throw new Error(
-      "ShowBox web search result not found"
-    );
-
-  }
-
-
-  console.log(
-    "[ShowBox] Web search detail URL:",
-    detailUrl
-  );
-
-
-  const detailResponse =
-    await fetch(
-      detailUrl,
-      {
-        headers:
-          SHOWBOX_SEARCH_HEADERS
-      }
-    );
-
-
-  console.log(
-    "[ShowBox] Web detail response:",
-    detailResponse.status
-  );
-
-
-  if (
-    !detailResponse.ok
-  ) {
-
-    throw new Error(
-      `ShowBox web detail failed: HTTP ${detailResponse.status}`
-    );
-
-  }
-
-
-  const detailHtml =
-    await detailResponse.text();
-
-
-  const showboxId =
-    parseShowBoxHeadingId(
-      detailHtml
-    );
-
-
-  if (
-    !showboxId
-  ) {
-
-    throw new Error(
-      "ShowBox media ID not found"
-    );
-
-  }
-
-
-  console.log(
-    "[ShowBox] Verified media ID:",
-    showboxId
-  );
-
-
-  return showboxId;
+  return await response.json();
 }
 
 
@@ -1608,6 +1283,9 @@ function getTechnicalMetadata(
   } else if (
     /\bTELESYNC\b/.test(
       upper
+    ) ||
+    /\bTS\b/.test(
+      upper
     )
   ) {
 
@@ -2451,6 +2129,184 @@ function buildFebboxStreams(
 
 
 // ---------------------------------------------------------
+// Extract ShowBox versions
+// ---------------------------------------------------------
+
+function getShowBoxVersions(
+  showboxData
+) {
+
+  if (
+    Array.isArray(
+      showboxData?.versions
+    )
+  ) {
+
+    return showboxData.versions;
+
+  }
+
+
+  if (
+    Array.isArray(
+      showboxData?.data?.versions
+    )
+  ) {
+
+    return showboxData.data.versions;
+
+  }
+
+
+  return [];
+}
+
+
+// ---------------------------------------------------------
+// Extract ShowBox version/link streams
+// ---------------------------------------------------------
+
+function extractShowBoxStreams(
+  showboxData,
+  tmdbDetails,
+  type,
+  season,
+  episode
+) {
+
+  const versions =
+    getShowBoxVersions(
+      showboxData
+    );
+
+
+  const streams = [];
+
+
+  for (
+    const version of versions
+  ) {
+
+    if (
+      !version ||
+      !Array.isArray(
+        version.links
+      )
+    ) {
+
+      continue;
+
+    }
+
+
+    for (
+      const link of version.links
+    ) {
+
+      if (
+        !link ||
+        !link.url
+      ) {
+
+        continue;
+
+      }
+
+
+      const fileName =
+        link.file_name ||
+        link.filename ||
+        link.fileName ||
+        link.name ||
+        version.file_name ||
+        version.filename ||
+        version.fileName ||
+        version.name ||
+        "";
+
+
+      const quality =
+        link.quality ||
+        version.quality ||
+        "";
+
+
+      const size =
+        link.size ||
+        version.size ||
+        "";
+
+
+      const item = {
+
+        url:
+          link.url,
+
+        quality,
+
+        size,
+
+        fileName,
+
+        link,
+
+        sourceFile:
+          link
+
+      };
+
+
+      streams.push({
+
+        name:
+          getQualityLabel(
+            quality,
+            fileName
+          ) ||
+          "ShowBox",
+
+
+        title:
+          buildStreamTitle(
+            item,
+            tmdbDetails,
+            type,
+            season,
+            episode
+          ),
+
+
+        url:
+          link.url,
+
+
+        size:
+          size,
+
+
+        behaviorHints: {
+          bingeGroup:
+            "showbox"
+        }
+
+      });
+
+    }
+
+  }
+
+
+  console.log(
+    "[ShowBox] ShowBox version streams:",
+    streams.length
+  );
+
+
+  return streams;
+}
+
+
+// ---------------------------------------------------------
 // Remove duplicate URLs
 // ---------------------------------------------------------
 
@@ -2520,6 +2376,13 @@ const DEFAULT_QUALITIES = [
 function normalizeQualityConfig(
   config
 ) {
+
+  /*
+   * Old configured addon URLs don't have
+   * a qualities property.
+   *
+   * Preserve their previous behavior.
+   */
 
   if (
     !Array.isArray(
@@ -2599,6 +2462,11 @@ function normalizeQualityConfig(
 
   }
 
+
+  /*
+   * Append any default qualities missing
+   * from the configuration.
+   */
 
   for (
     const quality of DEFAULT_QUALITIES
@@ -2753,6 +2621,11 @@ function getStreamQuality(
     );
 
 
+  /*
+   * The quality is normally the first part
+   * of the technical line.
+   */
+
   const firstLine =
     title.split(
       "\n"
@@ -2793,6 +2666,11 @@ function applyQualitySettings(
     );
 
 
+  /*
+   * Old configuration URLs don't have
+   * quality settings.
+   */
+
   if (
     !qualityConfig.configured
   ) {
@@ -2812,6 +2690,11 @@ function applyQualitySettings(
           );
 
 
+        /*
+         * Keep streams whose quality cannot
+         * be identified.
+         */
+
         if (!quality) {
           return true;
         }
@@ -2824,6 +2707,14 @@ function applyQualitySettings(
       }
     );
 
+
+  /*
+   * Stable sort:
+   * recognized qualities follow the user's
+   * configured priority.
+   *
+   * Unknown qualities stay after them.
+   */
 
   filtered.sort(
     (a, b) => {
@@ -3016,6 +2907,7 @@ function applyStreamFilters(
 // FILE SIZE CONFIGURATION
 // =========================================================
 
+
 // ---------------------------------------------------------
 // Parse file size into GB
 // ---------------------------------------------------------
@@ -3147,6 +3039,11 @@ function applyFileSizeSettings(
     config?.fileSize;
 
 
+  /*
+   * No file-size configuration means
+   * preserve the existing behavior.
+   */
+
   if (
     !fileSize ||
     (
@@ -3203,6 +3100,11 @@ function applyFileSizeSettings(
             stream.size
           );
 
+
+        /*
+         * If the size is unavailable or
+         * cannot be parsed, keep the stream.
+         */
 
         if (
           sizeGb === null
@@ -3520,9 +3422,37 @@ export default async (
     // ShowBox
     // -----------------------------------------------------
 
+    const showboxData =
+      await getShowBoxData(
+        tmdbId,
+        type,
+        season,
+        episode,
+        parsedToken
+      );
+
+
+    if (
+      !showboxData ||
+      showboxData.success === false
+    ) {
+
+      throw new Error(
+        "ShowBox API returned failure"
+      );
+
+    }
+
+
     const showboxId =
-      await searchShowBoxMediaId(
-        imdbId
+      showboxData.id ||
+      showboxData.mid ||
+      (
+        showboxData.data &&
+        (
+          showboxData.data.id ||
+          showboxData.data.mid
+        )
       );
 
 
@@ -3539,6 +3469,20 @@ export default async (
       );
 
     }
+
+
+    // -----------------------------------------------------
+    // ShowBox version/link streams
+    // -----------------------------------------------------
+
+    const showboxStreams =
+      extractShowBoxStreams(
+        showboxData,
+        tmdbDetails,
+        type,
+        season,
+        episode
+      );
 
 
     // -----------------------------------------------------
@@ -3620,7 +3564,7 @@ export default async (
 
     // -----------------------------------------------------
     // Apply CAM / Telecine filter
-    // BEFORE building Stremio streams
+    // BEFORE building FebBox streams
     // -----------------------------------------------------
 
     const filteredQualityResults =
@@ -3650,7 +3594,8 @@ export default async (
 
     const streams =
       dedupeStreams([
-        ...febboxStreams
+        ...febboxStreams,
+        ...showboxStreams
       ]);
 
 
@@ -3697,6 +3642,9 @@ export default async (
 
         febbox:
           febboxStreams.length,
+
+        showbox:
+          showboxStreams.length,
 
         combined:
           streams.length,
