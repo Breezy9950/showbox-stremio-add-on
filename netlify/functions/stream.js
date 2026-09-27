@@ -1406,19 +1406,6 @@ function getTechnicalMetadata(
     /\bTELECINE\b/.test(
       upper
     ) ||
-    /\bTS\b/.test(
-      upper
-    )
-  ) {
-
-    result.push(
-      "TELECINE"
-    );
-
-  } else if (
-    /\bTELECINE\b/.test(
-      upper
-    ) ||
     /\bTC\b/.test(
       upper
     )
@@ -2769,7 +2756,7 @@ function normalizeStreamFilterConfig(
 
 
 // ---------------------------------------------------------
-// Detect CAM / Telesync
+// Detect CAM / Telecine
 // ---------------------------------------------------------
 
 function isCamOrTelecine(
@@ -2784,10 +2771,9 @@ function isCamOrTelecine(
 
 
   return (
-      return (
-      /\bTELECINE\b/.test(text) ||
-      /\bCAM\b/.test(text)
-    );
+    /\bTELECINE\b/.test(text) ||
+    /\bCAM\b/.test(text)
+  );
 }
 
 
@@ -3483,7 +3469,7 @@ export default async (
 
 
     // -----------------------------------------------------
-    // Apply CAM / Telesync filter
+    // Apply CAM / Telecine filter
     // BEFORE building Stremio streams
     // -----------------------------------------------------
 
