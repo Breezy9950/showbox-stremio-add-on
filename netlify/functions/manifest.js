@@ -1443,7 +1443,7 @@ ShowBox UI Token
 
 <input
   id="tokenInput"
-  type="password"
+  type="text"
   autocomplete="off"
   autocapitalize="none"
   spellcheck="false"
