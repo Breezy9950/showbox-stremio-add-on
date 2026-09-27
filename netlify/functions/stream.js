@@ -280,6 +280,7 @@ async function getTMDBDetails(
   }
 }
 
+
 // ---------------------------------------------------------
 // ShowBox web search: IMDb -> ShowBox media ID
 // ---------------------------------------------------------
@@ -491,6 +492,7 @@ async function searchShowBoxMediaId(
 
   return showboxId;
 }
+
 
 // ---------------------------------------------------------
 // FebBox share
@@ -2247,6 +2249,7 @@ function buildFebboxStreams(
   );
 }
 
+
 // ---------------------------------------------------------
 // Remove duplicate URLs
 // ---------------------------------------------------------
@@ -2703,6 +2706,191 @@ function applyQualitySettings(
 
       before:
         streams.length,
+
+      after:
+        filtered.length
+
+    }
+  );
+
+
+  return filtered;
+}
+
+
+// =========================================================
+// STREAM FILTER CONFIGURATION
+// =========================================================
+
+const DEFAULT_STREAM_FILTERS = {
+  cam: true,
+  atmos: true
+};
+
+
+// ---------------------------------------------------------
+// Normalize stream filter configuration
+// ---------------------------------------------------------
+
+function normalizeStreamFilterConfig(
+  config
+) {
+
+  const filters =
+    config?.filters;
+
+
+  /*
+   * Old addon configurations don't have
+   * stream filters.
+   *
+   * Preserve their previous behavior by
+   * keeping both filters enabled.
+   */
+
+  if (
+    !filters ||
+    typeof filters !== "object"
+  ) {
+
+    return {
+      ...DEFAULT_STREAM_FILTERS
+    };
+
+  }
+
+
+  return {
+
+    cam:
+      filters.cam !== false,
+
+    atmos:
+      filters.atmos !== false
+
+  };
+}
+
+
+// ---------------------------------------------------------
+// Detect CAM / Telesync
+// ---------------------------------------------------------
+
+function isCamOrTelesync(
+  fileName
+) {
+
+  const text =
+    String(
+      fileName || ""
+    )
+      .toUpperCase();
+
+
+  return (
+    /\bTELESYNC\b/.test(text) ||
+    /\bTS\b/.test(text) ||
+    /\bCAM\b/.test(text)
+  );
+}
+
+
+// ---------------------------------------------------------
+// Detect Dolby Atmos
+// ---------------------------------------------------------
+
+function isAtmos(
+  fileName
+) {
+
+  const text =
+    String(
+      fileName || ""
+    )
+      .toUpperCase();
+
+
+  return /\bATMOS\b/.test(text);
+}
+
+
+// ---------------------------------------------------------
+// Apply stream filters
+// ---------------------------------------------------------
+
+function applyStreamFilters(
+  qualityResults,
+  config
+) {
+
+  const filters =
+    normalizeStreamFilterConfig(
+      config
+    );
+
+
+  /*
+   * Filter the original FebBox file
+   * metadata before streams are built.
+   *
+   * This means the filtering uses the
+   * actual source filename rather than
+   * trying to infer the source later from
+   * the generated Stremio title.
+   */
+
+  const filtered =
+    qualityResults.filter(
+      item => {
+
+        const fileName =
+          item.fileName ||
+          item.sourceFile?.file_name ||
+          "";
+
+
+        if (
+          !filters.cam &&
+          isCamOrTelesync(
+            fileName
+          )
+        ) {
+
+          return false;
+
+        }
+
+
+        if (
+          !filters.atmos &&
+          isAtmos(
+            fileName
+          )
+        ) {
+
+          return false;
+
+        }
+
+
+        return true;
+
+      }
+    );
+
+
+  console.log(
+    "[ShowBox] Stream filters:",
+    {
+
+      cam:
+        filters.cam,
+
+      atmos:
+        filters.atmos,
+
+      before:
+        qualityResults.length,
 
       after:
         filtered.length
@@ -3333,12 +3521,24 @@ export default async (
 
 
     // -----------------------------------------------------
+    // Apply CAM / Telesync / Atmos filters
+    // BEFORE building Stremio streams
+    // -----------------------------------------------------
+
+    const filteredQualityResults =
+      applyStreamFilters(
+        allQualityResults,
+        config
+      );
+
+
+    // -----------------------------------------------------
     // FebBox streams
     // -----------------------------------------------------
 
     const febboxStreams =
       buildFebboxStreams(
-        allQualityResults,
+        filteredQualityResults,
         tmdbDetails,
         type,
         season,
@@ -3394,21 +3594,22 @@ export default async (
     // -----------------------------------------------------
 
     console.log(
-  `[ShowBox][${requestId}] Stream breakdown:`,
-  {
+      `[ShowBox][${requestId}] Stream breakdown:`,
+      {
 
-    febbox:
-      febboxStreams.length,
+        febbox:
+          febboxStreams.length,
 
-    combined:
-      streams.length,
+        combined:
+          streams.length,
 
-    final:
-      configuredStreams.length
+        final:
+          configuredStreams.length
 
-  }
-);
-    
+      }
+    );
+
+
     console.log(
       `[ShowBox][${requestId}] ===== END =====`
     );
