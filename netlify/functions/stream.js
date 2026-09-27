@@ -7,7 +7,7 @@ const TMDB_BASE_URL =
   "https://api.themoviedb.org/3";
 
 const SHOWBOX_API =
-  "https://id-mapping-api-showbox-proxy.hf.space/api/media";
+  "https://febapi.nuvioapp.space/api/media";
 
 const WORKING_HEADERS = {
   "User-Agent":
