@@ -3700,3 +3700,23 @@ export const config = {
     "/:config/stream/:type/:id.json"
 
 };
+
+console.log(
+  "[ShowBox] ===== STREAM FUNCTION LOADED =====",
+  {
+    time:
+      new Date().toISOString(),
+
+    function:
+      "stream",
+
+    route:
+      "/:config/stream/:type/:id.json",
+
+    showboxApi:
+      SHOWBOX_API,
+
+    showboxWebApi:
+      SHOWBOX_WEB_API
+  }
+);
