@@ -371,6 +371,217 @@ async function getShowBoxData(
   return await response.json();
 }
 
+// ---------------------------------------------------------
+// ShowBox web search: IMDb -> ShowBox media ID
+// ---------------------------------------------------------
+
+const SHOWBOX_WEB_API =
+  "https://showbox.media";
+
+const SHOWBOX_SEARCH_HEADERS = {
+  "Accept":
+    "application/json, text/html, */*",
+
+  "Accept-Language":
+    "en",
+
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
+};
+
+
+function parseShowBoxSearchHref(
+  html
+) {
+
+  const patterns = [
+    /class="film-name[^"]*"[^>]*>\s*<a[^>]+href="([^"]+)"/i,
+    /<a[^>]+href="([^"]+)"[^>]*class="[^"]*film-name[^"]*"/i
+  ];
+
+
+  for (
+    const pattern of patterns
+  ) {
+
+    const match =
+      html.match(
+        pattern
+      );
+
+
+    if (
+      match?.[1]
+    ) {
+
+      return new URL(
+        match[1],
+        SHOWBOX_WEB_API
+      ).href;
+
+    }
+
+  }
+
+
+  return null;
+}
+
+
+function parseShowBoxHeadingId(
+  html
+) {
+
+  const match =
+    html.match(
+      /class="heading-name[^"]*"[^>]*>[\s\S]*?<a[^>]+href="([^"]+)"/i
+    );
+
+
+  if (
+    !match?.[1]
+  ) {
+
+    return null;
+
+  }
+
+
+  const id =
+    match[1]
+      .split("/")
+      .filter(Boolean)
+      .pop();
+
+
+  return id || null;
+}
+
+
+async function searchShowBoxMediaId(
+  imdbId
+) {
+
+  console.log(
+    "[ShowBox] Web search:",
+    imdbId
+  );
+
+
+  const searchUrl =
+    `${SHOWBOX_WEB_API}/search?keyword=${encodeURIComponent(imdbId)}`;
+
+
+  const searchResponse =
+    await fetch(
+      searchUrl,
+      {
+        headers:
+          SHOWBOX_SEARCH_HEADERS
+      }
+    );
+
+
+  console.log(
+    "[ShowBox] Web search response:",
+    searchResponse.status
+  );
+
+
+  if (
+    !searchResponse.ok
+  ) {
+
+    throw new Error(
+      `ShowBox web search failed: HTTP ${searchResponse.status}`
+    );
+
+  }
+
+
+  const searchHtml =
+    await searchResponse.text();
+
+
+  const detailUrl =
+    parseShowBoxSearchHref(
+      searchHtml
+    );
+
+
+  if (
+    !detailUrl
+  ) {
+
+    throw new Error(
+      "ShowBox web search result not found"
+    );
+
+  }
+
+
+  console.log(
+    "[ShowBox] Web search detail URL:",
+    detailUrl
+  );
+
+
+  const detailResponse =
+    await fetch(
+      detailUrl,
+      {
+        headers:
+          SHOWBOX_SEARCH_HEADERS
+      }
+    );
+
+
+  console.log(
+    "[ShowBox] Web detail response:",
+    detailResponse.status
+  );
+
+
+  if (
+    !detailResponse.ok
+  ) {
+
+    throw new Error(
+      `ShowBox web detail failed: HTTP ${detailResponse.status}`
+    );
+
+  }
+
+
+  const detailHtml =
+    await detailResponse.text();
+
+
+  const showboxId =
+    parseShowBoxHeadingId(
+      detailHtml
+    );
+
+
+  if (
+    !showboxId
+  ) {
+
+    throw new Error(
+      "ShowBox media ID not found"
+    );
+
+  }
+
+
+  console.log(
+    "[ShowBox] Verified media ID:",
+    showboxId
+  );
+
+
+  return showboxId;
+}
 
 // ---------------------------------------------------------
 // FebBox share
@@ -3316,14 +3527,8 @@ export default async (
 
 
     const showboxId =
-      showboxData.id ||
-      showboxData.mid ||
-      (
-        showboxData.data &&
-        (
-          showboxData.data.id ||
-          showboxData.data.mid
-        )
+      await searchShowBoxMediaId(
+        imdbId
       );
 
 
