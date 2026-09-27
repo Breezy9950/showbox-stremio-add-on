@@ -324,7 +324,7 @@ async function getShowBoxData(
   } else {
 
     requestUrl =
-      `${SHOWBOX_API}/movie/${tmdbId}?cookie=${encodeURIComponent(token)}`;
+      `${SHOWBOX_API}/movie/${tmdbId}/oss=USA7?cookie=${encodeURIComponent(token)}`
 
   }
 
