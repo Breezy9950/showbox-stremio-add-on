@@ -1067,7 +1067,7 @@ async function findFebboxFiles(
   );
 
 
-  return matchingFiles;
+  return matchingFiles.slice(0, 1);
 }
 
 
