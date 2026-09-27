@@ -3,27 +3,6 @@ import CryptoJS from "crypto-js";
 const TMDB_API_KEY =
   "439c478a771f35c05022f9feabcca01c";
 
-const TMDB_BASE_URL =
-  "https://api.themoviedb.org/3";
-
-const SHOWBOX_API =
-  "https://id-mapping-api-showbox-proxy.hf.space/api/media";
-
-const WORKING_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-
-  Accept:
-    "application/json",
-
-  "Accept-Language":
-    "en-US,en;q=0.9",
-
-  "Content-Type":
-    "application/json"
-};
-
-
 // ---------------------------------------------------------
 // Base64URL
 // ---------------------------------------------------------
@@ -296,79 +275,6 @@ async function getTMDBDetails(
     return null;
 
   }
-}
-
-
-// ---------------------------------------------------------
-// ShowBox API
-// ---------------------------------------------------------
-
-async function getShowBoxData(
-  tmdbId,
-  type,
-  season,
-  episode,
-  token
-) {
-
-  let requestUrl;
-
-
-  if (
-    type === "series"
-  ) {
-
-    requestUrl =
-      `${SHOWBOX_API}/tv/${tmdbId}/${season}/${episode}?cookie=${encodeURIComponent(token)}`;
-
-  } else {
-
-    requestUrl =
-      `${SHOWBOX_API}/movie/${tmdbId}?cookie=${encodeURIComponent(token)}`;
-
-  }
-
-
-  console.log(
-    "[ShowBox] ShowBox request:",
-    {
-      type,
-      tmdbId,
-      season,
-      episode
-    }
-  );
-
-
-  const response =
-    await fetch(
-      requestUrl,
-      {
-        headers:
-          WORKING_HEADERS
-      }
-    );
-
-
-  console.log(
-    "[ShowBox] ShowBox response:",
-    {
-      status:
-        response.status
-    }
-  );
-
-
-  if (!response.ok) {
-
-    throw new Error(
-      `ShowBox API HTTP ${response.status}`
-    );
-
-  }
-
-
-  return await response.json();
 }
 
 // ---------------------------------------------------------
@@ -1067,7 +973,7 @@ async function findFebboxFiles(
   );
 
 
-  return matchingFiles.slice(0, 1);
+  return matchingFiles;
 }
 
 
@@ -2338,185 +2244,6 @@ function buildFebboxStreams(
   );
 }
 
-
-// ---------------------------------------------------------
-// Extract ShowBox versions
-// ---------------------------------------------------------
-
-function getShowBoxVersions(
-  showboxData
-) {
-
-  if (
-    Array.isArray(
-      showboxData?.versions
-    )
-  ) {
-
-    return showboxData.versions;
-
-  }
-
-
-  if (
-    Array.isArray(
-      showboxData?.data?.versions
-    )
-  ) {
-
-    return showboxData.data.versions;
-
-  }
-
-
-  return [];
-}
-
-
-// ---------------------------------------------------------
-// Extract ShowBox version/link streams
-// ---------------------------------------------------------
-
-function extractShowBoxStreams(
-  showboxData,
-  tmdbDetails,
-  type,
-  season,
-  episode
-) {
-
-  const versions =
-    getShowBoxVersions(
-      showboxData
-    );
-
-
-  const streams = [];
-
-
-  for (
-    const version of versions
-  ) {
-
-    if (
-      !version ||
-      !Array.isArray(
-        version.links
-      )
-    ) {
-
-      continue;
-
-    }
-
-
-    for (
-      const link of version.links
-    ) {
-
-      if (
-        !link ||
-        !link.url
-      ) {
-
-        continue;
-
-      }
-
-
-      const fileName =
-        link.file_name ||
-        link.filename ||
-        link.fileName ||
-        link.name ||
-        version.file_name ||
-        version.filename ||
-        version.fileName ||
-        version.name ||
-        "";
-
-
-      const quality =
-        link.quality ||
-        version.quality ||
-        "";
-
-
-      const size =
-        link.size ||
-        version.size ||
-        "";
-
-
-      const item = {
-
-        url:
-          link.url,
-
-        quality,
-
-        size,
-
-        fileName,
-
-        link,
-
-        sourceFile:
-          link
-
-      };
-
-
-      streams.push({
-
-        name:
-          getQualityLabel(
-            quality,
-            fileName
-          ) ||
-          "ShowBox",
-
-
-        title:
-          buildStreamTitle(
-            item,
-            tmdbDetails,
-            type,
-            season,
-            episode
-          ),
-
-
-        url:
-          link.url,
-
-
-        size:
-          size,
-
-
-        behaviorHints: {
-          bingeGroup:
-            "showbox"
-        }
-
-      });
-
-    }
-
-  }
-
-
-  console.log(
-    "[ShowBox] ShowBox version streams:",
-    streams.length
-  );
-
-
-  return streams;
-}
-
-
 // ---------------------------------------------------------
 // Remove duplicate URLs
 // ---------------------------------------------------------
@@ -3504,28 +3231,6 @@ export default async (
     // ShowBox
     // -----------------------------------------------------
 
-    const showboxData =
-      await getShowBoxData(
-        tmdbId,
-        type,
-        season,
-        episode,
-        parsedToken
-      );
-
-
-    if (
-      !showboxData ||
-      showboxData.success === false
-    ) {
-
-      throw new Error(
-        "ShowBox API returned failure"
-      );
-
-    }
-
-
     const showboxId =
       await searchShowBoxMediaId(
         imdbId
@@ -3545,20 +3250,6 @@ export default async (
       );
 
     }
-
-
-    // -----------------------------------------------------
-    // ShowBox version/link streams
-    // -----------------------------------------------------
-
-    const showboxStreams =
-      extractShowBoxStreams(
-        showboxData,
-        tmdbDetails,
-        type,
-        season,
-        episode
-      );
 
 
     // -----------------------------------------------------
@@ -3657,10 +3348,9 @@ export default async (
     // -----------------------------------------------------
 
     const streams =
-      dedupeStreams([
-        ...febboxStreams,
-        ...showboxStreams
-      ]);
+       dedupeStreams([
+        ...febboxStreams
+       ]);
 
 
     // -----------------------------------------------------
@@ -3701,25 +3391,21 @@ export default async (
     // -----------------------------------------------------
 
     console.log(
-      `[ShowBox][${requestId}] Stream breakdown:`,
-      {
+  `[ShowBox][${requestId}] Stream breakdown:`,
+  {
 
-        febbox:
-          febboxStreams.length,
+    febbox:
+      febboxStreams.length,
 
-        showbox:
-          showboxStreams.length,
+    combined:
+      streams.length,
 
-        combined:
-          streams.length,
+    final:
+      configuredStreams.length
 
-        final:
-          configuredStreams.length
-
-      }
-    );
-
-
+  }
+);
+    
     console.log(
       `[ShowBox][${requestId}] ===== END =====`
     );
