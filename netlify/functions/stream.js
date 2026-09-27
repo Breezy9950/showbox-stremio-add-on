@@ -449,6 +449,154 @@ async function searchShowBoxMediaId(
 
   console.log(
     "[ShowBox] Web search response:",
+    {
+      status:
+        searchResponse.status,
+
+      contentType:
+        searchResponse.headers.get(
+          "content-type"
+        ),
+
+      finalUrl:
+        searchResponse.url
+    }
+  );
+
+
+  if (
+    !searchResponse.ok
+  ) {
+
+    throw new Error(
+      `ShowBox web search failed: HTTP ${searchResponse.status}`
+    );
+
+  }
+
+
+  const searchHtml =
+    await searchResponse.text();
+
+
+  console.log(
+    "[ShowBox] Web search body:",
+    {
+      length:
+        searchHtml.length,
+
+      preview:
+        searchHtml.slice(
+          0,
+          1500
+        )
+    }
+  );
+
+
+  const detailUrl =
+    parseShowBoxSearchHref(
+      searchHtml
+    );
+
+
+  console.log(
+    "[ShowBox] Parsed detail URL:",
+    detailUrl
+  );
+
+
+  if (
+    !detailUrl
+  ) {
+
+    throw new Error(
+      "ShowBox web search result not found"
+    );
+
+  }
+
+
+  console.log(
+    "[ShowBox] Web search detail URL:",
+    detailUrl
+  );
+
+
+  const detailResponse =
+    await fetch(
+      detailUrl,
+      {
+        headers:
+          SHOWBOX_SEARCH_HEADERS
+      }
+    );
+
+
+  console.log(
+    "[ShowBox] Web detail response:",
+    detailResponse.status
+  );
+
+
+  if (
+    !detailResponse.ok
+  ) {
+
+    throw new Error(
+      `ShowBox web detail failed: HTTP ${detailResponse.status}`
+    );
+
+  }
+
+
+  const detailHtml =
+    await detailResponse.text();
+
+
+  console.log(
+    "[ShowBox] Web detail body:",
+    {
+      length:
+        detailHtml.length,
+
+      preview:
+        detailHtml.slice(
+          0,
+          1000
+        )
+    }
+  );
+
+
+  const showboxId =
+    parseShowBoxHeadingId(
+      detailHtml
+    );
+
+
+  if (
+    !showboxId
+  ) {
+
+    throw new Error(
+      "ShowBox media ID not found"
+    );
+
+  }
+
+
+  console.log(
+    "[ShowBox] Verified media ID:",
+    showboxId
+  );
+
+
+  return showboxId;
+}
+
+  console.log(
+    "[ShowBox] Web search response:",
     searchResponse.status
   );
 
