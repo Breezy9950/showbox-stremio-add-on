@@ -78,7 +78,7 @@ function filterRows() {
           checked
         >
 
-        <span>CAM / Telesync</span>
+        <span>CAM</span>
 
       </label>
 
