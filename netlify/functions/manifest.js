@@ -65,6 +65,44 @@ function qualityRows() {
     .join("");
 }
 
+function filterRows() {
+  return `
+    <div class="filter-setting-row">
+
+      <label class="filter-setting-name">
+
+        <input
+          type="checkbox"
+          class="filter-setting-checkbox"
+          id="camFilter"
+          checked
+        >
+
+        <span>CAM / Telesync</span>
+
+      </label>
+
+    </div>
+
+    <div class="filter-setting-row">
+
+      <label class="filter-setting-name">
+
+        <input
+          type="checkbox"
+          class="filter-setting-checkbox"
+          id="atmosFilter"
+          checked
+        >
+
+        <span>Dolby Atmos</span>
+
+      </label>
+
+    </div>
+  `;
+}
+
 function homepageScript() {
 
   return `
@@ -86,6 +124,9 @@ function homepageScript() {
 
   const qualityList =
     document.getElementById("qualityList");
+
+  const filterList =
+    document.getElementById("filterList");
 
   const minSizeInput =
     document.getElementById("minSize");
@@ -128,6 +169,21 @@ function homepageScript() {
       };
 
     });
+
+  }
+
+
+  function getFilterConfig() {
+
+    return {
+
+      cam:
+        document.getElementById("camFilter").checked,
+
+      atmos:
+        document.getElementById("atmosFilter").checked
+
+    };
 
   }
 
@@ -190,7 +246,10 @@ function homepageScript() {
       fileSize:
         getFileSizeConfig(),
 
-      qualities
+      qualities,
+
+      filters:
+        getFilterConfig()
 
     };
 
@@ -228,6 +287,12 @@ function homepageScript() {
 
 
   qualityList.addEventListener(
+    "change",
+    updateManifest
+  );
+
+
+  filterList.addEventListener(
     "change",
     updateManifest
   );
@@ -521,6 +586,7 @@ export default async (request) => {
             "application/json"
         }
       }
+
     );
 
   }
@@ -1009,6 +1075,75 @@ h1 {
     var(--border-light);
 }
 
+.filter-section {
+  margin-top: 38px;
+}
+
+.filter-setting-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 8px;
+
+  padding: 8px;
+
+  border:
+    1px solid var(--border);
+
+  border-radius:
+    var(--radius-lg);
+
+  background:
+    var(--surface);
+}
+
+.filter-setting-row {
+  display: flex;
+
+  align-items: center;
+
+  min-height: 62px;
+
+  padding:
+    11px 14px;
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--surface-2);
+
+  border:
+    1px solid transparent;
+}
+
+.filter-setting-name {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  color:
+    var(--text);
+
+  font-size: 15px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.filter-setting-checkbox {
+  width: 20px;
+  height: 20px;
+
+  margin: 0;
+
+  accent-color:
+    #f1f1f2;
+}
+
 .quality-name {
   display: flex;
 
@@ -1042,19 +1177,19 @@ h1 {
 }
 
 .move-button {
-  width: 38px;
+  width: 36px;
   height: 36px;
 
   padding: 0;
 
   border:
-    1px solid #343740;
+    1px solid var(--border-light);
 
   border-radius:
     10px;
 
   background:
-    #292c34;
+    var(--surface-3);
 
   color:
     var(--text-soft);
@@ -1062,21 +1197,24 @@ h1 {
   font-size: 16px;
 
   cursor: pointer;
-
-  transition:
-    background .15s ease,
-    opacity .15s ease;
 }
 
-.move-button:hover:not(:disabled) {
+.move-button:hover {
   background:
-    #333640;
+    #2b2e36;
+}
+
+.move-button:active {
+  transform:
+    scale(.95);
 }
 
 .move-button:disabled {
-  opacity: .25;
+  opacity:
+    .3;
 
-  cursor: default;
+  cursor:
+    default;
 }
 
 
@@ -1085,26 +1223,13 @@ h1 {
 /* -------------------------------------------------- */
 
 #result {
-  margin-top: 38px;
-
-  padding:
-    16px;
-
-  border:
-    1px solid var(--border);
-
-  border-radius:
-    var(--radius-lg);
-
-  background:
-    var(--surface);
+  margin-top: 40px;
 }
 
 .result-label {
   display: block;
 
-  margin:
-    2px 4px 9px;
+  margin-bottom: 9px;
 
   color:
     var(--muted-2);
@@ -1112,19 +1237,20 @@ h1 {
   font-size: 11px;
   font-weight: 700;
 
-  letter-spacing: .11em;
+  letter-spacing: .12em;
   text-transform: uppercase;
 }
 
 .result-row {
   display: flex;
 
-  gap: 9px;
+  gap: 10px;
 }
 
 #manifestUrl {
-  min-width: 0;
   flex: 1;
+
+  min-width: 0;
 
   height: 50px;
 
@@ -1143,27 +1269,21 @@ h1 {
     var(--surface-2);
 
   color:
-    var(--muted);
+    var(--text-soft);
 
   font-size: 12px;
 }
 
 #copyButton {
-  flex: 0 0 auto;
+  width: 90px;
 
-  height: 50px;
-
-  padding:
-    0 17px;
-
-  border:
-    1px solid var(--border-light);
+  border: 0;
 
   border-radius:
     var(--radius-sm);
 
   background:
-    #292c34;
+    var(--surface-3);
 
   color:
     var(--text);
@@ -1174,6 +1294,11 @@ h1 {
   cursor: pointer;
 }
 
+#copyButton:hover {
+  background:
+    #2b2e36;
+}
+
 #installButton {
   display: flex;
 
@@ -1181,9 +1306,12 @@ h1 {
   justify-content: center;
 
   width: 100%;
-  height: 51px;
+  height: 50px;
 
-  margin-top: 9px;
+  margin-top: 10px;
+
+  border:
+    1px solid var(--border-light);
 
   border-radius:
     var(--radius-sm);
@@ -1194,38 +1322,44 @@ h1 {
   color:
     var(--black);
 
+  font-size: 13px;
+  font-weight: 700;
+
   text-decoration: none;
 
-  font-size: 14px;
-  font-weight: 700;
+  cursor: pointer;
+
+  transition:
+    opacity .15s ease;
+}
+
+#installButton:hover {
+  opacity:
+    .9;
 }
 
 #installButton.disabled {
-  background:
-    #292c34;
-
-  color:
-    #686b74;
+  opacity:
+    .35;
 
   pointer-events:
     none;
 }
 
 .note {
-  margin:
-    11px 3px 1px;
+  margin-top: 12px;
 
   color:
     var(--muted-2);
 
-  line-height: 1.5;
-
   font-size: 11px;
+
+  line-height: 1.5;
 }
 
 
 /* -------------------------------------------------- */
-/* MOBILE */
+/* RESPONSIVE */
 /* -------------------------------------------------- */
 
 @media (max-width: 600px) {
@@ -1427,6 +1561,28 @@ Enable the qualities you want. Move them up or down to set their priority.
   class="quality-list"
 >
 ${qualityRows()}
+</div>
+
+</section>
+
+
+<!-- STREAM FILTERS -->
+
+<section class="filter-section">
+
+<div class="configuration-title">
+Stream filters
+</div>
+
+<div class="description">
+Enable the stream types you want to keep. These settings do not change quality priority.
+</div>
+
+<div
+  id="filterList"
+  class="filter-setting-list"
+>
+${filterRows()}
 </div>
 
 </section>
