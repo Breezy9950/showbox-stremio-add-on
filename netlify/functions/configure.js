@@ -9,8 +9,7 @@ const DEFAULT_QUALITIES = [
 ];
 
 const DEFAULT_FILTERS = {
-  cam: true,
-  atmos: true
+  cam: true
 };
 
 function decodeConfig(value) {
@@ -95,10 +94,7 @@ function normalizeFilters(filters) {
 
   return {
     cam:
-      filters.cam !== false,
-
-    atmos:
-      filters.atmos !== false
+      filters.cam !== false
   };
 }
 
@@ -1007,21 +1003,6 @@ These settings do not change quality priority.
 
 </div>
 
-<div class="filter-row">
-
-<label class="filter-label">
-
-<input
-  id="atmosFilter"
-  type="checkbox"
->
-
-<span>Dolby Atmos</span>
-
-</label>
-
-</div>
-
 </div>
 
 </div>
@@ -1123,11 +1104,6 @@ const maxSizeInput =
 const camFilter =
   document.getElementById(
     "camFilter"
-  );
-
-const atmosFilter =
-  document.getElementById(
-    "atmosFilter"
   );
 
 const saveButton =
@@ -1428,10 +1404,7 @@ async function saveConfiguration() {
 
     filters: {
       cam:
-        camFilter.checked,
-
-      atmos:
-        atmosFilter.checked
+        camFilter.checked
     }
 
   };
@@ -1617,9 +1590,6 @@ if (
 
 camFilter.checked =
   filters.cam !== false;
-
-atmosFilter.checked =
-  filters.atmos !== false;
 
 
 renderQualities();
