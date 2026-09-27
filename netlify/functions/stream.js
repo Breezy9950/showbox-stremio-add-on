@@ -9,6 +9,9 @@ const TMDB_BASE_URL =
 const SHOWBOX_API =
   "https://id-mapping-api-showbox-proxy.hf.space/api/media";
 
+const SHOWBOX_WEB_API =
+  "https://showbox.media";
+
 const WORKING_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -24,9 +27,7 @@ const WORKING_HEADERS = {
 };
 
 
-// ---------------------------------------------------------
 // Base64URL
-// ---------------------------------------------------------
 
 function decodeBase64Url(value) {
 
@@ -50,9 +51,7 @@ function decodeBase64Url(value) {
 }
 
 
-// ---------------------------------------------------------
 // Parse configured Stremio config
-// ---------------------------------------------------------
 
 function parseConfig(rawConfig) {
 
@@ -80,9 +79,7 @@ function parseConfig(rawConfig) {
 }
 
 
-// ---------------------------------------------------------
 // ShowBox token parser
-// ---------------------------------------------------------
 
 function parseSingleToken(
   token
@@ -177,9 +174,7 @@ function parseSingleToken(
 }
 
 
-// ---------------------------------------------------------
 // IMDb -> TMDB
-// ---------------------------------------------------------
 
 async function imdbToTmdb(
   imdbId
@@ -261,9 +256,7 @@ async function imdbToTmdb(
 }
 
 
-// ---------------------------------------------------------
 // TMDB title information
-// ---------------------------------------------------------
 
 async function getTMDBDetails(
   tmdbId,
@@ -299,9 +292,194 @@ async function getTMDBDetails(
 }
 
 
-// ---------------------------------------------------------
+// ShowBox web search / media ID validation
+
+function parseShowBoxSearchHrefs(
+  html
+) {
+
+  const hrefs = [];
+
+  const patterns = [
+    /class="film-name[^"]*"[^>]*>\s*<a[^>]+href="([^"]+)"/gi,
+    /<a[^>]+href="([^"]+)"[^>]*class="[^"]*film-name[^"]*"/gi
+  ];
+
+  for (const pattern of patterns) {
+
+    let match;
+
+    while ((match = pattern.exec(html)) !== null) {
+
+      if (!match[1]) {
+        continue;
+      }
+
+      try {
+
+        const href =
+          new URL(
+            match[1],
+            SHOWBOX_WEB_API
+          ).href;
+
+        if (!hrefs.includes(href)) {
+          hrefs.push(href);
+        }
+
+      } catch {
+        // Ignore malformed result links.
+      }
+
+    }
+
+  }
+
+  return hrefs;
+}
+
+function parseShowBoxHeadingInfo(
+  html
+) {
+
+  const match =
+    html.match(
+      /class="heading-name[^"]*"[^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  const id =
+    match[1]
+      .split("?")[0]
+      .split("#")[0]
+      .split("/")
+      .filter(Boolean)
+      .pop();
+
+  if (!/^\d+$/.test(id || "")) {
+    return null;
+  }
+
+  const title =
+    String(match[2] || "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  return {
+    id,
+    title
+  };
+}
+
+async function searchShowBoxMediaId(
+  tmdbId
+) {
+
+  console.log(
+    "[ShowBox] Web search for TMDB:",
+    tmdbId
+  );
+
+  const searchResponse =
+    await fetch(
+      `${SHOWBOX_WEB_API}/search?keyword=${encodeURIComponent(tmdbId)}`,
+      {
+        headers: {
+          "Accept":
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language":
+            "en",
+          "User-Agent":
+            WORKING_HEADERS["User-Agent"]
+        }
+      }
+    );
+
+  if (!searchResponse.ok) {
+    throw new Error(
+      `ShowBox web search failed: HTTP ${searchResponse.status}`
+    );
+  }
+
+  const searchHtml =
+    await searchResponse.text();
+
+  const detailUrls =
+    parseShowBoxSearchHrefs(
+      searchHtml
+    );
+
+  if (!detailUrls.length) {
+    throw new Error(
+      `ShowBox search returned no result for TMDB ID ${tmdbId}`
+    );
+  }
+
+  // IMPORTANT:
+  // Only use the FIRST ShowBox search result.
+  // We deliberately do not inspect the remaining results.
+  const detailUrl =
+    detailUrls[0];
+
+  console.log(
+    "[ShowBox] First search result:",
+    detailUrl
+  );
+
+  const detailResponse =
+    await fetch(
+      detailUrl,
+      {
+        headers: {
+          "Accept":
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language":
+            "en",
+          "User-Agent":
+            WORKING_HEADERS["User-Agent"]
+        }
+      }
+    );
+
+  if (!detailResponse.ok) {
+    throw new Error(
+      `ShowBox detail request failed: HTTP ${detailResponse.status}`
+    );
+  }
+
+  const detailHtml =
+    await detailResponse.text();
+
+  const info =
+    parseShowBoxHeadingInfo(
+      detailHtml
+    );
+
+  if (!info) {
+    throw new Error(
+      "ShowBox media ID not found on first result detail page"
+    );
+  }
+
+  console.log(
+    "[ShowBox] Direct ShowBox media result:",
+    {
+      id:
+        info.id,
+      title:
+        info.title
+    }
+  );
+
+  return info.id;
+}
+
+
 // ShowBox API
-// ---------------------------------------------------------
 
 async function getShowBoxData(
   tmdbId,
@@ -372,9 +550,7 @@ async function getShowBoxData(
 }
 
 
-// ---------------------------------------------------------
 // FebBox share
-// ---------------------------------------------------------
 
 async function febboxShare(
   showboxId,
@@ -496,9 +672,7 @@ async function febboxShare(
 }
 
 
-// ---------------------------------------------------------
 // FebBox root file list
-// ---------------------------------------------------------
 
 async function febboxFileList(
   shareKey
@@ -597,9 +771,7 @@ async function febboxFileList(
 }
 
 
-// ---------------------------------------------------------
 // FebBox season file list
-// ---------------------------------------------------------
 
 async function febboxSeasonFileList(
   shareKey,
@@ -674,9 +846,7 @@ async function febboxSeasonFileList(
 }
 
 
-// ---------------------------------------------------------
 // Find ALL matching FebBox files
-// ---------------------------------------------------------
 
 async function findFebboxFiles(
   shareKey,
@@ -691,9 +861,7 @@ async function findFebboxFiles(
     );
 
 
-  // -------------------------------------------------------
   // Movie
-  // -------------------------------------------------------
 
   if (
     type === "movie"
@@ -735,9 +903,7 @@ async function findFebboxFiles(
   }
 
 
-  // -------------------------------------------------------
   // TV season
-  // -------------------------------------------------------
 
   const expectedSeason =
     `season ${season}`
@@ -860,9 +1026,7 @@ async function findFebboxFiles(
 }
 
 
-// ---------------------------------------------------------
 // FebBox quality list
-// ---------------------------------------------------------
 
 async function febboxQualityList(
   file,
@@ -1004,9 +1168,7 @@ async function febboxQualityList(
 }
 
 
-// ---------------------------------------------------------
 // Parse FebBox quality HTML
-// ---------------------------------------------------------
 
 function parseFebboxHtml(
   html,
@@ -1110,9 +1272,7 @@ function parseFebboxHtml(
 }
 
 
-// ---------------------------------------------------------
 // Quality label
-// ---------------------------------------------------------
 
 function getQualityLabel(
   quality,
@@ -1183,9 +1343,7 @@ function getQualityLabel(
 }
 
 
-// ---------------------------------------------------------
 // Clean filename
-// ---------------------------------------------------------
 
 function cleanFilename(
   value
@@ -1205,9 +1363,7 @@ function cleanFilename(
 }
 
 
-// ---------------------------------------------------------
 // Technical metadata
-// ---------------------------------------------------------
 
 function getTechnicalMetadata(
   fileName,
@@ -1227,9 +1383,7 @@ function getTechnicalMetadata(
   const result = [];
 
 
-  // -------------------------------------------------------
   // Source / release type
-  // -------------------------------------------------------
 
   if (
     /\bWEB[- .]?DL\b/.test(
@@ -1319,9 +1473,7 @@ function getTechnicalMetadata(
   }
 
 
-  // -------------------------------------------------------
   // Dynamic range
-  // -------------------------------------------------------
 
   if (
     /\bDOLBY[ ._-]?VISION\b/.test(
@@ -1382,9 +1534,7 @@ function getTechnicalMetadata(
   }
 
 
-  // -------------------------------------------------------
   // Audio codec
-  // -------------------------------------------------------
 
   if (
     /\bATMOS\b/.test(
@@ -1452,9 +1602,7 @@ function getTechnicalMetadata(
   }
 
 
-  // -------------------------------------------------------
   // Video codec
-  // -------------------------------------------------------
 
   if (
     /\bHEVC\b/.test(
@@ -1505,9 +1653,7 @@ function getTechnicalMetadata(
 }
 
 
-// ---------------------------------------------------------
 // Normalize language value
-// ---------------------------------------------------------
 
 function normalizeLanguageValue(
   value
@@ -1568,9 +1714,7 @@ function normalizeLanguageValue(
 }
 
 
-// ---------------------------------------------------------
 // Detect explicit languages from an object
-// ---------------------------------------------------------
 
 function getLanguagesFromObject(
   object,
@@ -1618,9 +1762,7 @@ function getLanguagesFromObject(
 }
 
 
-// ---------------------------------------------------------
 // Detect explicit languages in filenames
-// ---------------------------------------------------------
 
 function getLanguagesFromFilename(
   fileName
@@ -1712,9 +1854,7 @@ function getLanguagesFromFilename(
 }
 
 
-// ---------------------------------------------------------
 // Audio / subtitle information
-// ---------------------------------------------------------
 
 function getAudioLanguages(
   item
@@ -1823,9 +1963,7 @@ function getSubtitleLanguages(
 }
 
 
-// ---------------------------------------------------------
 // Title
-// ---------------------------------------------------------
 
 function buildTitle(
   tmdbDetails,
@@ -1881,9 +2019,7 @@ function buildTitle(
 }
 
 
-// ---------------------------------------------------------
 // Stream technical line
-// ---------------------------------------------------------
 
 function buildTechnicalLine(
   item
@@ -1940,9 +2076,7 @@ function buildTechnicalLine(
 }
 
 
-// ---------------------------------------------------------
 // Build stream title
-// ---------------------------------------------------------
 
 function buildStreamTitle(
   item,
@@ -2054,9 +2188,7 @@ function buildStreamTitle(
 }
 
 
-// ---------------------------------------------------------
 // Build FebBox streams
-// ---------------------------------------------------------
 
 function buildFebboxStreams(
   qualityResults,
@@ -2128,9 +2260,7 @@ function buildFebboxStreams(
 }
 
 
-// ---------------------------------------------------------
 // Extract ShowBox versions
-// ---------------------------------------------------------
 
 function getShowBoxVersions(
   showboxData
@@ -2162,9 +2292,7 @@ function getShowBoxVersions(
 }
 
 
-// ---------------------------------------------------------
 // Extract ShowBox version/link streams
-// ---------------------------------------------------------
 
 function extractShowBoxStreams(
   showboxData,
@@ -2306,9 +2434,7 @@ function extractShowBoxStreams(
 }
 
 
-// ---------------------------------------------------------
 // Remove duplicate URLs
-// ---------------------------------------------------------
 
 function dedupeStreams(
   streams
@@ -2354,9 +2480,7 @@ function dedupeStreams(
 }
 
 
-// =========================================================
 // QUALITY CONFIGURATION
-// =========================================================
 
 const DEFAULT_QUALITIES = [
   "ORG",
@@ -2369,9 +2493,7 @@ const DEFAULT_QUALITIES = [
 ];
 
 
-// ---------------------------------------------------------
 // Normalize quality configuration
-// ---------------------------------------------------------
 
 function normalizeQualityConfig(
   config
@@ -2500,9 +2622,7 @@ function normalizeQualityConfig(
 }
 
 
-// ---------------------------------------------------------
 // Canonical quality name
-// ---------------------------------------------------------
 
 function getCanonicalQuality(
   value
@@ -2591,9 +2711,7 @@ function getCanonicalQuality(
 }
 
 
-// ---------------------------------------------------------
 // Get quality from stream
-// ---------------------------------------------------------
 
 function getStreamQuality(
   stream
@@ -2651,9 +2769,7 @@ function getStreamQuality(
 }
 
 
-// ---------------------------------------------------------
 // Apply configured quality settings
-// ---------------------------------------------------------
 
 function applyQualitySettings(
   streams,
@@ -2774,14 +2890,10 @@ function applyQualitySettings(
 }
 
 
-// =========================================================
 // FILE SIZE CONFIGURATION
-// =========================================================
 
 
-// ---------------------------------------------------------
 // Parse file size into GB
-// ---------------------------------------------------------
 
 function parseSizeGb(
   value
@@ -2897,9 +3009,7 @@ function parseSizeGb(
 }
 
 
-// ---------------------------------------------------------
 // Apply file-size settings
-// ---------------------------------------------------------
 
 function applyFileSizeSettings(
   streams,
@@ -3034,14 +3144,12 @@ function applyFileSizeSettings(
 }
 
 
-// =========================================================
 // Main handler
-// =========================================================
 
 export default async (
   req,
   context
-) => {
+) {
 
   const requestId =
     Math.random()
@@ -3066,9 +3174,7 @@ export default async (
       url.pathname;
 
 
-    // -----------------------------------------------------
     // Extract config + request
-    // -----------------------------------------------------
 
     const match =
       pathname.match(
@@ -3108,9 +3214,7 @@ export default async (
     );
 
 
-    // -----------------------------------------------------
     // Remove .json
-    // -----------------------------------------------------
 
     rawId =
       rawId.replace(
@@ -3119,9 +3223,7 @@ export default async (
       );
 
 
-    // -----------------------------------------------------
     // Parse configuration
-    // -----------------------------------------------------
 
     const config =
       parseConfig(
@@ -3152,9 +3254,7 @@ export default async (
     }
 
 
-    // -----------------------------------------------------
     // Parse IMDb / season / episode
-    // -----------------------------------------------------
 
     let imdbId;
 
@@ -3229,9 +3329,7 @@ export default async (
     }
 
 
-    // -----------------------------------------------------
     // IMDb -> TMDB
-    // -----------------------------------------------------
 
     const tmdbId =
       await imdbToTmdb(
@@ -3245,9 +3343,7 @@ export default async (
     );
 
 
-    // -----------------------------------------------------
     // Get title metadata
-    // -----------------------------------------------------
 
     const tmdbDetails =
       await getTMDBDetails(
@@ -3270,9 +3366,7 @@ export default async (
     );
 
 
-    // -----------------------------------------------------
     // Parse ShowBox token
-    // -----------------------------------------------------
 
     const parsedToken =
       parseSingleToken(
@@ -3289,9 +3383,7 @@ export default async (
     );
 
 
-    // -----------------------------------------------------
     // ShowBox
-    // -----------------------------------------------------
 
     const showboxData =
       await getShowBoxData(
@@ -3315,7 +3407,7 @@ export default async (
     }
 
 
-    const showboxId =
+    const proxyShowboxId =
       showboxData.id ||
       showboxData.mid ||
       (
@@ -3327,38 +3419,67 @@ export default async (
       );
 
 
+    const verifiedShowboxId =
+      await searchShowBoxMediaId(
+        tmdbId
+      );
+
+
     console.log(
-      `[ShowBox][${requestId}] ShowBox ID:`,
-      showboxId
+      `[ShowBox][${requestId}] ShowBox ID verification:`,
+      {
+        proxyId:
+          proxyShowboxId || null,
+
+        webId:
+          verifiedShowboxId,
+
+        match:
+          proxyShowboxId != null &&
+          String(proxyShowboxId) ===
+            String(verifiedShowboxId)
+      }
     );
 
 
-    if (!showboxId) {
+    if (
+      proxyShowboxId != null &&
+      String(proxyShowboxId) !==
+        String(verifiedShowboxId)
+    ) {
 
-      throw new Error(
-        "ShowBox ID missing"
+      console.log(
+        `[ShowBox][${requestId}] Proxy ID differs from verified web ID; ignoring proxy ID and proxy streams`
       );
 
     }
 
 
-    // -----------------------------------------------------
+    const showboxId =
+      verifiedShowboxId;
+
+
+    const showboxIdMatchesProxy =
+      proxyShowboxId != null &&
+      String(proxyShowboxId) ===
+        String(verifiedShowboxId);
+
+
     // ShowBox version/link streams
-    // -----------------------------------------------------
 
     const showboxStreams =
-      extractShowBoxStreams(
-        showboxData,
-        tmdbDetails,
-        type,
-        season,
-        episode
-      );
+      showboxIdMatchesProxy
+        ? extractShowBoxStreams(
+            showboxData,
+            tmdbDetails,
+            type,
+            season,
+            episode
+          )
+        : [];
 
 
-    // -----------------------------------------------------
     // FebBox share
-    // -----------------------------------------------------
 
     const shareKey =
       await febboxShare(
@@ -3367,9 +3488,7 @@ export default async (
       );
 
 
-    // -----------------------------------------------------
     // Find ALL matching FebBox files
-    // -----------------------------------------------------
 
     const files =
       await findFebboxFiles(
@@ -3380,9 +3499,7 @@ export default async (
       );
 
 
-    // -----------------------------------------------------
     // Get qualities from ALL matching files
-    // -----------------------------------------------------
 
     const allQualityResults =
       [];
@@ -3433,9 +3550,7 @@ export default async (
     }
 
 
-    // -----------------------------------------------------
     // FebBox streams
-    // -----------------------------------------------------
 
     const febboxStreams =
       buildFebboxStreams(
@@ -3447,9 +3562,7 @@ export default async (
       );
 
 
-    // -----------------------------------------------------
     // Combine both sources
-    // -----------------------------------------------------
 
     const streams =
       dedupeStreams([
@@ -3458,9 +3571,7 @@ export default async (
       ]);
 
 
-    // -----------------------------------------------------
     // Apply quality settings
-    // -----------------------------------------------------
 
     const qualityFilteredStreams =
       applyQualitySettings(
@@ -3469,9 +3580,7 @@ export default async (
       );
 
 
-    // -----------------------------------------------------
     // Apply file-size settings
-    // -----------------------------------------------------
 
     const configuredStreams =
       applyFileSizeSettings(
@@ -3491,9 +3600,7 @@ export default async (
     }
 
 
-    // -----------------------------------------------------
     // Final diagnostics
-    // -----------------------------------------------------
 
     console.log(
       `[ShowBox][${requestId}] Stream breakdown:`,
@@ -3585,9 +3692,7 @@ export default async (
 };
 
 
-// ---------------------------------------------------------
 // Netlify route
-// ---------------------------------------------------------
 
 export const config = {
 
