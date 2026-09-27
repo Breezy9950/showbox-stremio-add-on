@@ -8,6 +8,11 @@ const DEFAULT_QUALITIES = [
   { name: "360p", enabled: true }
 ];
 
+const DEFAULT_FILTERS = {
+  cam: true,
+  atmos: true
+};
+
 function decodeConfig(value) {
   try {
     if (!value) return {};
@@ -76,6 +81,25 @@ function normalizeQualities(qualities) {
   }
 
   return result;
+}
+
+function normalizeFilters(filters) {
+  if (
+    !filters ||
+    typeof filters !== "object"
+  ) {
+    return {
+      ...DEFAULT_FILTERS
+    };
+  }
+
+  return {
+    cam:
+      filters.cam !== false,
+
+    atmos:
+      filters.atmos !== false
+  };
 }
 
 function normalizeFileSize(fileSize) {
@@ -285,6 +309,11 @@ an existing addon configuration.
       existingConfig.fileSize
     );
 
+  const filters =
+    normalizeFilters(
+      existingConfig.filters
+    );
+
 
   /*
    * POST
@@ -325,6 +354,12 @@ an existing addon configuration.
             );
 
 
+      const newFilters =
+        normalizeFilters(
+          body.filters
+        );
+
+
       const newFileSize = {
         minGb:
           Number.isFinite(minGb)
@@ -357,7 +392,10 @@ an existing addon configuration.
               name: item.name,
               enabled: item.enabled
             })
-          )
+          ),
+
+        filters:
+          newFilters
       };
 
 
@@ -424,7 +462,8 @@ an existing addon configuration.
    */
   const publicConfig = {
     qualities,
-    fileSize
+    fileSize,
+    filters
   };
 
 
@@ -449,6 +488,24 @@ an existing addon configuration.
   const fileSizeJson =
     JSON.stringify(
       publicConfig.fileSize
+    )
+      .replace(
+        /</g,
+        "\\u003c"
+      )
+      .replace(
+        />/g,
+        "\\u003e"
+      )
+      .replace(
+        /&/g,
+        "\\u0026"
+      );
+
+
+  const filtersJson =
+    JSON.stringify(
+      publicConfig.filters
     )
       .replace(
         /</g,
@@ -656,6 +713,44 @@ input[type="number"]:focus {
 
 .quality-controls button:disabled {
   opacity: 0.3;
+}
+
+.filter-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 8px;
+}
+
+.filter-row {
+  display: flex;
+
+  align-items: center;
+
+  min-height: 48px;
+
+  padding: 8px 10px;
+
+  background: #20222a;
+
+  border-radius: 11px;
+}
+
+.filter-label {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  margin: 0;
+
+  color: #fff;
+
+  font-size: 15px;
+
+  cursor: pointer;
 }
 
 input[type="checkbox"] {
@@ -884,6 +979,54 @@ the arrows to change their priority.
 </div>
 
 
+<div class="card">
+
+<div class="card-title">
+Stream filters
+</div>
+
+<div class="card-description">
+Enable the stream types you want to keep.
+These settings do not change quality priority.
+</div>
+
+<div class="filter-list">
+
+<div class="filter-row">
+
+<label class="filter-label">
+
+<input
+  id="camFilter"
+  type="checkbox"
+>
+
+<span>CAM / Telesync</span>
+
+</label>
+
+</div>
+
+<div class="filter-row">
+
+<label class="filter-label">
+
+<input
+  id="atmosFilter"
+  type="checkbox"
+>
+
+<span>Dolby Atmos</span>
+
+</label>
+
+</div>
+
+</div>
+
+</div>
+
+
 <button
   id="save"
   class="main"
@@ -958,6 +1101,9 @@ const qualities =
 const fileSize =
   ${fileSizeJson};
 
+const filters =
+  ${filtersJson};
+
 
 const qualityList =
   document.getElementById(
@@ -972,6 +1118,16 @@ const minSizeInput =
 const maxSizeInput =
   document.getElementById(
     "maxSize"
+  );
+
+const camFilter =
+  document.getElementById(
+    "camFilter"
+  );
+
+const atmosFilter =
+  document.getElementById(
+    "atmosFilter"
   );
 
 const saveButton =
@@ -1268,7 +1424,15 @@ async function saveConfiguration() {
         })
       ),
 
-    fileSize
+    fileSize,
+
+    filters: {
+      cam:
+        camFilter.checked,
+
+      atmos:
+        atmosFilter.checked
+    }
 
   };
 
@@ -1449,6 +1613,13 @@ if (
     fileSize.maxGb;
 
 }
+
+
+camFilter.checked =
+  filters.cam !== false;
+
+atmosFilter.checked =
+  filters.atmos !== false;
 
 
 renderQualities();
