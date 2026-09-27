@@ -997,7 +997,7 @@ These settings do not change quality priority.
   type="checkbox"
 >
 
-<span>CAM / Telesync</span>
+<span>CAM</span>
 
 </label>
 
