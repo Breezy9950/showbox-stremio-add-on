@@ -83,23 +83,6 @@ function filterRows() {
       </label>
 
     </div>
-
-    <div class="filter-setting-row">
-
-      <label class="filter-setting-name">
-
-        <input
-          type="checkbox"
-          class="filter-setting-checkbox"
-          id="atmosFilter"
-          checked
-        >
-
-        <span>Dolby Atmos</span>
-
-      </label>
-
-    </div>
   `;
 }
 
@@ -178,10 +161,7 @@ function homepageScript() {
     return {
 
       cam:
-        document.getElementById("camFilter").checked,
-
-      atmos:
-        document.getElementById("atmosFilter").checked
+        document.getElementById("camFilter").checked
 
     };
 
