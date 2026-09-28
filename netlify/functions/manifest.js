@@ -1388,7 +1388,7 @@ export default async (request,context)=>{
         <div>
           <h1 class="settings-title">Settings</h1>
           <div class="settings-description">
-            Configure the streams you want in Stremio.
+            Fine-tune your stream quality and filtering preferences.
           </div>
         </div>
 
