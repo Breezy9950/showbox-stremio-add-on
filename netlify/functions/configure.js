@@ -21,6 +21,7 @@ const DEFAULT_FILTERS = {
 const MAX_CONFIG_BODY_BYTES = 16 * 1024;
 const MAX_QUALITY_ITEMS = 20;
 const MAX_FILE_SIZE_GB = 200;
+const CONFIGURE_SESSION_MS = 60 * 60 * 1000;
 
 function decodeConfig(value) {
   try {
@@ -54,17 +55,18 @@ function normalizeQualities(qualities) {
     }));
   }
 
-  const allowed = new Map(
-    DEFAULT_QUALITIES.map(item => [
-      item.name,
-      item
-    ])
+  const allowed = new Set(
+    DEFAULT_QUALITIES.map(
+      item => item.name
+    )
   );
 
-  const result = DEFAULT_QUALITIES.map(item => ({
-    name: item.name,
-    enabled: item.enabled
-  }));
+  const result = DEFAULT_QUALITIES.map(
+    item => ({
+      name: item.name,
+      enabled: item.enabled
+    })
+  );
 
   for (const item of qualities) {
     if (
@@ -76,11 +78,13 @@ function normalizeQualities(qualities) {
     }
 
     const target = result.find(
-      quality => quality.name === item.name
+      quality =>
+        quality.name === item.name
     );
 
     if (target) {
-      target.enabled = item.enabled !== false;
+      target.enabled =
+        item.enabled !== false;
     }
   }
 
@@ -96,13 +100,15 @@ function normalizeQualities(qualities) {
     }
 
     const target = result.find(
-      quality => quality.name === item.name
+      quality =>
+        quality.name === item.name
     );
 
     if (
       target &&
       !ordered.some(
-        quality => quality.name === target.name
+        quality =>
+          quality.name === target.name
       )
     ) {
       ordered.push(target);
@@ -112,7 +118,8 @@ function normalizeQualities(qualities) {
   for (const item of result) {
     if (
       !ordered.some(
-        quality => quality.name === item.name
+        quality =>
+          quality.name === item.name
       )
     ) {
       ordered.push(item);
@@ -125,7 +132,8 @@ function normalizeQualities(qualities) {
 function normalizeFilters(filters) {
   if (
     !filters ||
-    typeof filters !== "object"
+    typeof filters !== "object" ||
+    Array.isArray(filters)
   ) {
     return {
       ...DEFAULT_FILTERS
@@ -140,7 +148,8 @@ function normalizeFilters(filters) {
 function normalizeFileSize(fileSize) {
   if (
     !fileSize ||
-    typeof fileSize !== "object"
+    typeof fileSize !== "object" ||
+    Array.isArray(fileSize)
   ) {
     return {
       minGb: null,
@@ -163,15 +172,21 @@ function normalizeFileSize(fileSize) {
       : Number(fileSize.maxGb);
 
   return {
-    minGb: Number.isFinite(min) ? min : null,
-    maxGb: Number.isFinite(max) ? max : null
+    minGb: Number.isFinite(min)
+      ? min
+      : null,
+
+    maxGb: Number.isFinite(max)
+      ? max
+      : null
   };
 }
 
 function validateFileSize(fileSize) {
   if (
     !fileSize ||
-    typeof fileSize !== "object"
+    typeof fileSize !== "object" ||
+    Array.isArray(fileSize)
   ) {
     return {
       minGb: null,
@@ -253,10 +268,12 @@ function validateFileSize(fileSize) {
 
 async function getConfigFromRequest(request) {
   const url = new URL(request.url);
-  const pathname = url.pathname.replace(
-    /\/+$/,
-    ""
-  );
+
+  const pathname =
+    url.pathname.replace(
+      /\/+$/,
+      ""
+    );
 
   let configValue = null;
 
@@ -282,9 +299,8 @@ async function getConfigFromRequest(request) {
     return null;
   }
 
-  const storedConfig = await getConfig(
-    configValue
-  );
+  const storedConfig =
+    await getConfig(configValue);
 
   if (
     storedConfig &&
@@ -298,9 +314,8 @@ async function getConfigFromRequest(request) {
     };
   }
 
-  const legacyConfig = decodeConfig(
-    configValue
-  );
+  const legacyConfig =
+    decodeConfig(configValue);
 
   if (
     !legacyConfig ||
@@ -341,19 +356,28 @@ export default async function handler(request) {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1"
   >
+
+  <meta
+    name="theme-color"
+    content="#111"
+  >
+
   <title>ShowBox Configure</title>
+
   <style>
     * {
       box-sizing: border-box;
     }
 
+    html,
     body {
       margin: 0;
-      padding: 40px 20px;
+      min-height: 100%;
       background: #111;
       color: #fff;
       font-family:
@@ -361,19 +385,32 @@ export default async function handler(request) {
         BlinkMacSystemFont,
         "Segoe UI",
         sans-serif;
-      text-align: center;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
     }
 
     .card {
       width: min(560px, 100%);
-      margin: auto;
       padding: 28px;
       border-radius: 18px;
       background: #17181d;
+      border: 1px solid #24252c;
+      text-align: center;
+    }
+
+    h2 {
+      margin: 0 0 10px;
     }
 
     p {
-      color: #aaa;
+      margin: 0;
+      color: #999ba3;
       line-height: 1.5;
     }
   </style>
@@ -393,47 +430,46 @@ export default async function handler(request) {
       {
         status: 400,
         headers: {
-          "Content-Type": "text/html; charset=utf-8",
+          "Content-Type":
+            "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
           "X-Content-Type-Options": "nosniff",
-          "Referrer-Policy": "no-referrer",
-          "Cache-Control": "no-store"
+          "Referrer-Policy": "no-referrer"
         }
       }
     );
   }
 
-  /*
-   * The token is deliberately never exposed
-   * to browser-side JavaScript.
-   */
   const uiToken =
     typeof existingConfig.uiToken === "string"
       ? existingConfig.uiToken
       : "";
 
-  const qualities = normalizeQualities(
-    existingConfig.qualities
-  );
+  const qualities =
+    normalizeQualities(
+      existingConfig.qualities
+    );
 
-  const fileSize = normalizeFileSize(
-    existingConfig.fileSize
-  );
+  const fileSize =
+    normalizeFileSize(
+      existingConfig.fileSize
+    );
 
-  const filters = normalizeFilters(
-    existingConfig.filters
-  );
+  const filters =
+    normalizeFilters(
+      existingConfig.filters
+    );
 
-  /*
-   * Save configuration.
-   */
   if (request.method === "POST") {
     try {
-      const requestBody = await request.text();
+      const requestBody =
+        await request.text();
 
       if (
         new TextEncoder()
           .encode(requestBody)
-          .byteLength > MAX_CONFIG_BODY_BYTES
+          .byteLength >
+        MAX_CONFIG_BODY_BYTES
       ) {
         return new Response(
           JSON.stringify({
@@ -458,7 +494,9 @@ export default async function handler(request) {
       try {
         body = JSON.parse(requestBody);
       } catch {
-        throw new Error("Invalid JSON");
+        throw new Error(
+          "Invalid JSON"
+        );
       }
 
       if (
@@ -473,7 +511,8 @@ export default async function handler(request) {
 
       if (
         Array.isArray(body.qualities) &&
-        body.qualities.length > MAX_QUALITY_ITEMS
+        body.qualities.length >
+          MAX_QUALITY_ITEMS
       ) {
         throw new Error(
           "Too many quality entries"
@@ -495,31 +534,25 @@ export default async function handler(request) {
           body.filters
         );
 
-      /*
-       * Preserve the existing configuration,
-       * especially the private UI token.
-       */
       const newConfig = {
         ...existingConfig,
         uiToken,
         fileSize: newFileSize,
-        qualities: newQualities.map(item => ({
-          name: item.name,
-          enabled: item.enabled
-        })),
+        qualities: newQualities.map(
+          item => ({
+            name: item.name,
+            enabled: item.enabled
+          })
+        ),
         filters: newFilters
       };
 
-      const requestUrl = new URL(
-        request.url
-      );
+      const requestUrl =
+        new URL(request.url);
 
-      let finalConfigId = configId;
+      let finalConfigId =
+        configId;
 
-      /*
-       * Legacy configurations are migrated
-       * to a permanent Blob configuration ID.
-       */
       if (!finalConfigId) {
         finalConfigId =
           await createConfig(
@@ -584,10 +617,6 @@ export default async function handler(request) {
     }
   }
 
-  /*
-   * Only expose safe configuration values
-   * to browser JavaScript.
-   */
   const publicConfig = {
     qualities,
     fileSize,
@@ -675,6 +704,7 @@ export default async function handler(request) {
       margin: 0;
       min-height: 100vh;
       padding: 40px 16px 60px;
+
       background:
         radial-gradient(
           circle at 50% -15%,
@@ -682,7 +712,9 @@ export default async function handler(request) {
           transparent 38%
         ),
         var(--bg);
+
       color: var(--text);
+
       font-family:
         -apple-system,
         BlinkMacSystemFont,
@@ -690,6 +722,7 @@ export default async function handler(request) {
         "SF Pro Text",
         "Segoe UI",
         sans-serif;
+
       -webkit-font-smoothing: antialiased;
     }
 
@@ -910,10 +943,6 @@ export default async function handler(request) {
       margin-top: 28px;
     }
 
-    .result.visible {
-      display: block;
-    }
-
     .result-label {
       display: block;
       margin-bottom: 9px;
@@ -995,8 +1024,7 @@ export default async function handler(request) {
 
     @media (max-width: 600px) {
       body {
-        padding:
-          38px 12px 60px;
+        padding: 38px 12px 60px;
       }
 
       h1 {
@@ -1028,7 +1056,7 @@ export default async function handler(request) {
 
 <body>
   <div class="container">
-    <h1>ShowBox Stremio Addon</h1>
+    <h1>ShowBox Configure</h1>
 
     <p class="subtitle">
       Configure your stream preferences.
@@ -1179,6 +1207,11 @@ export default async function handler(request) {
     const fileSize = ${fileSizeJson};
     const filters = ${filtersJson};
 
+    const SESSION_DURATION = ${CONFIGURE_SESSION_MS};
+    const sessionStartedAt = Date.now();
+    let sessionExpired = false;
+    let sessionTimer = null;
+
     const qualityList =
       document.getElementById("qualityList");
 
@@ -1212,126 +1245,232 @@ export default async function handler(request) {
     const installButton =
       document.getElementById("installButton");
 
+    function expireSession() {
+      if (sessionExpired) {
+        return;
+      }
+
+      sessionExpired = true;
+
+      if (sessionTimer) {
+        clearTimeout(sessionTimer);
+        sessionTimer = null;
+      }
+
+      document.body.innerHTML = "";
+
+      const wrapper =
+        document.createElement("div");
+
+      wrapper.style.cssText =
+        "min-height:100vh;" +
+        "display:flex;" +
+        "align-items:center;" +
+        "justify-content:center;" +
+        "padding:24px;" +
+        "background:#111;" +
+        "color:#fff;" +
+        "font-family:-apple-system,BlinkMacSystemFont," +
+        "\"Segoe UI\",sans-serif;";
+
+      const card =
+        document.createElement("div");
+
+      card.style.cssText =
+        "width:min(460px,100%);" +
+        "padding:28px;" +
+        "border:1px solid #24252c;" +
+        "border-radius:18px;" +
+        "background:#17181d;" +
+        "text-align:center;";
+
+      const title =
+        document.createElement("h1");
+
+      title.textContent =
+        "Configure session expired";
+
+      title.style.cssText =
+        "margin:0 0 10px;" +
+        "font-size:24px;";
+
+      const message =
+        document.createElement("p");
+
+      message.textContent =
+        "This Configure page expired after one hour. " +
+        "Open Configure again from Stremio to start a new session.";
+
+      message.style.cssText =
+        "margin:0;" +
+        "color:#999ba3;" +
+        "font-size:14px;" +
+        "line-height:1.5;";
+
+      card.appendChild(title);
+      card.appendChild(message);
+      wrapper.appendChild(card);
+      document.body.appendChild(wrapper);
+
+      try {
+        window.close();
+      } catch {}
+    }
+
+    function checkSession() {
+      if (
+        Date.now() - sessionStartedAt >=
+        SESSION_DURATION
+      ) {
+        expireSession();
+      }
+    }
+
+    sessionTimer = setTimeout(
+      expireSession,
+      SESSION_DURATION
+    );
+
+    document.addEventListener(
+      "visibilitychange",
+      checkSession
+    );
+
+    window.addEventListener(
+      "focus",
+      checkSession
+    );
+
     function renderQualities() {
       qualityList.innerHTML = "";
 
-      qualities.forEach((quality, index) => {
-        const row =
-          document.createElement("div");
+      qualities.forEach(
+        (quality, index) => {
+          const row =
+            document.createElement("div");
 
-        row.className =
-          "quality-row";
+          row.className =
+            "quality-row";
 
-        const checkbox =
-          document.createElement("input");
+          const checkbox =
+            document.createElement("input");
 
-        checkbox.type = "checkbox";
-        checkbox.className = "quality-checkbox";
-        checkbox.checked = quality.enabled;
+          checkbox.type = "checkbox";
+          checkbox.className =
+            "quality-checkbox";
+          checkbox.checked =
+            quality.enabled;
 
-        checkbox.addEventListener(
-          "change",
-          () => {
-            quality.enabled =
-              checkbox.checked;
+          checkbox.addEventListener(
+            "change",
+            () => {
+              quality.enabled =
+                checkbox.checked;
 
-            settingsChanged();
-          }
-        );
-
-        const name =
-          document.createElement("div");
-
-        name.className =
-          "quality-name";
-
-        name.textContent =
-          quality.name;
-
-        const controls =
-          document.createElement("div");
-
-        controls.className =
-          "quality-controls";
-
-        const up =
-          document.createElement("button");
-
-        up.type = "button";
-        up.textContent = "↑";
-        up.disabled = index === 0;
-
-        up.addEventListener(
-          "click",
-          () => {
-            if (index === 0) {
-              return;
+              settingsChanged();
             }
+          );
 
-            const temp =
-              qualities[index - 1];
+          const name =
+            document.createElement("div");
 
-            qualities[index - 1] =
-              qualities[index];
+          name.className =
+            "quality-name";
 
-            qualities[index] =
-              temp;
+          name.textContent =
+            quality.name;
 
-            settingsChanged();
-            renderQualities();
-          }
-        );
+          const controls =
+            document.createElement("div");
 
-        const down =
-          document.createElement("button");
+          controls.className =
+            "quality-controls";
 
-        down.type = "button";
-        down.textContent = "↓";
-        down.disabled =
-          index === qualities.length - 1;
+          const up =
+            document.createElement("button");
 
-        down.addEventListener(
-          "click",
-          () => {
-            if (
-              index ===
-              qualities.length - 1
-            ) {
-              return;
+          up.type = "button";
+          up.textContent = "↑";
+          up.disabled = index === 0;
+
+          up.addEventListener(
+            "click",
+            () => {
+              if (index === 0) {
+                return;
+              }
+
+              const temp =
+                qualities[index - 1];
+
+              qualities[index - 1] =
+                qualities[index];
+
+              qualities[index] =
+                temp;
+
+              settingsChanged();
+              renderQualities();
             }
+          );
 
-            const temp =
-              qualities[index + 1];
+          const down =
+            document.createElement("button");
 
-            qualities[index + 1] =
-              qualities[index];
+          down.type = "button";
+          down.textContent = "↓";
 
-            qualities[index] =
-              temp;
+          down.disabled =
+            index ===
+            qualities.length - 1;
 
-            settingsChanged();
-            renderQualities();
-          }
-        );
+          down.addEventListener(
+            "click",
+            () => {
+              if (
+                index ===
+                qualities.length - 1
+              ) {
+                return;
+              }
 
-        controls.appendChild(up);
-        controls.appendChild(down);
+              const temp =
+                qualities[index + 1];
 
-        row.appendChild(checkbox);
-        row.appendChild(name);
-        row.appendChild(controls);
+              qualities[index + 1] =
+                qualities[index];
 
-        qualityList.appendChild(row);
-      });
+              qualities[index] =
+                temp;
+
+              settingsChanged();
+              renderQualities();
+            }
+          );
+
+          controls.appendChild(up);
+          controls.appendChild(down);
+
+          row.appendChild(checkbox);
+          row.appendChild(name);
+          row.appendChild(controls);
+
+          qualityList.appendChild(row);
+        }
+      );
     }
 
     function showStatus(
       message,
-      type = ""
+      type
     ) {
-      status.textContent = message;
+      status.textContent =
+        message;
+
       status.className =
-        `status ${type}`.trim();
+        type
+          ? "status " + type
+          : "status";
     }
 
     function settingsChanged() {
@@ -1369,7 +1508,9 @@ export default async function handler(request) {
       if (
         current.minGb !== null &&
         (
-          !Number.isFinite(current.minGb) ||
+          !Number.isFinite(
+            current.minGb
+          ) ||
           current.minGb < 0 ||
           current.minGb > 200
         )
@@ -1379,7 +1520,9 @@ export default async function handler(request) {
       } else if (
         current.maxGb !== null &&
         (
-          !Number.isFinite(current.maxGb) ||
+          !Number.isFinite(
+            current.maxGb
+          ) ||
           current.maxGb < 0 ||
           current.maxGb > 200
         )
@@ -1389,30 +1532,35 @@ export default async function handler(request) {
       } else if (
         current.minGb !== null &&
         current.maxGb !== null &&
-        current.minGb > current.maxGb
+        current.minGb >
+          current.maxGb
       ) {
         error =
           "Minimum size cannot be greater than maximum size.";
       }
 
-      fileSizeError.textContent = error;
+      fileSizeError.textContent =
+        error;
 
       if (error) {
-        showStatus(error, "error");
-        return false;
-      }
+        showStatus(
+          error,
+          "error"
+        );
 
-      if (
-        status.classList.contains("error")
-      ) {
-        status.textContent = "";
-        status.className = "status";
+        return false;
       }
 
       return true;
     }
 
     async function saveConfiguration() {
+      checkSession();
+
+      if (sessionExpired) {
+        return;
+      }
+
       if (!validateFileSizeInputs()) {
         return;
       }
@@ -1424,10 +1572,11 @@ export default async function handler(request) {
       saveButton.textContent = "Saving...";
 
       const config = {
-        qualities: qualities.map(item => ({
-          name: item.name,
-          enabled: item.enabled
-        })),
+        qualities:
+          qualities.map(item => ({
+            name: item.name,
+            enabled: item.enabled
+          })),
 
         fileSize,
 
@@ -1442,10 +1591,12 @@ export default async function handler(request) {
             window.location.pathname,
             {
               method: "POST",
+
               headers: {
                 "Content-Type":
                   "application/json"
               },
+
               body:
                 JSON.stringify(config)
             }
@@ -1559,7 +1710,9 @@ export default async function handler(request) {
           manifestUrl.select();
 
           try {
-            document.execCommand("copy");
+            document.execCommand(
+              "copy"
+            );
 
             copyButton.textContent =
               "Copied!";
@@ -1628,13 +1781,17 @@ export default async function handler(request) {
 </body>
 </html>`;
 
-  return new Response(html, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-      "Referrer-Policy": "no-referrer"
+  return new Response(
+    html,
+    {
+      status: 200,
+      headers: {
+        "Content-Type":
+          "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer"
+      }
     }
-  });
+  );
 }
