@@ -181,8 +181,7 @@ function normalizeQualities(input) {
     new Set();
 
 
-  const result =
-    [];
+  const result = [];
 
 
   for (
@@ -657,6 +656,12 @@ function homepageScript() {
 
     catch (error) {
 
+      console.error(
+        "[ShowBox] Configuration generation failed:",
+        error?.message
+      );
+
+
       checkStatus.textContent =
         error.message ||
         "Failed to create configuration.";
@@ -950,6 +955,10 @@ export default async (
   const pathname =
     url.pathname;
 
+
+  /* -------------------------------------------------- */
+  /* CREATE CONFIGURATION */
+  /* -------------------------------------------------- */
 
   if (
     pathname === "/create-config"
@@ -1285,7 +1294,13 @@ export default async (
 
     }
 
-    catch {
+    catch (error) {
+
+      console.error(
+        "[ShowBox] Config creation failed:",
+        error?.message
+      );
+
 
       return jsonResponse(
         {
@@ -1299,6 +1314,10 @@ export default async (
 
   }
 
+
+  /* -------------------------------------------------- */
+  /* MANIFEST */
+  /* -------------------------------------------------- */
 
   if (
     pathname === "/manifest.json" ||
@@ -1419,6 +1438,10 @@ export default async (
   }
 
 
+  /* -------------------------------------------------- */
+  /* HOMEPAGE */
+  /* -------------------------------------------------- */
+
   if (
     request.method !== "GET"
   ) {
@@ -1458,15 +1481,11 @@ export default async (
 
 <head>
 
-<meta
-  name="viewport"
-  content="width=device-width, initial-scale=1"
->
+<meta name="viewport"
+      content="width=device-width, initial-scale=1">
 
-<meta
-  name="theme-color"
-  content="#0d0e11"
->
+<meta name="theme-color"
+      content="#0d0e11">
 
 <title>ShowBox Stremio Addon</title>
 
@@ -1494,8 +1513,8 @@ export default async (
   --success: #a7e3b1;
   --error: #ff9b9b;
 
-  --radius-lg: 24px;
-  --radius-md: 17px;
+  --radius-lg: 22px;
+  --radius-md: 16px;
   --radius-sm: 13px;
 }
 
@@ -1504,16 +1523,12 @@ export default async (
 }
 
 html {
-  background:
-    var(--bg);
+  background: var(--bg);
 }
 
 body {
-  margin:
-    0;
-
-  min-height:
-    100vh;
+  margin: 0;
+  min-height: 100vh;
 
   background:
     radial-gradient(
@@ -1523,8 +1538,7 @@ body {
     ),
     var(--bg);
 
-  color:
-    var(--text);
+  color: var(--text);
 
   font-family:
     -apple-system,
@@ -1534,26 +1548,13 @@ body {
     "Segoe UI",
     sans-serif;
 
-  -webkit-font-smoothing:
-    antialiased;
+  -webkit-font-smoothing: antialiased;
 }
 
-
-/* -------------------------------------------------- */
-/* CONTAINER */
-/* -------------------------------------------------- */
-
 .container {
-  width:
-    calc(100% - 24px);
-
-  margin:
-    auto;
-
-  padding:
-    36px
-    0
-    56px;
+  width: min(680px, calc(100% - 28px));
+  margin: auto;
+  padding: 48px 0 70px;
 }
 
 
@@ -1562,37 +1563,24 @@ body {
 /* -------------------------------------------------- */
 
 h1 {
-  margin:
-    0;
+  margin: 0;
 
-  font-size:
-    38px;
-
-  line-height:
-    1;
-
-  font-weight:
-    750;
-
-  letter-spacing:
-    -1.5px;
+  font-size: clamp(36px, 8vw, 48px);
+  line-height: 1;
+  font-weight: 750;
+  letter-spacing: -1.8px;
 }
 
 .subtitle {
-  max-width:
-    520px;
+  max-width: 520px;
 
   margin:
     14px 0 0;
 
-  color:
-    var(--muted);
+  color: var(--muted);
 
-  font-size:
-    13px;
-
-  line-height:
-    1.55;
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 
@@ -1601,37 +1589,26 @@ h1 {
 /* -------------------------------------------------- */
 
 .title {
-  display:
-    block;
+  display: block;
 
   margin:
-    32px 0 8px;
+    38px 0 9px;
 
-  color:
-    var(--muted-2);
+  color: var(--muted-2);
 
-  font-size:
-    11px;
+  font-size: 11px;
+  font-weight: 700;
 
-  font-weight:
-    700;
-
-  letter-spacing:
-    .12em;
-
-  text-transform:
-    uppercase;
+  letter-spacing: .12em;
+  text-transform: uppercase;
 }
 
 #tokenInput {
-  width:
-    100%;
-
-  height:
-    48px;
+  width: 100%;
+  height: 54px;
 
   padding:
-    0 14px;
+    0 16px;
 
   border:
     1px solid var(--border-light);
@@ -1639,17 +1616,14 @@ h1 {
   border-radius:
     var(--radius-sm);
 
-  outline:
-    none;
+  outline: none;
 
   background:
     var(--surface-2);
 
-  color:
-    var(--text);
+  color: var(--text);
 
-  font-size:
-    14px;
+  font-size: 14px;
 
   transition:
     border-color .15s ease,
@@ -1657,51 +1631,32 @@ h1 {
 }
 
 #tokenInput::placeholder {
-  color:
-    var(--muted-2);
+  color: var(--muted-2);
 }
 
 #tokenInput:focus {
-  border-color:
-    #50545f;
-
-  background:
-    var(--surface-3);
+  border-color: #50545f;
+  background: var(--surface-3);
 }
 
 #generateButton {
-  width:
-    100%;
+  width: 100%;
+  height: 50px;
 
-  height:
-    48px;
+  margin-top: 12px;
 
-  margin-top:
-    10px;
+  padding: 0 20px;
 
-  padding:
-    0 18px;
+  border: 0;
+  border-radius: 14px;
 
-  border:
-    0;
+  background: var(--white);
+  color: var(--black);
 
-  border-radius:
-    14px;
+  font-size: 14px;
+  font-weight: 700;
 
-  background:
-    var(--white);
-
-  color:
-    var(--black);
-
-  font-size:
-    14px;
-
-  font-weight:
-    700;
-
-  cursor:
-    pointer;
+  cursor: pointer;
 
   transition:
     opacity .15s ease,
@@ -1709,45 +1664,34 @@ h1 {
 }
 
 #generateButton:hover {
-  opacity:
-    .9;
+  opacity: .9;
 }
 
 #generateButton:active {
-  transform:
-    scale(.985);
+  transform: scale(.985);
 }
 
 #generateButton:disabled {
-  opacity:
-    .55;
-
-  cursor:
-    default;
+  opacity: .55;
+  cursor: default;
 }
 
 #checkStatus {
-  min-height:
-    18px;
+  min-height: 18px;
 
-  margin-top:
-    10px;
+  margin-top: 10px;
 
-  color:
-    var(--muted-2);
+  color: var(--muted-2);
 
-  font-size:
-    12px;
+  font-size: 12px;
 }
 
 .success {
-  color:
-    var(--success) !important;
+  color: var(--success) !important;
 }
 
 .error {
-  color:
-    var(--error) !important;
+  color: var(--error) !important;
 }
 
 
@@ -1756,11 +1700,8 @@ h1 {
 /* -------------------------------------------------- */
 
 #configuration {
-  display:
-    none;
-
-  margin-top:
-    36px;
+  display: none;
+  margin-top: 42px;
 }
 
 
@@ -1768,40 +1709,26 @@ h1 {
 /* SECTION HEADERS */
 /* -------------------------------------------------- */
 
-.section-title,
-.configuration-title {
-  margin:
-    0;
+.section-title {
+  margin: 0;
 
-  color:
-    var(--text);
+  color: var(--text);
 
-  font-size:
-    28px;
+  font-size: 29px;
+  line-height: 1.15;
+  font-weight: 700;
 
-  line-height:
-    1.15;
-
-  font-weight:
-    700;
-
-  letter-spacing:
-    -.7px;
+  letter-spacing: -.7px;
 }
 
-.section-description,
-.description {
+.section-description {
   margin:
-    6px 0 12px;
+    6px 0 14px;
 
-  color:
-    var(--muted-2);
+  color: var(--muted-2);
 
-  font-size:
-    12px;
-
-  line-height:
-    1.45;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 
@@ -1810,8 +1737,7 @@ h1 {
 /* -------------------------------------------------- */
 
 .filter-card {
-  padding:
-    10px;
+  padding: 14px;
 
   border:
     1px solid var(--border);
@@ -1825,27 +1751,24 @@ h1 {
 
 .filter-heading {
   padding:
-    4px 6px 10px;
+    5px 7px 12px;
 
   color:
     var(--muted-2);
 
-  font-size:
-    11px;
+  font-size: 11px;
+  font-weight: 700;
 
-  font-weight:
-    700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
 
-  letter-spacing:
-    .12em;
-
-  text-transform:
-    uppercase;
+.filter-icon {
+  display: none;
 }
 
 .filter-option {
-  padding:
-    14px;
+  padding: 17px;
 
   border:
     1px solid var(--border-light);
@@ -1858,106 +1781,72 @@ h1 {
 }
 
 .filter-option-title {
-  display:
-    flex;
+  display: flex;
+  align-items: center;
 
-  align-items:
-    center;
+  gap: 9px;
 
-  gap:
-    8px;
+  margin: 0 0 5px;
 
-  margin:
-    0 0 4px;
+  color: var(--text);
 
-  color:
-    var(--text);
+  font-size: 17px;
+  font-weight: 650;
 
-  font-size:
-    16px;
-
-  font-weight:
-    650;
-
-  letter-spacing:
-    -.2px;
+  letter-spacing: -.2px;
 }
 
 .help-button {
-  width:
-    22px;
+  width: 24px;
+  height: 24px;
 
-  height:
-    22px;
+  padding: 0;
 
-  padding:
-    0;
+  border: 0;
+  border-radius: 50%;
 
-  border:
-    0;
+  background: #30333b;
 
-  border-radius:
-    50%;
+  color: var(--muted);
 
-  background:
-    #30333b;
+  font-size: 12px;
+  font-weight: 700;
 
-  color:
-    var(--muted);
-
-  font-size:
-    12px;
-
-  font-weight:
-    700;
-
-  cursor:
-    pointer;
+  cursor: pointer;
 }
 
 .size-fields {
-  display:
-    grid;
+  display: grid;
 
   grid-template-columns:
     1fr 1fr;
 
-  gap:
-    9px;
+  gap: 10px;
 
-  margin-top:
-    12px;
+  margin-top: 14px;
 }
 
 .size-field label {
-  display:
-    block;
+  display: block;
 
   margin:
-    0 0 6px;
+    0 0 7px;
 
   color:
     var(--muted-2);
 
-  font-size:
-    11px;
+  font-size: 11px;
+  font-weight: 600;
 
-  font-weight:
-    600;
-
-  letter-spacing:
-    .03em;
+  letter-spacing: .03em;
 }
 
 .size-input {
-  width:
-    100%;
-
-  height:
-    48px;
+  width: 100%;
+  height: 52px;
 
   padding:
-    0 13px;
+    0 14px;
 
   border:
     1px solid var(--border-light);
@@ -1965,8 +1854,7 @@ h1 {
   border-radius:
     var(--radius-sm);
 
-  outline:
-    none;
+  outline: none;
 
   background:
     var(--surface-3);
@@ -1974,8 +1862,7 @@ h1 {
   color:
     var(--text);
 
-  font-size:
-    14px;
+  font-size: 14px;
 }
 
 .size-input::placeholder {
@@ -1989,23 +1876,16 @@ h1 {
 }
 
 .filter-error {
-  min-height:
-    18px;
+  min-height: 18px;
 
-  margin-top:
-    9px;
-
-  padding:
-    0 6px;
+  margin-top: 10px;
+  padding: 0 7px;
 
   color:
     var(--error);
 
-  font-size:
-    12px;
-
-  line-height:
-    1.45;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 
@@ -2014,22 +1894,43 @@ h1 {
 /* -------------------------------------------------- */
 
 .quality-section {
-  margin-top:
-    34px;
+  margin-top: 38px;
+}
+
+.configuration-title {
+  margin: 0;
+
+  color:
+    var(--text);
+
+  font-size: 29px;
+  line-height: 1.15;
+
+  font-weight: 700;
+
+  letter-spacing: -.7px;
+}
+
+.description {
+  margin:
+    6px 0 14px;
+
+  color:
+    var(--muted-2);
+
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .quality-list {
-  display:
-    flex;
+  display: flex;
 
   flex-direction:
     column;
 
-  gap:
-    7px;
+  gap: 8px;
 
-  padding:
-    7px;
+  padding: 8px;
 
   border:
     1px solid var(--border);
@@ -2042,20 +1943,15 @@ h1 {
 }
 
 .quality-row {
-  display:
-    flex;
+  display: flex;
 
-  align-items:
-    center;
+  align-items: center;
+  justify-content: space-between;
 
-  justify-content:
-    space-between;
-
-  min-height:
-    54px;
+  min-height: 62px;
 
   padding:
-    9px 10px 9px 12px;
+    11px 12px 11px 14px;
 
   border-radius:
     var(--radius-md);
@@ -2076,60 +1972,112 @@ h1 {
     var(--border-light);
 }
 
-.quality-name {
-  display:
-    flex;
+.filter-section {
+  margin-top: 38px;
+}
 
-  align-items:
-    center;
+.filter-setting-list {
+  display: flex;
 
-  gap:
-    10px;
+  flex-direction: column;
+
+  gap: 8px;
+
+  padding: 8px;
+
+  border:
+    1px solid var(--border);
+
+  border-radius:
+    var(--radius-lg);
+
+  background:
+    var(--surface);
+}
+
+.filter-setting-row {
+  display: flex;
+
+  align-items: center;
+
+  min-height: 62px;
+
+  padding:
+    11px 14px;
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--surface-2);
+
+  border:
+    1px solid transparent;
+}
+
+.filter-setting-name {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
 
   color:
     var(--text);
 
-  font-size:
-    14px;
+  font-size: 15px;
+  font-weight: 600;
 
-  font-weight:
-    600;
+  cursor: pointer;
+}
 
-  cursor:
-    pointer;
+.filter-setting-checkbox {
+  width: 20px;
+  height: 20px;
+
+  margin: 0;
+
+  accent-color:
+    #f1f1f2;
+}
+
+.quality-name {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  color:
+    var(--text);
+
+  font-size: 15px;
+  font-weight: 600;
+
+  cursor: pointer;
 }
 
 .quality-checkbox {
-  width:
-    18px;
+  width: 20px;
+  height: 20px;
 
-  height:
-    18px;
-
-  margin:
-    0;
+  margin: 0;
 
   accent-color:
     #f1f1f2;
 }
 
 .move-buttons {
-  display:
-    flex;
+  display: flex;
 
-  gap:
-    5px;
+  gap: 6px;
 }
 
 .move-button {
-  width:
-    34px;
+  width: 36px;
+  height: 36px;
 
-  height:
-    34px;
-
-  padding:
-    0;
+  padding: 0;
 
   border:
     1px solid var(--border-light);
@@ -2143,11 +2091,9 @@ h1 {
   color:
     var(--text-soft);
 
-  font-size:
-    15px;
+  font-size: 16px;
 
-  cursor:
-    pointer;
+  cursor: pointer;
 }
 
 .move-button:hover {
@@ -2170,162 +2116,43 @@ h1 {
 
 
 /* -------------------------------------------------- */
-/* STREAM FILTERS */
-/* -------------------------------------------------- */
-
-.filter-section {
-  margin-top:
-    34px;
-}
-
-.filter-setting-list {
-  display:
-    flex;
-
-  flex-direction:
-    column;
-
-  gap:
-    7px;
-
-  padding:
-    7px;
-
-  border:
-    1px solid var(--border);
-
-  border-radius:
-    var(--radius-lg);
-
-  background:
-    var(--surface);
-}
-
-.filter-setting-row {
-  display:
-    flex;
-
-  align-items:
-    center;
-
-  min-height:
-    54px;
-
-  padding:
-    9px 12px;
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--surface-2);
-
-  border:
-    1px solid transparent;
-}
-
-.filter-setting-name {
-  display:
-    flex;
-
-  align-items:
-    center;
-
-  gap:
-    10px;
-
-  color:
-    var(--text);
-
-  font-size:
-    14px;
-
-  font-weight:
-    600;
-
-  cursor:
-    pointer;
-}
-
-.filter-setting-checkbox {
-  width:
-    18px;
-
-  height:
-    18px;
-
-  margin:
-    0;
-
-  accent-color:
-    #f1f1f2;
-}
-
-
-/* -------------------------------------------------- */
 /* RESULT */
 /* -------------------------------------------------- */
 
 #result {
-  margin-top:
-    36px;
+  margin-top: 40px;
 }
 
 .result-label {
-  display:
-    block;
+  display: block;
 
-  margin:
-    0 0 8px;
+  margin-bottom: 9px;
 
   color:
     var(--muted-2);
 
-  font-size:
-    11px;
+  font-size: 11px;
+  font-weight: 700;
 
-  font-weight:
-    700;
-
-  letter-spacing:
-    .12em;
-
-  text-transform:
-    uppercase;
+  letter-spacing: .12em;
+  text-transform: uppercase;
 }
 
 .result-row {
-  display:
-    flex;
+  display: flex;
 
-  flex-direction:
-    row;
-
-  align-items:
-    stretch;
-
-  gap:
-    8px;
-
-  width:
-    100%;
+  gap: 10px;
 }
 
 #manifestUrl {
-  flex:
-    1 1 auto;
+  flex: 1;
 
-  min-width:
-    0;
+  min-width: 0;
 
-  width:
-    0;
-
-  height:
-    50px;
+  height: 50px;
 
   padding:
-    0 12px;
+    0 14px;
 
   border:
     1px solid var(--border-light);
@@ -2333,8 +2160,7 @@ h1 {
   border-radius:
     var(--radius-sm);
 
-  outline:
-    none;
+  outline: none;
 
   background:
     var(--surface-2);
@@ -2342,22 +2168,13 @@ h1 {
   color:
     var(--text-soft);
 
-  font-size:
-    11px;
+  font-size: 12px;
 }
 
 #copyButton {
-  flex:
-    0 0 72px;
+  width: 90px;
 
-  width:
-    72px;
-
-  height:
-    50px;
-
-  border:
-    0;
+  border: 0;
 
   border-radius:
     var(--radius-sm);
@@ -2368,14 +2185,10 @@ h1 {
   color:
     var(--text);
 
-  font-size:
-    12px;
+  font-size: 13px;
+  font-weight: 650;
 
-  font-weight:
-    650;
-
-  cursor:
-    pointer;
+  cursor: pointer;
 }
 
 #copyButton:hover {
@@ -2384,23 +2197,15 @@ h1 {
 }
 
 #installButton {
-  display:
-    flex;
+  display: flex;
 
-  align-items:
-    center;
+  align-items: center;
+  justify-content: center;
 
-  justify-content:
-    center;
+  width: 100%;
+  height: 50px;
 
-  width:
-    100%;
-
-  height:
-    50px;
-
-  margin-top:
-    8px;
+  margin-top: 10px;
 
   border:
     1px solid var(--border-light);
@@ -2414,17 +2219,12 @@ h1 {
   color:
     var(--black);
 
-  font-size:
-    14px;
+  font-size: 13px;
+  font-weight: 700;
 
-  font-weight:
-    700;
+  text-decoration: none;
 
-  text-decoration:
-    none;
-
-  cursor:
-    pointer;
+  cursor: pointer;
 
   transition:
     opacity .15s ease;
@@ -2444,487 +2244,67 @@ h1 {
 }
 
 .note {
-  margin:
-    10px 3px 1px;
+  margin-top: 12px;
 
   color:
     var(--muted-2);
 
-  font-size:
-    11px;
+  font-size: 11px;
 
-  line-height:
-    1.5;
+  line-height: 1.5;
 }
 
 
 /* -------------------------------------------------- */
-/* TABLET */
+/* RESPONSIVE */
 /* -------------------------------------------------- */
 
-@media (min-width: 601px) and (max-width: 1024px) {
+@media (max-width: 600px) {
 
   .container {
     width:
-      min(740px, calc(100% - 40px));
+      calc(100% - 24px);
 
     padding:
-      48px 0 70px;
+      38px 0 60px;
   }
 
   h1 {
     font-size:
-      48px;
+      38px;
 
     letter-spacing:
-      -1.8px;
+      -1.5px;
   }
 
   .subtitle {
     font-size:
-      14px;
-  }
-
-  .title {
-    margin:
-      38px 0 9px;
-  }
-
-  #tokenInput {
-    height:
-      54px;
-
-    padding:
-      0 16px;
-  }
-
-  #generateButton {
-    height:
-      50px;
-
-    margin-top:
-      12px;
-
-    padding:
-      0 20px;
-  }
-
-  #configuration {
-    margin-top:
-      42px;
+      13px;
   }
 
   .section-title,
   .configuration-title {
     font-size:
-      29px;
-  }
-
-  .section-description,
-  .description {
-    margin:
-      6px 0 14px;
-  }
-
-  .filter-card {
-    padding:
-      14px;
-  }
-
-  .filter-heading {
-    padding:
-      5px 7px 12px;
-  }
-
-  .filter-option {
-    padding:
-      17px;
-  }
-
-  .filter-option-title {
-    font-size:
-      17px;
-
-    gap:
-      9px;
-  }
-
-  .help-button {
-    width:
-      24px;
-
-    height:
-      24px;
+      27px;
   }
 
   .size-fields {
     gap:
-      10px;
-
-    margin-top:
-      14px;
-  }
-
-  .size-field label {
-    margin:
-      0 0 7px;
+      9px;
   }
 
   .size-input {
-    height:
-      52px;
-
-    padding:
-      0 14px;
-  }
-
-  .filter-error {
-    margin-top:
-      10px;
-
-    padding:
-      0 7px;
-  }
-
-  .quality-section,
-  .filter-section {
-    margin-top:
-      38px;
-  }
-
-  .quality-list,
-  .filter-setting-list {
-    gap:
-      8px;
-
-    padding:
-      8px;
-  }
-
-  .quality-row,
-  .filter-setting-row {
-    min-height:
-      62px;
-  }
-
-  .quality-row {
-    padding:
-      11px 12px 11px 14px;
-  }
-
-  .quality-name,
-  .filter-setting-name {
-    gap:
-      12px;
-
     font-size:
-      15px;
-  }
-
-  .quality-checkbox,
-  .filter-setting-checkbox {
-    width:
-      20px;
-
-    height:
-      20px;
-  }
-
-  .move-buttons {
-    gap:
-      6px;
-  }
-
-  .move-button {
-    width:
-      38px;
-
-    height:
-      36px;
-
-    font-size:
-      16px;
-  }
-
-  #result {
-    margin-top:
-      40px;
+      14px;
   }
 
   .result-row {
     flex-direction:
-      row;
-
-    gap:
-      9px;
-  }
-
-  #manifestUrl {
-    height:
-      50px;
-
-    padding:
-      0 14px;
+      column;
   }
 
   #copyButton {
-    flex:
-      0 0 90px;
-
-    width:
-      90px;
-
-    height:
-      50px;
-  }
-
-  #installButton {
-    height:
-      51px;
-
-    margin-top:
-      9px;
-  }
-
-  .note {
-    margin:
-      11px 3px 1px;
-  }
-
-}
-
-
-/* -------------------------------------------------- */
-/* DESKTOP */
-/* -------------------------------------------------- */
-
-@media (min-width: 1025px) {
-
-  .container {
-    width:
-      min(780px, calc(100% - 48px));
-
-    padding:
-      48px 0 70px;
-  }
-
-  h1 {
-    font-size:
-      48px;
-
-    letter-spacing:
-      -1.8px;
-  }
-
-  .subtitle {
-    font-size:
-      14px;
-  }
-
-  .title {
-    margin:
-      38px 0 9px;
-  }
-
-  #tokenInput {
-    height:
-      54px;
-
-    padding:
-      0 16px;
-  }
-
-  #generateButton {
-    height:
-      50px;
-
-    margin-top:
-      12px;
-
-    padding:
-      0 20px;
-  }
-
-  #configuration {
-    margin-top:
-      42px;
-  }
-
-  .section-title,
-  .configuration-title {
-    font-size:
-      29px;
-  }
-
-  .section-description,
-  .description {
-    margin:
-      6px 0 14px;
-  }
-
-  .filter-card {
-    padding:
-      14px;
-  }
-
-  .filter-heading {
-    padding:
-      5px 7px 12px;
-  }
-
-  .filter-option {
-    padding:
-      17px;
-  }
-
-  .filter-option-title {
-    font-size:
-      17px;
-
-    gap:
-      9px;
-  }
-
-  .help-button {
-    width:
-      24px;
-
-    height:
-      24px;
-  }
-
-  .size-fields {
-    gap:
-      10px;
-
-    margin-top:
-      14px;
-  }
-
-  .size-field label {
-    margin:
-      0 0 7px;
-  }
-
-  .size-input {
-    height:
-      52px;
-
-    padding:
-      0 14px;
-  }
-
-  .filter-error {
-    margin-top:
-      10px;
-
-    padding:
-      0 7px;
-  }
-
-  .quality-section,
-  .filter-section {
-    margin-top:
-      38px;
-  }
-
-  .quality-list,
-  .filter-setting-list {
-    gap:
-      8px;
-
-    padding:
-      8px;
-  }
-
-  .quality-row,
-  .filter-setting-row {
-    min-height:
-      62px;
-  }
-
-  .quality-row {
-    padding:
-      11px 12px 11px 14px;
-  }
-
-  .quality-name,
-  .filter-setting-name {
-    gap:
-      12px;
-
-    font-size:
-      15px;
-  }
-
-  .quality-checkbox,
-  .filter-setting-checkbox {
-    width:
-      20px;
-
-    height:
-      20px;
-  }
-
-  .move-buttons {
-    gap:
-      6px;
-  }
-
-  .move-button {
-    width:
-      38px;
-
-    height:
-      36px;
-
-    font-size:
-      16px;
-  }
-
-  #result {
-    margin-top:
-      40px;
-  }
-
-  .result-row {
-    flex-direction:
-      row;
-
-    gap:
-      9px;
-  }
-
-  #manifestUrl {
-    height:
-      50px;
-
-    padding:
-      0 14px;
-  }
-
-  #copyButton {
-    flex:
-      0 0 90px;
-
-    width:
-      90px;
-
-    height:
-      50px;
-  }
-
-  #installButton {
-    height:
-      51px;
-
-    margin-top:
-      9px;
-  }
-
-  .note {
-    margin:
-      11px 3px 1px;
+    width: 100%;
   }
 
 }
@@ -2938,6 +2318,8 @@ h1 {
 <div class="container">
 
 
+<!-- HERO -->
+
 <h1>
 ShowBox
 </h1>
@@ -2946,6 +2328,8 @@ ShowBox
 Enter your FebBox UI token to generate your addon.
 </div>
 
+
+<!-- TOKEN -->
 
 <label
   class="title"
@@ -2975,6 +2359,8 @@ Generate
 
 <div id="configuration">
 
+
+<!-- FILTERING -->
 
 <section>
 
@@ -3061,6 +2447,8 @@ Max (GB)
 </section>
 
 
+<!-- QUALITY -->
+
 <section class="quality-section">
 
 <div class="configuration-title">
@@ -3081,6 +2469,8 @@ ${qualityRows()}
 </section>
 
 
+<!-- STREAM FILTERS -->
+
 <section class="filter-section">
 
 <div class="configuration-title">
@@ -3100,6 +2490,8 @@ ${filterRows()}
 
 </section>
 
+
+<!-- RESULT -->
 
 <div id="result">
 
@@ -3135,10 +2527,6 @@ Install in Stremio
 <div class="note">
 On iOS, if the Install button does not open Stremio,
 use Copy and paste the manifest URL into Stremio's Add Addon field.
-</div>
-
-<div class="note">
-On Nuvio, reinstalling isn't required — it syncs automatically.
 </div>
 
 </div>
