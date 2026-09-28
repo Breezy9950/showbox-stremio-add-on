@@ -2,9 +2,7 @@ import { getStore } from "@netlify/blobs";
 
 const CONFIG_STORE = "showbox-configs";
 const CONFIGURE_SESSION_STORE = "showbox-configure-sessions";
-
-const SESSION_IDLE_MS = 5 * 60 * 1000;
-const SESSION_TOTAL_IDLE_MS = 10 * 60 * 1000;
+const CHECK_INTERVAL_MS = 150 * 1000;
 
 function getConfigStore() {
   return getStore({
@@ -68,6 +66,7 @@ export async function createConfigureSession() {
     {
       createdAt: now,
       lastActivityAt: now,
+      missedChecks: 0,
       state: "active"
     },
     {
@@ -88,46 +87,10 @@ export async function getConfigureSession(id) {
 
   const store = getConfigureSessionStore();
 
-  const session = await store.get(id, {
+  return await store.get(id, {
     type: "json",
     consistency: "strong"
   });
-
-  if (!session || typeof session !== "object") {
-    return null;
-  }
-
-  if (session.state === "expired") {
-    return {
-      ...session,
-      state: "expired"
-    };
-  }
-
-  const lastActivityAt = Number(session.lastActivityAt);
-
-  if (!Number.isFinite(lastActivityAt)) {
-    return null;
-  }
-
-  const idle = Date.now() - lastActivityAt;
-
-  if (idle >= SESSION_TOTAL_IDLE_MS) {
-    const expired = {
-      ...session,
-      state: "expired",
-      expiredAt: Date.now()
-    };
-
-    await store.setJSON(id, expired);
-
-    return expired;
-  }
-
-  return {
-    ...session,
-    state: idle >= SESSION_IDLE_MS ? "warning" : "active"
-  };
 }
 
 export async function recordConfigureActivity(id) {
@@ -159,6 +122,52 @@ export async function recordConfigureActivity(id) {
     };
   }
 
+  const now = Date.now();
+
+  await store.setJSON(id, {
+    ...session,
+    lastActivityAt: now,
+    missedChecks: 0,
+    state: "active"
+  });
+
+  return {
+    ok: true,
+    state: "active",
+    lastActivityAt: now
+  };
+}
+
+export async function checkConfigureSession(id) {
+  if (!validId(id)) {
+    return {
+      ok: false,
+      state: "invalid"
+    };
+  }
+
+  const store = getConfigureSessionStore();
+
+  const session = await store.get(id, {
+    type: "json",
+    consistency: "strong"
+  });
+
+  if (!session || typeof session !== "object") {
+    return {
+      ok: false,
+      state: "invalid"
+    };
+  }
+
+  if (session.state === "expired") {
+    return {
+      ok: false,
+      state: "expired"
+    };
+  }
+
+  const now = Date.now();
   const lastActivityAt = Number(session.lastActivityAt);
 
   if (!Number.isFinite(lastActivityAt)) {
@@ -168,12 +177,26 @@ export async function recordConfigureActivity(id) {
     };
   }
 
-  const now = Date.now();
-  const idle = now - lastActivityAt;
+  const elapsed = now - lastActivityAt;
 
-  if (idle >= SESSION_TOTAL_IDLE_MS) {
+  if (elapsed < CHECK_INTERVAL_MS) {
+    return {
+      ok: true,
+      state: "active",
+      missedChecks: 0
+    };
+  }
+
+  const missedChecks =
+    Number(session.missedChecks) || 0;
+
+  const nextMissedChecks =
+    missedChecks + 1;
+
+  if (nextMissedChecks >= 2) {
     await store.setJSON(id, {
       ...session,
+      missedChecks: nextMissedChecks,
       state: "expired",
       expiredAt: now
     });
@@ -186,13 +209,13 @@ export async function recordConfigureActivity(id) {
 
   await store.setJSON(id, {
     ...session,
-    lastActivityAt: now,
-    state: "active"
+    missedChecks: nextMissedChecks,
+    state: "warning"
   });
 
   return {
     ok: true,
-    state: "active",
-    lastActivityAt: now
+    state: "warning",
+    missedChecks: nextMissedChecks
   };
 }
