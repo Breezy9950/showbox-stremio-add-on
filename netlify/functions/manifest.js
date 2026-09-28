@@ -1326,7 +1326,7 @@ export default async (request,context)=>{
       .settings-title,
       .section-title,
       .configuration-title{
-        font-size:27px;
+        font-size:clamp(32px, 1.5rem + 2.5vw, 56px)⁠;
       }
 
       .size-fields{
