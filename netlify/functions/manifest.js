@@ -684,7 +684,7 @@ export default async (request, context) => {
     }
   }
 
-  /* MANIFEST */
+   /* MANIFEST */
 
   if (
     pathname === "/manifest.json" ||
@@ -730,15 +730,15 @@ export default async (request, context) => {
       }),
       {
         headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*",
-        "X-Content-Type-Options": "nosniff",
-        "Referrer-Policy": "no-referrer"
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "Access-Control-Allow-Origin": "*",
+          "X-Content-Type-Options": "nosniff",
+          "Referrer-Policy": "no-referrer"
+        }
       }
     );
   }
-
   /* HOMEPAGE */
 
   if (request.method !== "GET") {
