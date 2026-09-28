@@ -1,10 +1,16 @@
 import CryptoJS from "crypto-js";
 
+import {
+  getConfig
+} from "./config-store.js";
+
+
 const TMDB_API_KEY =
   "439c478a771f35c05022f9feabcca01c";
 
 const TMDB_BASE_URL =
   "https://api.themoviedb.org/3";
+
 
 // ---------------------------------------------------------
 // Base64URL
@@ -33,7 +39,7 @@ function decodeBase64Url(value) {
 
 
 // ---------------------------------------------------------
-// Parse configured Stremio config
+// Parse legacy Base64 config
 // ---------------------------------------------------------
 
 function parseConfig(rawConfig) {
@@ -59,6 +65,78 @@ function parseConfig(rawConfig) {
     return {};
 
   }
+}
+
+
+// ---------------------------------------------------------
+// Load configured Stremio config
+// ---------------------------------------------------------
+
+async function loadConfig(
+  rawConfig
+) {
+
+  /*
+   * New configuration IDs are 32-character
+   * hexadecimal values stored in Netlify Blobs.
+   */
+
+  if (
+    /^[a-f0-9]{32}$/i.test(
+      rawConfig
+    )
+  ) {
+
+    const storedConfig =
+      await getConfig(
+        rawConfig
+      );
+
+
+    if (
+      storedConfig &&
+      typeof storedConfig === "object" &&
+      !Array.isArray(storedConfig)
+    ) {
+
+      console.log(
+        "[ShowBox] Loaded persistent configuration:",
+        {
+          id:
+            rawConfig
+        }
+      );
+
+
+      return storedConfig;
+
+    }
+
+
+    console.log(
+      "[ShowBox] Persistent configuration not found:",
+      rawConfig
+    );
+
+  }
+
+
+  /*
+   * Legacy Base64 configuration.
+   *
+   * Existing installations generated before
+   * the persistent configuration system continue
+   * to work.
+   */
+
+  const legacyConfig =
+    parseConfig(
+      rawConfig
+    );
+
+
+  return legacyConfig;
+
 }
 
 
@@ -3197,7 +3275,7 @@ export default async (
     // -----------------------------------------------------
 
     const config =
-      parseConfig(
+      await loadConfig(
         rawConfig
       );
 
