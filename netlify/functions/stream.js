@@ -5,95 +5,28 @@ import {
 } from "./config-store.js";
 
 
-const FETCH_TIMEOUT_MS =
-  10_000;
+const TMDB_API_KEY =
+  "439c478a771f35c05022f9feabcca01c";
 
-const MAX_FILE_SIZE_GB =
-  200;
-
-
-// ---------------------------------------------------------
-// Fetch with timeout
-// ---------------------------------------------------------
-
-async function fetchWithTimeout(
-  url,
-  options = {},
-  timeoutMs = FETCH_TIMEOUT_MS
-) {
-
-  const controller =
-    new AbortController();
-
-  const timeout =
-    setTimeout(
-      () => {
-        controller.abort();
-      },
-      timeoutMs
-    );
-
-  try {
-
-    return await fetch(
-      url,
-      {
-        ...options,
-        signal:
-          controller.signal
-      }
-    );
-
-  } catch (error) {
-
-    if (
-      error?.name ===
-      "AbortError"
-    ) {
-
-      throw new Error(
-        `Upstream request timed out after ${timeoutMs / 1000} seconds`
-      );
-
-    }
-
-    throw error;
-
-  } finally {
-
-    clearTimeout(
-      timeout
-    );
-
-  }
-}
+const TMDB_BASE_URL =
+  "https://api.themoviedb.org/3";
 
 
 // ---------------------------------------------------------
 // Base64URL
 // ---------------------------------------------------------
 
-function decodeBase64Url(
-  value
-) {
+function decodeBase64Url(value) {
 
   let base64 =
     value
-      .replace(
-        /-/g,
-        "+"
-      )
-      .replace(
-        /_/g,
-        "/"
-      );
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
 
   while (
     base64.length % 4
   ) {
-
     base64 += "=";
-
   }
 
   return Buffer
@@ -101,9 +34,7 @@ function decodeBase64Url(
       base64,
       "base64"
     )
-    .toString(
-      "utf8"
-    );
+    .toString("utf8");
 }
 
 
@@ -111,9 +42,7 @@ function decodeBase64Url(
 // Parse legacy Base64 config
 // ---------------------------------------------------------
 
-function parseConfig(
-  rawConfig
-) {
+function parseConfig(rawConfig) {
 
   try {
 
@@ -226,9 +155,7 @@ function parseSingleToken(
   if (
     !token.startsWith("eyJ")
   ) {
-
     return token;
-
   }
 
   try {
@@ -240,9 +167,7 @@ function parseSingleToken(
             token.split(".")[1] || "",
             "base64"
           )
-          .toString(
-            "utf8"
-          )
+          .toString("utf8")
       );
 
 
@@ -250,9 +175,7 @@ function parseSingleToken(
       !decoded ||
       !decoded.encrypt_data
     ) {
-
       return token;
-
     }
 
 
@@ -260,7 +183,6 @@ function parseSingleToken(
       CryptoJS.enc.Utf8.parse(
         "123d6cedf626dy54233aa1w6"
       );
-
 
     const iv =
       CryptoJS.enc.Utf8.parse(
@@ -295,11 +217,9 @@ function parseSingleToken(
       result &&
       result.uid
     ) {
-
       return String(
         result.uid
       );
-
     }
 
     return token;
@@ -312,6 +232,128 @@ function parseSingleToken(
     );
 
     return token;
+
+  }
+}
+
+
+// ---------------------------------------------------------
+// IMDb -> TMDB
+// ---------------------------------------------------------
+
+async function imdbToTmdb(
+  imdbId
+) {
+
+  console.log(
+    "[ShowBox] TMDB lookup:",
+    imdbId
+  );
+
+
+  const response =
+    await fetch(
+      `${TMDB_BASE_URL}/find/${encodeURIComponent(imdbId)}?api_key=${TMDB_API_KEY}&external_source=imdb_id`
+    );
+
+
+  console.log(
+    "[ShowBox] TMDB response:",
+    response.status
+  );
+
+
+  if (!response.ok) {
+
+    throw new Error(
+      `TMDB lookup failed: HTTP ${response.status}`
+    );
+
+  }
+
+
+  const data =
+    await response.json();
+
+
+  const movieResults =
+    Array.isArray(
+      data.movie_results
+    )
+      ? data.movie_results
+      : [];
+
+
+  const tvResults =
+    Array.isArray(
+      data.tv_results
+    )
+      ? data.tv_results
+      : [];
+
+
+  const result =
+    movieResults[0] ||
+    tvResults[0];
+
+
+  if (
+    !result ||
+    !result.id
+  ) {
+
+    throw new Error(
+      `TMDB ID not found for ${imdbId}`
+    );
+
+  }
+
+
+  console.log(
+    "[ShowBox] TMDB result:",
+    result.id
+  );
+
+
+  return String(
+    result.id
+  );
+}
+
+
+// ---------------------------------------------------------
+// TMDB title information
+// ---------------------------------------------------------
+
+async function getTMDBDetails(
+  tmdbId,
+  type
+) {
+
+  try {
+
+    const endpoint =
+      type === "series"
+        ? `/tv/${tmdbId}`
+        : `/movie/${tmdbId}`;
+
+
+    const response =
+      await fetch(
+        `${TMDB_BASE_URL}${endpoint}?api_key=${TMDB_API_KEY}`
+      );
+
+
+    if (!response.ok) {
+      return null;
+    }
+
+
+    return await response.json();
+
+  } catch {
+
+    return null;
 
   }
 }
@@ -334,51 +376,6 @@ const SHOWBOX_SEARCH_HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
 };
-
-
-// ---------------------------------------------------------
-// Validate ShowBox URL
-// ---------------------------------------------------------
-
-function isAllowedShowBoxUrl(
-  value
-) {
-
-  try {
-
-    const url =
-      new URL(
-        value
-      );
-
-
-    if (
-      url.protocol !== "https:"
-    ) {
-
-      return false;
-
-    }
-
-
-    const hostname =
-      url.hostname.toLowerCase();
-
-
-    return (
-      hostname ===
-        "showbox.media" ||
-      hostname.endsWith(
-        ".showbox.media"
-      )
-    );
-
-  } catch {
-
-    return false;
-
-  }
-}
 
 
 function parseShowBoxSearchHref(
@@ -405,30 +402,10 @@ function parseShowBoxSearchHref(
       match?.[1]
     ) {
 
-      const detailUrl =
-        new URL(
-          match[1],
-          SHOWBOX_WEB_API
-        ).href;
-
-
-      if (
-        !isAllowedShowBoxUrl(
-          detailUrl
-        )
-      ) {
-
-        console.log(
-          "[ShowBox] Rejected unexpected detail URL:",
-          detailUrl
-        );
-
-        return null;
-
-      }
-
-
-      return detailUrl;
+      return new URL(
+        match[1],
+        SHOWBOX_WEB_API
+      ).href;
 
     }
 
@@ -480,19 +457,11 @@ async function searchShowBoxMediaId(
 
 
   const searchUrl =
-    new URL(
-      `${SHOWBOX_WEB_API}/search`
-    );
-
-
-  searchUrl.searchParams.set(
-    "keyword",
-    imdbId
-  );
+    `${SHOWBOX_WEB_API}/search?keyword=${encodeURIComponent(imdbId)}`;
 
 
   const searchResponse =
-    await fetchWithTimeout(
+    await fetch(
       searchUrl,
       {
         headers:
@@ -546,7 +515,7 @@ async function searchShowBoxMediaId(
 
 
   const detailResponse =
-    await fetchWithTimeout(
+    await fetch(
       detailUrl,
       {
         headers:
@@ -618,30 +587,8 @@ async function febboxShare(
       : 1;
 
 
-  const febboxUrl =
-    new URL(
-      "https://www.febbox.com/mbp/to_share_page"
-    );
-
-
-  febboxUrl.searchParams.set(
-    "box_type",
-    String(
-      boxType
-    )
-  );
-
-  febboxUrl.searchParams.set(
-    "mid",
-    String(
-      showboxId
-    )
-  );
-
-  febboxUrl.searchParams.set(
-    "json",
-    "1"
-  );
+  const url =
+    `https://www.febbox.com/mbp/to_share_page?box_type=${boxType}&mid=${showboxId}&json=1`;
 
 
   console.log(
@@ -654,9 +601,7 @@ async function febboxShare(
 
 
   const response =
-    await fetchWithTimeout(
-      febboxUrl
-    );
+    await fetch(url);
 
 
   const text =
@@ -681,9 +626,7 @@ async function febboxShare(
   try {
 
     data =
-      JSON.parse(
-        text
-      );
+      JSON.parse(text);
 
   } catch {
 
@@ -732,50 +675,19 @@ async function febboxShare(
   }
 
 
-  let shareKey = "";
-
-
-  try {
-
-    const shareUrl =
-      new URL(
-        shareLink
-      );
-
-
-    shareKey =
-      shareUrl.pathname
-        .split("/")
-        .filter(Boolean)
-        .pop() ||
-      "";
-
-  } catch {
-
-    shareKey =
-      shareLink
-        .split("/")
-        .filter(Boolean)
-        .pop() ||
-      "";
-
-  }
-
-
-  if (!shareKey) {
-
-    throw new Error(
-      "FebBox share key missing"
-    );
-
-  }
+  const shareKey =
+    shareLink
+      .split("/")
+      .pop();
 
 
   console.log(
     "[ShowBox] FebBox share key:",
     {
       length:
-        shareKey.length
+        shareKey
+          ? shareKey.length
+          : 0
     }
   );
 
@@ -792,23 +704,13 @@ async function febboxFileList(
   shareKey
 ) {
 
-  const febboxUrl =
-    new URL(
-      "https://www.febbox.com/file/file_share_list"
-    );
-
-
-  febboxUrl.searchParams.set(
-    "share_key",
-    String(
-      shareKey
-    )
-  );
+  const url =
+    `https://www.febbox.com/file/file_share_list?share_key=${shareKey}`;
 
 
   const response =
-    await fetchWithTimeout(
-      febboxUrl,
+    await fetch(
+      url,
       {
         headers: {
           "Accept-Language":
@@ -843,9 +745,7 @@ async function febboxFileList(
   try {
 
     data =
-      JSON.parse(
-        text
-      );
+      JSON.parse(text);
 
   } catch {
 
@@ -906,37 +806,13 @@ async function febboxSeasonFileList(
   seasonFolder
 ) {
 
-  const febboxUrl =
-    new URL(
-      "https://www.febbox.com/file/file_share_list"
-    );
-
-
-  febboxUrl.searchParams.set(
-    "share_key",
-    String(
-      shareKey
-    )
-  );
-
-
-  febboxUrl.searchParams.set(
-    "parent_id",
-    String(
-      seasonFolder.fid
-    )
-  );
-
-
-  febboxUrl.searchParams.set(
-    "page",
-    "1"
-  );
+  const url =
+    `https://www.febbox.com/file/file_share_list?share_key=${shareKey}&parent_id=${seasonFolder.fid}&page=1`;
 
 
   const response =
-    await fetchWithTimeout(
-      febboxUrl,
+    await fetch(
+      url,
       {
         headers: {
           "Accept-Language":
@@ -968,9 +844,7 @@ async function febboxSeasonFileList(
   try {
 
     data =
-      JSON.parse(
-        text
-      );
+      JSON.parse(text);
 
   } catch {
 
@@ -1111,35 +985,20 @@ async function findFebboxFiles(
 
 
   const s2 =
-    String(
-      season
-    )
-      .padStart(
-        2,
-        "0"
-      );
+    String(season)
+      .padStart(2, "0");
 
 
   const e2 =
-    String(
-      episode
-    )
-      .padStart(
-        2,
-        "0"
-      );
+    String(episode)
+      .padStart(2, "0");
 
 
   const lowerS =
-    String(
-      season
-    );
-
+    String(season);
 
   const lowerE =
-    String(
-      episode
-    );
+    String(episode);
 
 
   const matchingFiles =
@@ -1150,9 +1009,7 @@ async function findFebboxFiles(
           !item ||
           !item.file_name
         ) {
-
           return false;
-
         }
 
 
@@ -1237,26 +1094,8 @@ async function febboxQualityList(
   );
 
 
-  const febboxUrl =
-    new URL(
-      "https://www.febbox.com/console/video_quality_list"
-    );
-
-
-  febboxUrl.searchParams.set(
-    "fid",
-    String(
-      file.fid
-    )
-  );
-
-
-  febboxUrl.searchParams.set(
-    "share_key",
-    String(
-      shareKey
-    )
-  );
+  const qualityUrl =
+    `https://www.febbox.com/console/video_quality_list?fid=${file.fid}&share_key=${shareKey}`;
 
 
   console.log(
@@ -1269,8 +1108,8 @@ async function febboxQualityList(
 
 
   const response =
-    await fetchWithTimeout(
-      febboxUrl,
+    await fetch(
+      qualityUrl,
       {
         headers: {
           Cookie:
@@ -1316,16 +1155,8 @@ async function febboxQualityList(
   try {
 
     data =
-      JSON.parse(
-        text
-      );
+      JSON.parse(text);
 
-
-    /*
-     * Kept intentionally for current testing.
-     * Remove detailed upstream response logging
-     * before production if it contains sensitive data.
-     */
 
     console.log(
       "[ShowBox] FebBox quality JSON:",
@@ -1374,37 +1205,6 @@ async function febboxQualityList(
 
 
 // ---------------------------------------------------------
-// Validate stream URL
-// ---------------------------------------------------------
-
-function isValidStreamUrl(
-  value
-) {
-
-  try {
-
-    const url =
-      new URL(
-        String(
-          value
-        )
-      );
-
-
-    return (
-      url.protocol === "https:" ||
-      url.protocol === "http:"
-    );
-
-  } catch {
-
-    return false;
-
-  }
-}
-
-
-// ---------------------------------------------------------
 // Parse FebBox quality HTML
 // ---------------------------------------------------------
 
@@ -1431,9 +1231,7 @@ function parseFebboxHtml(
         "file_quality"
       )
     ) {
-
       continue;
-
     }
 
 
@@ -1444,28 +1242,7 @@ function parseFebboxHtml(
 
 
     if (!urlMatch) {
-
       continue;
-
-    }
-
-
-    const streamUrl =
-      urlMatch[1];
-
-
-    if (
-      !isValidStreamUrl(
-        streamUrl
-      )
-    ) {
-
-      console.log(
-        "[ShowBox] Rejected invalid stream URL"
-      );
-
-      continue;
-
     }
 
 
@@ -1479,6 +1256,10 @@ function parseFebboxHtml(
       block.match(
         /class=["'][^"']*\bsize\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i
       );
+
+
+    const streamUrl =
+      urlMatch[1];
 
 
     const quality =
@@ -1550,54 +1331,42 @@ function getQualityLabel(
     value.includes("2160") ||
     value.includes("4k")
   ) {
-
     return "4K";
-
   }
 
 
   if (
     value.includes("1440")
   ) {
-
     return "1440p";
-
   }
 
 
   if (
     value.includes("1080")
   ) {
-
     return "1080p";
-
   }
 
 
   if (
     value.includes("720")
   ) {
-
     return "720p";
-
   }
 
 
   if (
     value.includes("480")
   ) {
-
     return "480p";
-
   }
 
 
   if (
     value.includes("360")
   ) {
-
     return "360p";
-
   }
 
 
@@ -1606,9 +1375,7 @@ function getQualityLabel(
       .toUpperCase()
       === "ORG"
   ) {
-
     return "ORG";
-
   }
 
 
@@ -1937,16 +1704,12 @@ function normalizeLanguageValue(
     value === null ||
     value === undefined
   ) {
-
     return [];
-
   }
 
 
   if (
-    Array.isArray(
-      value
-    )
+    Array.isArray(value)
   ) {
 
     return value.flatMap(
@@ -1980,9 +1743,7 @@ function normalizeLanguageValue(
   }
 
 
-  return String(
-    value
-  )
+  return String(value)
     .split(
       /[,|/]+/
     )
@@ -2007,9 +1768,7 @@ function getLanguagesFromObject(
     !object ||
     typeof object !== "object"
   ) {
-
     return [];
-
   }
 
 
@@ -2252,6 +2011,64 @@ function getSubtitleLanguages(
 
 
 // ---------------------------------------------------------
+// Title
+// ---------------------------------------------------------
+
+function buildTitle(
+  tmdbDetails,
+  type
+) {
+
+  if (!tmdbDetails) {
+    return "";
+  }
+
+
+  if (
+    type === "series"
+  ) {
+
+    return (
+      tmdbDetails.name ||
+      tmdbDetails.original_name ||
+      ""
+    );
+
+  }
+
+
+  const title =
+    tmdbDetails.title ||
+    tmdbDetails.original_title ||
+    "";
+
+
+  const releaseDate =
+    tmdbDetails.release_date ||
+    "";
+
+
+  const year =
+    releaseDate
+      ? releaseDate.slice(0, 4)
+      : "";
+
+
+  if (
+    title &&
+    year
+  ) {
+
+    return `${title} (${year})`;
+
+  }
+
+
+  return title;
+}
+
+
+// ---------------------------------------------------------
 // Stream technical line
 // ---------------------------------------------------------
 
@@ -2292,9 +2109,7 @@ function buildTechnicalLine(
   ) {
 
     if (
-      !parts.includes(
-        value
-      )
+      !parts.includes(value)
     ) {
 
       parts.push(
@@ -2318,12 +2133,31 @@ function buildTechnicalLine(
 
 function buildStreamTitle(
   item,
+  tmdbDetails,
   type,
   season,
   episode
 ) {
 
   const lines = [];
+
+
+  const title =
+    buildTitle(
+      tmdbDetails,
+      type
+    );
+
+
+  if (
+    title
+  ) {
+
+    lines.push(
+      title
+    );
+
+  }
 
 
   if (
@@ -2413,6 +2247,7 @@ function buildStreamTitle(
 
 function buildFebboxStreams(
   qualityResults,
+  tmdbDetails,
   type,
   season,
   episode
@@ -2432,6 +2267,7 @@ function buildFebboxStreams(
       title:
         buildStreamTitle(
           item,
+          tmdbDetails,
           type,
           season,
           episode
@@ -2613,9 +2449,7 @@ function normalizeQualityConfig(
 
 
     if (
-      !priority.includes(
-        name
-      )
+      !priority.includes(name)
     ) {
 
       priority.push(
@@ -2804,7 +2638,7 @@ function getStreamQuality(
   const firstLine =
     title.split(
       "\n"
-    )[1] || "";
+    )[2] || "";
 
 
   const qualityFromTitle =
@@ -2884,22 +2718,21 @@ function applyQualitySettings(
 
 
   /*
-   * Keep the existing stable quality ordering.
+   * Stable sort:
+   * recognized qualities follow the user's
+   * configured priority.
+   *
+   * Unknown qualities stay after them.
    */
 
   filtered.sort(
     (a, b) => {
 
       const qa =
-        getStreamQuality(
-          a
-        );
-
+        getStreamQuality(a);
 
       const qb =
-        getStreamQuality(
-          b
-        );
+        getStreamQuality(b);
 
 
       const ia =
@@ -3003,15 +2836,8 @@ function normalizeStreamFilterConfig(
 // Detect CAM / Telecine
 // ---------------------------------------------------------
 
-function isCamOrTelecine(
-  fileName
-) {
-
-  const text =
-    String(
-      fileName || ""
-    ).toUpperCase();
-
+function isCamOrTelecine(fileName) {
+  const text = String(fileName || "").toUpperCase();
 
   return (
     /\bTELECINE\b/.test(text) ||
@@ -3042,6 +2868,12 @@ function applyStreamFilters(
   /*
    * Filter the original FebBox file
    * metadata before streams are built.
+   *
+   * cam === false:
+   *     block CAM / Telecine
+   *
+   * cam === true:
+   *     allow CAM / Telecine
    */
 
   const filtered =
@@ -3247,7 +3079,7 @@ function applyFileSizeSettings(
   }
 
 
-  let minGb =
+  const minGb =
     Number.isFinite(
       Number(
         fileSize.minGb
@@ -3259,7 +3091,7 @@ function applyFileSizeSettings(
       : null;
 
 
-  let maxGb =
+  const maxGb =
     Number.isFinite(
       Number(
         fileSize.maxGb
@@ -3269,72 +3101,6 @@ function applyFileSizeSettings(
           fileSize.maxGb
         )
       : null;
-
-
-  /*
-   * Defense-in-depth for legacy Base64
-   * configurations.
-   *
-   * New configurations are already validated
-   * before being stored, but old configuration
-   * URLs can bypass that validation.
-   */
-
-  if (
-    minGb !== null
-  ) {
-
-    minGb =
-      Math.max(
-        0,
-        Math.min(
-          MAX_FILE_SIZE_GB,
-          minGb
-        )
-      );
-
-  }
-
-
-  if (
-    maxGb !== null
-  ) {
-
-    maxGb =
-      Math.max(
-        0,
-        Math.min(
-          MAX_FILE_SIZE_GB,
-          maxGb
-        )
-      );
-
-  }
-
-
-  /*
-   * An invalid min > max configuration is
-   * ignored rather than accidentally filtering
-   * every stream.
-   */
-
-  if (
-    minGb !== null &&
-    maxGb !== null &&
-    minGb > maxGb
-  ) {
-
-    console.log(
-      "[ShowBox] Invalid file-size configuration:",
-      {
-        minGb,
-        maxGb
-      }
-    );
-
-    return streams;
-
-  }
 
 
   if (
@@ -3426,7 +3192,7 @@ function applyFileSizeSettings(
 export default async (
   req,
   context
-) {
+) => {
 
   const requestId =
     Math.random()
@@ -3476,23 +3242,6 @@ export default async (
 
     const type =
       match[2];
-
-
-    /*
-     * Explicitly allow only the two Stremio
-     * content types this addon supports.
-     */
-
-    if (
-      type !== "movie" &&
-      type !== "series"
-    ) {
-
-      throw new Error(
-        `Unsupported stream type: ${type}`
-      );
-
-    }
 
 
     let rawId =
@@ -3577,12 +3326,6 @@ export default async (
         parts[0];
 
 
-      /*
-       * Keep season / episode unrestricted.
-       * Some metadata providers can expose very
-       * large episode numbers.
-       */
-
       season =
         Number(
           parts[1]
@@ -3635,6 +3378,47 @@ export default async (
       );
 
     }
+
+
+    // -----------------------------------------------------
+    // IMDb -> TMDB
+    // -----------------------------------------------------
+
+    const tmdbId =
+      await imdbToTmdb(
+        imdbId
+      );
+
+
+    console.log(
+      `[ShowBox][${requestId}] TMDB:`,
+      tmdbId
+    );
+
+
+    // -----------------------------------------------------
+    // Get title metadata
+    // -----------------------------------------------------
+
+    const tmdbDetails =
+      await getTMDBDetails(
+        tmdbId,
+        type
+      );
+
+
+    console.log(
+      `[ShowBox][${requestId}] TMDB details:`,
+      {
+        found:
+          !!tmdbDetails,
+
+        title:
+          tmdbDetails?.title ||
+          tmdbDetails?.name ||
+          null
+      }
+    );
 
 
     // -----------------------------------------------------
@@ -3709,14 +3493,6 @@ export default async (
     // Get qualities from ALL matching files
     // -----------------------------------------------------
 
-    /*
-     * No artificial file-count limit is applied.
-     *
-     * Movie requests may legitimately contain
-     * multiple source files, and series requests
-     * may contain multiple matching releases.
-     */
-
     const allQualityResults =
       [];
 
@@ -3785,6 +3561,7 @@ export default async (
     const febboxStreams =
       buildFebboxStreams(
         filteredQualityResults,
+        tmdbDetails,
         type,
         season,
         episode
@@ -3872,13 +3649,7 @@ export default async (
         headers: {
 
           "Content-Type":
-            "application/json; charset=utf-8",
-
-          "Cache-Control":
-            "no-store",
-
-          "X-Content-Type-Options":
-            "nosniff",
+            "application/json",
 
           "Access-Control-Allow-Origin":
             "*"
@@ -3917,13 +3688,7 @@ export default async (
         headers: {
 
           "Content-Type":
-            "application/json; charset=utf-8",
-
-          "Cache-Control":
-            "no-store",
-
-          "X-Content-Type-Options":
-            "nosniff",
+            "application/json",
 
           "Access-Control-Allow-Origin":
             "*"
