@@ -181,7 +181,8 @@ function normalizeQualities(input) {
     new Set();
 
 
-  const result = [];
+  const result =
+    [];
 
 
   for (
@@ -656,12 +657,6 @@ function homepageScript() {
 
     catch (error) {
 
-      console.error(
-        "[ShowBox] Configuration generation failed:",
-        error?.message
-      );
-
-
       checkStatus.textContent =
         error.message ||
         "Failed to create configuration.";
@@ -955,10 +950,6 @@ export default async (
   const pathname =
     url.pathname;
 
-
-  /* -------------------------------------------------- */
-  /* CREATE CONFIGURATION */
-  /* -------------------------------------------------- */
 
   if (
     pathname === "/create-config"
@@ -1294,13 +1285,7 @@ export default async (
 
     }
 
-    catch (error) {
-
-      console.error(
-        "[ShowBox] Config creation failed:",
-        error?.message
-      );
-
+    catch {
 
       return jsonResponse(
         {
@@ -1314,10 +1299,6 @@ export default async (
 
   }
 
-
-  /* -------------------------------------------------- */
-  /* MANIFEST */
-  /* -------------------------------------------------- */
 
   if (
     pathname === "/manifest.json" ||
@@ -1438,10 +1419,6 @@ export default async (
   }
 
 
-  /* -------------------------------------------------- */
-  /* HOMEPAGE */
-  /* -------------------------------------------------- */
-
   if (
     request.method !== "GET"
   ) {
@@ -1481,11 +1458,15 @@ export default async (
 
 <head>
 
-<meta name="viewport"
-      content="width=device-width, initial-scale=1">
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1"
+>
 
-<meta name="theme-color"
-      content="#0d0e11">
+<meta
+  name="theme-color"
+  content="#0d0e11"
+>
 
 <title>ShowBox Stremio Addon</title>
 
@@ -1513,8 +1494,8 @@ export default async (
   --success: #a7e3b1;
   --error: #ff9b9b;
 
-  --radius-lg: 22px;
-  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-md: 17px;
   --radius-sm: 13px;
 }
 
@@ -1523,12 +1504,16 @@ export default async (
 }
 
 html {
-  background: var(--bg);
+  background:
+    var(--bg);
 }
 
 body {
-  margin: 0;
-  min-height: 100vh;
+  margin:
+    0;
+
+  min-height:
+    100vh;
 
   background:
     radial-gradient(
@@ -1538,7 +1523,8 @@ body {
     ),
     var(--bg);
 
-  color: var(--text);
+  color:
+    var(--text);
 
   font-family:
     -apple-system,
@@ -1548,13 +1534,21 @@ body {
     "Segoe UI",
     sans-serif;
 
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing:
+    antialiased;
 }
 
 .container {
-  width: min(680px, calc(100% - 28px));
-  margin: auto;
-  padding: 48px 0 70px;
+  width:
+    min(900px, calc(100% - 40px));
+
+  margin:
+    auto;
+
+  padding:
+    clamp(44px, 7vw, 78px)
+    0
+    clamp(60px, 8vw, 90px);
 }
 
 
@@ -1563,24 +1557,37 @@ body {
 /* -------------------------------------------------- */
 
 h1 {
-  margin: 0;
+  margin:
+    0;
 
-  font-size: clamp(36px, 8vw, 48px);
-  line-height: 1;
-  font-weight: 750;
-  letter-spacing: -1.8px;
+  font-size:
+    clamp(38px, 6vw, 58px);
+
+  line-height:
+    1;
+
+  font-weight:
+    750;
+
+  letter-spacing:
+    -2px;
 }
 
 .subtitle {
-  max-width: 520px;
+  max-width:
+    620px;
 
   margin:
-    14px 0 0;
+    16px 0 0;
 
-  color: var(--muted);
+  color:
+    var(--muted);
 
-  font-size: 14px;
-  line-height: 1.55;
+  font-size:
+    clamp(15px, 2vw, 18px);
+
+  line-height:
+    1.55;
 }
 
 
@@ -1589,26 +1596,39 @@ h1 {
 /* -------------------------------------------------- */
 
 .title {
-  display: block;
+  display:
+    block;
 
   margin:
-    38px 0 9px;
+    clamp(34px, 5vw, 48px)
+    0
+    10px;
 
-  color: var(--muted-2);
+  color:
+    var(--muted-2);
 
-  font-size: 11px;
-  font-weight: 700;
+  font-size:
+    clamp(11px, 1.5vw, 13px);
 
-  letter-spacing: .12em;
-  text-transform: uppercase;
+  font-weight:
+    700;
+
+  letter-spacing:
+    .12em;
+
+  text-transform:
+    uppercase;
 }
 
 #tokenInput {
-  width: 100%;
-  height: 54px;
+  width:
+    100%;
+
+  height:
+    clamp(54px, 7vw, 64px);
 
   padding:
-    0 16px;
+    0 18px;
 
   border:
     1px solid var(--border-light);
@@ -1616,14 +1636,17 @@ h1 {
   border-radius:
     var(--radius-sm);
 
-  outline: none;
+  outline:
+    none;
 
   background:
     var(--surface-2);
 
-  color: var(--text);
+  color:
+    var(--text);
 
-  font-size: 14px;
+  font-size:
+    clamp(15px, 2vw, 17px);
 
   transition:
     border-color .15s ease,
@@ -1631,32 +1654,51 @@ h1 {
 }
 
 #tokenInput::placeholder {
-  color: var(--muted-2);
+  color:
+    var(--muted-2);
 }
 
 #tokenInput:focus {
-  border-color: #50545f;
-  background: var(--surface-3);
+  border-color:
+    #50545f;
+
+  background:
+    var(--surface-3);
 }
 
 #generateButton {
-  width: 100%;
-  height: 50px;
+  width:
+    100%;
 
-  margin-top: 12px;
+  height:
+    clamp(52px, 6vw, 60px);
 
-  padding: 0 20px;
+  margin-top:
+    13px;
 
-  border: 0;
-  border-radius: 14px;
+  padding:
+    0 20px;
 
-  background: var(--white);
-  color: var(--black);
+  border:
+    0;
 
-  font-size: 14px;
-  font-weight: 700;
+  border-radius:
+    14px;
 
-  cursor: pointer;
+  background:
+    var(--white);
+
+  color:
+    var(--black);
+
+  font-size:
+    clamp(15px, 2vw, 17px);
+
+  font-weight:
+    700;
+
+  cursor:
+    pointer;
 
   transition:
     opacity .15s ease,
@@ -1664,34 +1706,45 @@ h1 {
 }
 
 #generateButton:hover {
-  opacity: .9;
+  opacity:
+    .9;
 }
 
 #generateButton:active {
-  transform: scale(.985);
+  transform:
+    scale(.985);
 }
 
 #generateButton:disabled {
-  opacity: .55;
-  cursor: default;
+  opacity:
+    .55;
+
+  cursor:
+    default;
 }
 
 #checkStatus {
-  min-height: 18px;
+  min-height:
+    20px;
 
-  margin-top: 10px;
+  margin-top:
+    11px;
 
-  color: var(--muted-2);
+  color:
+    var(--muted-2);
 
-  font-size: 12px;
+  font-size:
+    clamp(12px, 1.7vw, 14px);
 }
 
 .success {
-  color: var(--success) !important;
+  color:
+    var(--success) !important;
 }
 
 .error {
-  color: var(--error) !important;
+  color:
+    var(--error) !important;
 }
 
 
@@ -1700,8 +1753,11 @@ h1 {
 /* -------------------------------------------------- */
 
 #configuration {
-  display: none;
-  margin-top: 42px;
+  display:
+    none;
+
+  margin-top:
+    clamp(42px, 6vw, 58px);
 }
 
 
@@ -1709,26 +1765,40 @@ h1 {
 /* SECTION HEADERS */
 /* -------------------------------------------------- */
 
-.section-title {
-  margin: 0;
+.section-title,
+.configuration-title {
+  margin:
+    0;
 
-  color: var(--text);
+  color:
+    var(--text);
 
-  font-size: 29px;
-  line-height: 1.15;
-  font-weight: 700;
+  font-size:
+    clamp(30px, 4vw, 38px);
 
-  letter-spacing: -.7px;
+  line-height:
+    1.15;
+
+  font-weight:
+    700;
+
+  letter-spacing:
+    -.9px;
 }
 
-.section-description {
+.section-description,
+.description {
   margin:
-    6px 0 14px;
+    8px 0 17px;
 
-  color: var(--muted-2);
+  color:
+    var(--muted-2);
 
-  font-size: 12px;
-  line-height: 1.45;
+  font-size:
+    clamp(13px, 1.8vw, 15px);
+
+  line-height:
+    1.5;
 }
 
 
@@ -1737,7 +1807,8 @@ h1 {
 /* -------------------------------------------------- */
 
 .filter-card {
-  padding: 14px;
+  padding:
+    clamp(15px, 2.5vw, 20px);
 
   border:
     1px solid var(--border);
@@ -1751,24 +1822,27 @@ h1 {
 
 .filter-heading {
   padding:
-    5px 7px 12px;
+    6px 8px 14px;
 
   color:
     var(--muted-2);
 
-  font-size: 11px;
-  font-weight: 700;
+  font-size:
+    clamp(11px, 1.5vw, 13px);
 
-  letter-spacing: .12em;
-  text-transform: uppercase;
-}
+  font-weight:
+    700;
 
-.filter-icon {
-  display: none;
+  letter-spacing:
+    .12em;
+
+  text-transform:
+    uppercase;
 }
 
 .filter-option {
-  padding: 17px;
+  padding:
+    clamp(17px, 2.5vw, 23px);
 
   border:
     1px solid var(--border-light);
@@ -1781,72 +1855,106 @@ h1 {
 }
 
 .filter-option-title {
-  display: flex;
-  align-items: center;
+  display:
+    flex;
 
-  gap: 9px;
+  align-items:
+    center;
 
-  margin: 0 0 5px;
+  gap:
+    10px;
 
-  color: var(--text);
+  margin:
+    0 0 6px;
 
-  font-size: 17px;
-  font-weight: 650;
+  color:
+    var(--text);
 
-  letter-spacing: -.2px;
+  font-size:
+    clamp(17px, 2.4vw, 20px);
+
+  font-weight:
+    650;
+
+  letter-spacing:
+    -.2px;
 }
 
 .help-button {
-  width: 24px;
-  height: 24px;
+  width:
+    25px;
 
-  padding: 0;
+  height:
+    25px;
 
-  border: 0;
-  border-radius: 50%;
+  padding:
+    0;
 
-  background: #30333b;
+  border:
+    0;
 
-  color: var(--muted);
+  border-radius:
+    50%;
 
-  font-size: 12px;
-  font-weight: 700;
+  background:
+    #30333b;
 
-  cursor: pointer;
+  color:
+    var(--muted);
+
+  font-size:
+    12px;
+
+  font-weight:
+    700;
+
+  cursor:
+    pointer;
 }
 
 .size-fields {
-  display: grid;
+  display:
+    grid;
 
   grid-template-columns:
     1fr 1fr;
 
-  gap: 10px;
+  gap:
+    clamp(10px, 2vw, 16px);
 
-  margin-top: 14px;
+  margin-top:
+    16px;
 }
 
 .size-field label {
-  display: block;
+  display:
+    block;
 
   margin:
-    0 0 7px;
+    0 0 8px;
 
   color:
     var(--muted-2);
 
-  font-size: 11px;
-  font-weight: 600;
+  font-size:
+    clamp(11px, 1.5vw, 13px);
 
-  letter-spacing: .03em;
+  font-weight:
+    600;
+
+  letter-spacing:
+    .03em;
 }
 
 .size-input {
-  width: 100%;
-  height: 52px;
+  width:
+    100%;
+
+  height:
+    clamp(50px, 6vw, 58px);
 
   padding:
-    0 14px;
+    0 15px;
 
   border:
     1px solid var(--border-light);
@@ -1854,7 +1962,8 @@ h1 {
   border-radius:
     var(--radius-sm);
 
-  outline: none;
+  outline:
+    none;
 
   background:
     var(--surface-3);
@@ -1862,7 +1971,8 @@ h1 {
   color:
     var(--text);
 
-  font-size: 14px;
+  font-size:
+    clamp(14px, 2vw, 16px);
 }
 
 .size-input::placeholder {
@@ -1876,16 +1986,23 @@ h1 {
 }
 
 .filter-error {
-  min-height: 18px;
+  min-height:
+    20px;
 
-  margin-top: 10px;
-  padding: 0 7px;
+  margin-top:
+    11px;
+
+  padding:
+    0 8px;
 
   color:
     var(--error);
 
-  font-size: 12px;
-  line-height: 1.45;
+  font-size:
+    clamp(12px, 1.7vw, 14px);
+
+  line-height:
+    1.45;
 }
 
 
@@ -1894,43 +2011,22 @@ h1 {
 /* -------------------------------------------------- */
 
 .quality-section {
-  margin-top: 38px;
-}
-
-.configuration-title {
-  margin: 0;
-
-  color:
-    var(--text);
-
-  font-size: 29px;
-  line-height: 1.15;
-
-  font-weight: 700;
-
-  letter-spacing: -.7px;
-}
-
-.description {
-  margin:
-    6px 0 14px;
-
-  color:
-    var(--muted-2);
-
-  font-size: 12px;
-  line-height: 1.45;
+  margin-top:
+    clamp(38px, 6vw, 54px);
 }
 
 .quality-list {
-  display: flex;
+  display:
+    flex;
 
   flex-direction:
     column;
 
-  gap: 8px;
+  gap:
+    10px;
 
-  padding: 8px;
+  padding:
+    clamp(8px, 1.5vw, 11px);
 
   border:
     1px solid var(--border);
@@ -1943,15 +2039,20 @@ h1 {
 }
 
 .quality-row {
-  display: flex;
+  display:
+    flex;
 
-  align-items: center;
-  justify-content: space-between;
+  align-items:
+    center;
 
-  min-height: 62px;
+  justify-content:
+    space-between;
+
+  min-height:
+    clamp(62px, 7vw, 74px);
 
   padding:
-    11px 12px 11px 14px;
+    12px 14px 12px 16px;
 
   border-radius:
     var(--radius-md);
@@ -1972,112 +2073,60 @@ h1 {
     var(--border-light);
 }
 
-.filter-section {
-  margin-top: 38px;
-}
-
-.filter-setting-list {
-  display: flex;
-
-  flex-direction: column;
-
-  gap: 8px;
-
-  padding: 8px;
-
-  border:
-    1px solid var(--border);
-
-  border-radius:
-    var(--radius-lg);
-
-  background:
-    var(--surface);
-}
-
-.filter-setting-row {
-  display: flex;
-
-  align-items: center;
-
-  min-height: 62px;
-
-  padding:
-    11px 14px;
-
-  border-radius:
-    var(--radius-md);
-
-  background:
-    var(--surface-2);
-
-  border:
-    1px solid transparent;
-}
-
-.filter-setting-name {
-  display: flex;
-
-  align-items: center;
-
-  gap: 12px;
-
-  color:
-    var(--text);
-
-  font-size: 15px;
-  font-weight: 600;
-
-  cursor: pointer;
-}
-
-.filter-setting-checkbox {
-  width: 20px;
-  height: 20px;
-
-  margin: 0;
-
-  accent-color:
-    #f1f1f2;
-}
-
 .quality-name {
-  display: flex;
+  display:
+    flex;
 
-  align-items: center;
+  align-items:
+    center;
 
-  gap: 12px;
+  gap:
+    13px;
 
   color:
     var(--text);
 
-  font-size: 15px;
-  font-weight: 600;
+  font-size:
+    clamp(16px, 2.2vw, 18px);
 
-  cursor: pointer;
+  font-weight:
+    600;
+
+  cursor:
+    pointer;
 }
 
 .quality-checkbox {
-  width: 20px;
-  height: 20px;
+  width:
+    clamp(20px, 2.7vw, 23px);
 
-  margin: 0;
+  height:
+    clamp(20px, 2.7vw, 23px);
+
+  margin:
+    0;
 
   accent-color:
     #f1f1f2;
 }
 
 .move-buttons {
-  display: flex;
+  display:
+    flex;
 
-  gap: 6px;
+  gap:
+    7px;
 }
 
 .move-button {
-  width: 36px;
-  height: 36px;
+  width:
+    clamp(38px, 5vw, 46px);
 
-  padding: 0;
+  height:
+    clamp(38px, 5vw, 46px);
+
+  padding:
+    0;
 
   border:
     1px solid var(--border-light);
@@ -2091,9 +2140,11 @@ h1 {
   color:
     var(--text-soft);
 
-  font-size: 16px;
+  font-size:
+    clamp(17px, 2.5vw, 21px);
 
-  cursor: pointer;
+  cursor:
+    pointer;
 }
 
 .move-button:hover {
@@ -2116,43 +2167,150 @@ h1 {
 
 
 /* -------------------------------------------------- */
+/* STREAM FILTERS */
+/* -------------------------------------------------- */
+
+.filter-section {
+  margin-top:
+    clamp(38px, 6vw, 54px);
+}
+
+.filter-setting-list {
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    10px;
+
+  padding:
+    clamp(8px, 1.5vw, 11px);
+
+  border:
+    1px solid var(--border);
+
+  border-radius:
+    var(--radius-lg);
+
+  background:
+    var(--surface);
+}
+
+.filter-setting-row {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  min-height:
+    clamp(62px, 7vw, 74px);
+
+  padding:
+    12px 16px;
+
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--surface-2);
+
+  border:
+    1px solid transparent;
+}
+
+.filter-setting-name {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    13px;
+
+  color:
+    var(--text);
+
+  font-size:
+    clamp(16px, 2.2vw, 18px);
+
+  font-weight:
+    600;
+
+  cursor:
+    pointer;
+}
+
+.filter-setting-checkbox {
+  width:
+    clamp(20px, 2.7vw, 23px);
+
+  height:
+    clamp(20px, 2.7vw, 23px);
+
+  margin:
+    0;
+
+  accent-color:
+    #f1f1f2;
+}
+
+
+/* -------------------------------------------------- */
 /* RESULT */
 /* -------------------------------------------------- */
 
 #result {
-  margin-top: 40px;
+  margin-top:
+    clamp(42px, 6vw, 58px);
 }
 
 .result-label {
-  display: block;
+  display:
+    block;
 
-  margin-bottom: 9px;
+  margin-bottom:
+    10px;
 
   color:
     var(--muted-2);
 
-  font-size: 11px;
-  font-weight: 700;
+  font-size:
+    clamp(11px, 1.5vw, 13px);
 
-  letter-spacing: .12em;
-  text-transform: uppercase;
+  font-weight:
+    700;
+
+  letter-spacing:
+    .12em;
+
+  text-transform:
+    uppercase;
 }
 
 .result-row {
-  display: flex;
+  display:
+    flex;
 
-  gap: 10px;
+  gap:
+    12px;
 }
 
 #manifestUrl {
-  flex: 1;
+  flex:
+    1;
 
-  min-width: 0;
+  min-width:
+    0;
 
-  height: 50px;
+  height:
+    clamp(52px, 6vw, 60px);
 
   padding:
-    0 14px;
+    0 15px;
 
   border:
     1px solid var(--border-light);
@@ -2160,7 +2318,8 @@ h1 {
   border-radius:
     var(--radius-sm);
 
-  outline: none;
+  outline:
+    none;
 
   background:
     var(--surface-2);
@@ -2168,13 +2327,16 @@ h1 {
   color:
     var(--text-soft);
 
-  font-size: 12px;
+  font-size:
+    clamp(12px, 1.7vw, 14px);
 }
 
 #copyButton {
-  width: 90px;
+  width:
+    clamp(90px, 12vw, 110px);
 
-  border: 0;
+  border:
+    0;
 
   border-radius:
     var(--radius-sm);
@@ -2185,10 +2347,14 @@ h1 {
   color:
     var(--text);
 
-  font-size: 13px;
-  font-weight: 650;
+  font-size:
+    clamp(13px, 1.8vw, 15px);
 
-  cursor: pointer;
+  font-weight:
+    650;
+
+  cursor:
+    pointer;
 }
 
 #copyButton:hover {
@@ -2197,15 +2363,23 @@ h1 {
 }
 
 #installButton {
-  display: flex;
+  display:
+    flex;
 
-  align-items: center;
-  justify-content: center;
+  align-items:
+    center;
 
-  width: 100%;
-  height: 50px;
+  justify-content:
+    center;
 
-  margin-top: 10px;
+  width:
+    100%;
+
+  height:
+    clamp(52px, 6vw, 60px);
+
+  margin-top:
+    12px;
 
   border:
     1px solid var(--border-light);
@@ -2219,12 +2393,17 @@ h1 {
   color:
     var(--black);
 
-  font-size: 13px;
-  font-weight: 700;
+  font-size:
+    clamp(14px, 1.9vw, 16px);
 
-  text-decoration: none;
+  font-weight:
+    700;
 
-  cursor: pointer;
+  text-decoration:
+    none;
+
+  cursor:
+    pointer;
 
   transition:
     opacity .15s ease;
@@ -2244,14 +2423,22 @@ h1 {
 }
 
 .note {
-  margin-top: 12px;
+  margin-top:
+    13px;
 
   color:
     var(--muted-2);
 
-  font-size: 11px;
+  font-size:
+    clamp(12px, 1.7vw, 14px);
 
-  line-height: 1.5;
+  line-height:
+    1.55;
+}
+
+.note + .note {
+  margin-top:
+    7px;
 }
 
 
@@ -2266,7 +2453,7 @@ h1 {
       calc(100% - 24px);
 
     padding:
-      38px 0 60px;
+      36px 0 56px;
   }
 
   h1 {
@@ -2285,7 +2472,7 @@ h1 {
   .section-title,
   .configuration-title {
     font-size:
-      27px;
+      28px;
   }
 
   .size-fields {
@@ -2304,7 +2491,11 @@ h1 {
   }
 
   #copyButton {
-    width: 100%;
+    width:
+      100%;
+
+    height:
+      50px;
   }
 
 }
@@ -2318,8 +2509,6 @@ h1 {
 <div class="container">
 
 
-<!-- HERO -->
-
 <h1>
 ShowBox
 </h1>
@@ -2328,8 +2517,6 @@ ShowBox
 Enter your FebBox UI token to generate your addon.
 </div>
 
-
-<!-- TOKEN -->
 
 <label
   class="title"
@@ -2359,8 +2546,6 @@ Generate
 
 <div id="configuration">
 
-
-<!-- FILTERING -->
 
 <section>
 
@@ -2447,8 +2632,6 @@ Max (GB)
 </section>
 
 
-<!-- QUALITY -->
-
 <section class="quality-section">
 
 <div class="configuration-title">
@@ -2469,8 +2652,6 @@ ${qualityRows()}
 </section>
 
 
-<!-- STREAM FILTERS -->
-
 <section class="filter-section">
 
 <div class="configuration-title">
@@ -2490,8 +2671,6 @@ ${filterRows()}
 
 </section>
 
-
-<!-- RESULT -->
 
 <div id="result">
 
@@ -2527,6 +2706,10 @@ Install in Stremio
 <div class="note">
 On iOS, if the Install button does not open Stremio,
 use Copy and paste the manifest URL into Stremio's Add Addon field.
+</div>
+
+<div class="note">
+On Nuvio, reinstalling isn't required — it syncs automatically.
 </div>
 
 </div>
