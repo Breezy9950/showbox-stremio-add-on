@@ -349,7 +349,7 @@ function invalidConfigPage() {
 <html lang="en">
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ShowBox Configure</title>
+<title>ShowBox</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;padding:40px 20px;background:#111;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:center}
@@ -801,12 +801,12 @@ export default async function handler(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ShowBox Stremio Addon</title>
+<title>ShowBox</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;padding:24px 16px 40px;background:#111;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .container{width:100%;max-width:560px;margin:0 auto}
-h1{margin:8px 0 8px;font-size:27px;font-weight:700;letter-spacing:-.5px}
+h1{margin:8px 0 8px;font-size: clamp(40px, 1.75rem + 4vw, 72px);⁠font-weight:700;letter-spacing:-.5px}
 .subtitle{margin:0 0 26px;color:#9b9ca3;font-size:15px;line-height:1.5}
 .card{background:#17181d;border:1px solid #24252c;border-radius:18px;padding:20px;margin-bottom:16px}
 .card-title{font-size:17px;font-weight:650;margin-bottom:6px}
@@ -855,7 +855,7 @@ button.main:disabled{opacity:.5}
 </head>
 <body>
 <div class="container">
-<h1>ShowBox Stremio Addon</h1>
+<h1>ShowBox</h1>
 <p class="subtitle">Configure your stream preferences.</p>
 
 <div class="card">
@@ -909,7 +909,7 @@ button.main:disabled{opacity:.5}
 </div>
 
 <div class="note">
-On iOS/iPadOS, if Stremio does not open automatically, copy the manifest URL and add it manually through Stremio's Add-ons page.
+Showbox automatically syncs changes to your existing manifest. If your updated preferences do not load, remove the addon and re-install it.
 </div>
 </div>
 
