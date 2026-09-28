@@ -5,12 +5,6 @@ import {
 } from "./config-store.js";
 
 
-const TMDB_API_KEY =
-  "439c478a771f35c05022f9feabcca01c";
-
-const TMDB_BASE_URL =
-  "https://api.themoviedb.org/3";
-
 const FETCH_TIMEOUT_MS =
   30_000;
 
@@ -318,145 +312,6 @@ function parseSingleToken(
     );
 
     return token;
-
-  }
-}
-
-
-// ---------------------------------------------------------
-// IMDb -> TMDB
-// ---------------------------------------------------------
-
-async function imdbToTmdb(
-  imdbId
-) {
-
-  console.log(
-    "[ShowBox] TMDB lookup:",
-    imdbId
-  );
-
-
-  const tmdbUrl =
-    new URL(
-      `${TMDB_BASE_URL}/find/${encodeURIComponent(imdbId)}`
-    );
-
-
-  tmdbUrl.searchParams.set(
-    "api_key",
-    TMDB_API_KEY
-  );
-
-  tmdbUrl.searchParams.set(
-    "external_source",
-    "imdb_id"
-  );
-
-
-  const response =
-    await fetchWithTimeout(
-      tmdbUrl
-    );
-
-
-  console.log(
-    "[ShowBox] TMDB response:",
-    response.status
-  );
-
-
-  if (!response.ok) {
-
-    throw new Error(
-      `TMDB lookup failed: HTTP ${response.status}`
-    );
-
-  }
-
-
-  const data =
-    await response.json();
-
-
-  const movieResults =
-    Array.isArray(
-      data.movie_results
-    )
-      ? data.movie_results
-      : [];
-
-
-  const tvResults =
-    Array.isArray(
-      data.tv_results
-    )
-      ? data.tv_results
-      : [];
-
-
-  const result =
-    movieResults[0] ||
-    tvResults[0];
-
-
-  if (
-    !result ||
-    !result.id
-  ) {
-
-    throw new Error(
-      `TMDB ID not found for ${imdbId}`
-    );
-
-  }
-
-
-  console.log(
-    "[ShowBox] TMDB result:",
-    result.id
-  );
-
-
-  return String(
-    result.id
-  );
-}
-
-
-// ---------------------------------------------------------
-// TMDB title information
-// ---------------------------------------------------------
-
-async function getTMDBDetails(
-  tmdbId,
-  type
-) {
-
-  try {
-
-    const endpoint =
-      type === "series"
-        ? `/tv/${tmdbId}`
-        : `/movie/${tmdbId}`;
-
-
-    const response =
-      await fetchWithTimeout(
-        `${TMDB_BASE_URL}${endpoint}?api_key=${encodeURIComponent(TMDB_API_KEY)}`
-      );
-
-
-    if (!response.ok) {
-      return null;
-    }
-
-
-    return await response.json();
-
-  } catch {
-
-    return null;
 
   }
 }
@@ -2397,67 +2252,6 @@ function getSubtitleLanguages(
 
 
 // ---------------------------------------------------------
-// Title
-// ---------------------------------------------------------
-
-function buildTitle(
-  tmdbDetails,
-  type
-) {
-
-  if (!tmdbDetails) {
-    return "";
-  }
-
-
-  if (
-    type === "series"
-  ) {
-
-    return (
-      tmdbDetails.name ||
-      tmdbDetails.original_name ||
-      ""
-    );
-
-  }
-
-
-  const title =
-    tmdbDetails.title ||
-    tmdbDetails.original_title ||
-    "";
-
-
-  const releaseDate =
-    tmdbDetails.release_date ||
-    "";
-
-
-  const year =
-    releaseDate
-      ? releaseDate.slice(
-          0,
-          4
-        )
-      : "";
-
-
-  if (
-    title &&
-    year
-  ) {
-
-    return `${title} (${year})`;
-
-  }
-
-
-  return title;
-}
-
-
-// ---------------------------------------------------------
 // Stream technical line
 // ---------------------------------------------------------
 
@@ -2524,31 +2318,12 @@ function buildTechnicalLine(
 
 function buildStreamTitle(
   item,
-  tmdbDetails,
   type,
   season,
   episode
 ) {
 
   const lines = [];
-
-
-  const title =
-    buildTitle(
-      tmdbDetails,
-      type
-    );
-
-
-  if (
-    title
-  ) {
-
-    lines.push(
-      title
-    );
-
-  }
 
 
   if (
@@ -2638,7 +2413,6 @@ function buildStreamTitle(
 
 function buildFebboxStreams(
   qualityResults,
-  tmdbDetails,
   type,
   season,
   episode
@@ -2658,7 +2432,6 @@ function buildFebboxStreams(
       title:
         buildStreamTitle(
           item,
-          tmdbDetails,
           type,
           season,
           episode
@@ -3031,7 +2804,7 @@ function getStreamQuality(
   const firstLine =
     title.split(
       "\n"
-    )[2] || "";
+    )[1] || "";
 
 
   const qualityFromTitle =
@@ -3865,52 +3638,6 @@ export default async (
 
 
     // -----------------------------------------------------
-    // IMDb -> TMDB
-    // -----------------------------------------------------
-
-    /*
-     * Keep this lookup because its resulting
-     * TMDB ID is used to obtain title metadata.
-     */
-
-    const tmdbId =
-      await imdbToTmdb(
-        imdbId
-      );
-
-
-    console.log(
-      `[ShowBox][${requestId}] TMDB:`,
-      tmdbId
-    );
-
-
-    // -----------------------------------------------------
-    // Get title metadata
-    // -----------------------------------------------------
-
-    const tmdbDetails =
-      await getTMDBDetails(
-        tmdbId,
-        type
-      );
-
-
-    console.log(
-      `[ShowBox][${requestId}] TMDB details:`,
-      {
-        found:
-          !!tmdbDetails,
-
-        title:
-          tmdbDetails?.title ||
-          tmdbDetails?.name ||
-          null
-      }
-    );
-
-
-    // -----------------------------------------------------
     // Parse ShowBox token
     // -----------------------------------------------------
 
@@ -4058,7 +3785,6 @@ export default async (
     const febboxStreams =
       buildFebboxStreams(
         filteredQualityResults,
-        tmdbDetails,
         type,
         season,
         episode
