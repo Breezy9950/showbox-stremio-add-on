@@ -310,6 +310,14 @@ function homepageScript() {
 
     const qualities = getQualityConfig();
 
+    console.log(
+  "[ShowBox] Homepage UI state:",
+  JSON.stringify({
+    qualities: getQualityConfig(),
+    filters: getFilterConfig()
+  })
+);
+
     if (!qualities.some(item => item.enabled)) {
       checkStatus.textContent = "Enable at least one quality.";
       checkStatus.className = "error";
