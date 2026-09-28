@@ -3277,7 +3277,15 @@ export default async (
     const config =
       await loadConfig(
         rawConfig
-      );
+      ); 
+    console.log(
+  `[ShowBox][${requestId}] Loaded config settings:`,
+  {
+    qualities: config?.qualities,
+    filters: config?.filters,
+    fileSize: config?.fileSize
+  }
+);
 
 
     const token =
