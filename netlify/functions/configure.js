@@ -1,3 +1,10 @@
+import {
+  createConfig,
+  getConfig,
+  saveConfig
+} from "./config-store.js";
+
+
 const DEFAULT_QUALITIES = [
   { name: "ORG", enabled: true },
   { name: "4K", enabled: true },
@@ -8,9 +15,11 @@ const DEFAULT_QUALITIES = [
   { name: "360p", enabled: true }
 ];
 
+
 const DEFAULT_FILTERS = {
   cam: true
 };
+
 
 function decodeConfig(value) {
   try {
@@ -25,30 +34,25 @@ function decodeConfig(value) {
     }
 
     const json =
-      Buffer.from(base64, "base64").toString("utf8");
+      Buffer.from(base64, "base64")
+        .toString("utf8");
 
     return JSON.parse(json);
+
   } catch {
     return {};
   }
 }
 
-function encodeConfig(config) {
-  const json = JSON.stringify(config);
-
-  return Buffer.from(json, "utf8")
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
 
 function normalizeQualities(qualities) {
+
   if (!Array.isArray(qualities)) {
     return DEFAULT_QUALITIES.map(item => ({
       ...item
     }));
   }
+
 
   const map = new Map(
     DEFAULT_QUALITIES.map(item => [
@@ -57,40 +61,101 @@ function normalizeQualities(qualities) {
     ])
   );
 
+
   const result =
     DEFAULT_QUALITIES.map(item => ({
       name: item.name,
       enabled: item.enabled
     }));
 
+
   for (const item of qualities) {
+
     if (!item || !map.has(item.name)) {
       continue;
     }
+
 
     const target =
       result.find(
         x => x.name === item.name
       );
 
+
     if (target) {
+
       target.enabled =
         item.enabled !== false;
+
     }
+
   }
 
-  return result;
+
+  /*
+   * Preserve the user's quality order.
+   */
+  const ordered = [];
+
+  for (const item of qualities) {
+
+    if (!item || !map.has(item.name)) {
+      continue;
+    }
+
+
+    const target =
+      result.find(
+        x => x.name === item.name
+      );
+
+
+    if (
+      target &&
+      !ordered.some(
+        x => x.name === target.name
+      )
+    ) {
+
+      ordered.push(target);
+
+    }
+
+  }
+
+
+  for (const item of result) {
+
+    if (
+      !ordered.some(
+        x => x.name === item.name
+      )
+    ) {
+
+      ordered.push(item);
+
+    }
+
+  }
+
+
+  return ordered;
 }
 
+
 function normalizeFilters(filters) {
+
   if (
     !filters ||
     typeof filters !== "object"
   ) {
+
     return {
       ...DEFAULT_FILTERS
     };
+
   }
+
 
   return {
     cam:
@@ -98,16 +163,21 @@ function normalizeFilters(filters) {
   };
 }
 
+
 function normalizeFileSize(fileSize) {
+
   if (
     !fileSize ||
     typeof fileSize !== "object"
   ) {
+
     return {
       minGb: null,
       maxGb: null
     };
+
   }
+
 
   const min =
     fileSize.minGb === null ||
@@ -116,6 +186,7 @@ function normalizeFileSize(fileSize) {
       ? null
       : Number(fileSize.minGb);
 
+
   const max =
     fileSize.maxGb === null ||
     fileSize.maxGb === undefined ||
@@ -123,7 +194,9 @@ function normalizeFileSize(fileSize) {
       ? null
       : Number(fileSize.maxGb);
 
+
   return {
+
     minGb:
       Number.isFinite(min)
         ? min
@@ -133,17 +206,23 @@ function normalizeFileSize(fileSize) {
       Number.isFinite(max)
         ? max
         : null
+
   };
 }
 
-function getConfigFromRequest(request) {
+
+async function getConfigFromRequest(request) {
+
   const url =
     new URL(request.url);
+
 
   const pathname =
     url.pathname.replace(/\/+$/, "");
 
+
   let configValue = null;
+
 
   /*
    * Supported formats:
@@ -155,47 +234,100 @@ function getConfigFromRequest(request) {
    * The second format is used by Nuvio.
    */
 
+
   let match =
     pathname.match(
       /^\/configure\/([^/]+)$/
     );
 
+
   if (match) {
     configValue = match[1];
   }
 
+
   if (!configValue) {
+
     match =
       pathname.match(
         /^\/([^/]+)\/configure$/
       );
 
+
     if (match) {
       configValue = match[1];
     }
+
   }
+
 
   if (!configValue) {
     return null;
   }
 
-  const config =
-    decodeConfig(configValue);
 
   /*
-   * Make sure we actually decoded
-   * an object rather than returning {}.
+   * First try the new persistent
+   * Netlify Blobs configuration.
    */
+
+  const storedConfig =
+    await getConfig(configValue);
+
+
   if (
-    !config ||
-    typeof config !== "object" ||
-    Array.isArray(config)
+    storedConfig &&
+    typeof storedConfig === "object" &&
+    !Array.isArray(storedConfig)
   ) {
-    return null;
+
+    return {
+
+      id: configValue,
+
+      config: storedConfig,
+
+      legacy: false
+
+    };
+
   }
 
-  return config;
+
+  /*
+   * Legacy Base64 configuration support.
+   *
+   * This keeps previously generated
+   * addon URLs working.
+   */
+
+  const legacyConfig =
+    decodeConfig(configValue);
+
+
+  if (
+    !legacyConfig ||
+    typeof legacyConfig !== "object" ||
+    Array.isArray(legacyConfig) ||
+    Object.keys(legacyConfig).length === 0
+  ) {
+
+    return null;
+
+  }
+
+
+  return {
+
+    id: null,
+
+    config: legacyConfig,
+
+    legacy: true
+
+  };
 }
+
 
 export const config = {
   path: [
@@ -204,10 +336,20 @@ export const config = {
   ]
 };
 
+
 export default async function handler(request) {
 
+  const configData =
+    await getConfigFromRequest(request);
+
+
   const existingConfig =
-    getConfigFromRequest(request);
+    configData?.config || null;
+
+
+  const configId =
+    configData?.id || null;
+
 
   if (!existingConfig) {
 
@@ -281,29 +423,32 @@ an existing addon configuration.
         }
       }
     );
+
   }
+
 
   /*
    * The token is deliberately never exposed
    * to browser-side JavaScript.
-   *
-   * It remains available only inside
-   * this server-side function.
    */
+
   const uiToken =
     typeof existingConfig.uiToken === "string"
       ? existingConfig.uiToken
       : "";
+
 
   const qualities =
     normalizeQualities(
       existingConfig.qualities
     );
 
+
   const fileSize =
     normalizeFileSize(
       existingConfig.fileSize
     );
+
 
   const filters =
     normalizeFilters(
@@ -317,12 +462,14 @@ an existing addon configuration.
    * Save the new configuration while
    * preserving the existing token.
    */
+
   if (request.method === "POST") {
 
     try {
 
       const body =
         await request.json();
+
 
       const newQualities =
         normalizeQualities(
@@ -357,6 +504,7 @@ an existing addon configuration.
 
 
       const newFileSize = {
+
         minGb:
           Number.isFinite(minGb)
             ? minGb
@@ -366,6 +514,7 @@ an existing addon configuration.
           Number.isFinite(maxGb)
             ? maxGb
             : null
+
       };
 
 
@@ -374,7 +523,9 @@ an existing addon configuration.
        *
        * Most importantly, preserve uiToken.
        */
+
       const newConfig = {
+
         ...existingConfig,
 
         uiToken,
@@ -392,19 +543,53 @@ an existing addon configuration.
 
         filters:
           newFilters
+
       };
-
-
-      const encoded =
-        encodeConfig(newConfig);
 
 
       const requestUrl =
         new URL(request.url);
 
 
+      let finalConfigId =
+        configId;
+
+
+      /*
+       * New/legacy configurations get
+       * migrated to a permanent ID.
+       *
+       * Existing Blob configurations
+       * keep their exact same ID.
+       */
+
+      if (!finalConfigId) {
+
+        finalConfigId =
+          await createConfig(
+            newConfig
+          );
+
+      } else {
+
+        await saveConfig(
+          finalConfigId,
+          newConfig
+        );
+
+      }
+
+
+      /*
+       * IMPORTANT:
+       *
+       * The manifest URL now stays the same
+       * whenever an existing configuration
+       * is edited.
+       */
+
       const manifestUrl =
-        `${requestUrl.origin}/${encoded}/manifest.json`;
+        `${requestUrl.origin}/${finalConfigId}/manifest.json`;
 
 
       return new Response(
@@ -415,14 +600,17 @@ an existing addon configuration.
           status: 200,
 
           headers: {
+
             "Content-Type":
               "application/json; charset=utf-8",
 
             "Cache-Control":
               "no-store"
+
           }
         }
       );
+
 
     } catch (error) {
 
@@ -446,7 +634,9 @@ an existing addon configuration.
           }
         }
       );
+
     }
+
   }
 
 
@@ -456,10 +646,15 @@ an existing addon configuration.
    *
    * uiToken is intentionally NOT included.
    */
+
   const publicConfig = {
+
     qualities,
+
     fileSize,
+
     filters
+
   };
 
 
