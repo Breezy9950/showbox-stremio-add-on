@@ -1,3 +1,6 @@
+import { createConfig } from "./config-store.js";
+
+
 const DEFAULT_QUALITIES = [
   "ORG",
   "4K",
@@ -8,21 +11,6 @@ const DEFAULT_QUALITIES = [
   "360p"
 ];
 
-function encodeConfig(config) {
-  const json = JSON.stringify(config);
-  const bytes = new TextEncoder().encode(json);
-
-  let binary = "";
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
 
 function qualityRows() {
   return DEFAULT_QUALITIES
@@ -65,6 +53,7 @@ function qualityRows() {
     .join("");
 }
 
+
 function filterRows() {
   return `
     <div class="filter-setting-row">
@@ -86,12 +75,14 @@ function filterRows() {
   `;
 }
 
+
 function homepageScript() {
 
   return `
 (function () {
 
   "use strict";
+
 
   const tokenInput =
     document.getElementById("tokenInput");
@@ -194,7 +185,20 @@ function homepageScript() {
   }
 
 
-  function updateManifest() {
+  function clearManifest() {
+
+    manifestUrl.value = "";
+
+    installButton.classList.add(
+      "disabled"
+    );
+
+    installButton.href = "#";
+
+  }
+
+
+  async function createManifest() {
 
     if (!currentToken) {
       return;
@@ -207,11 +211,13 @@ function homepageScript() {
 
     if (!qualities.some(item => item.enabled)) {
 
-      manifestUrl.value = "";
+      checkStatus.textContent =
+        "Enable at least one quality.";
 
-      installButton.classList.add("disabled");
+      checkStatus.className =
+        "error";
 
-      installButton.href = "#";
+      clearManifest();
 
       return;
 
@@ -234,47 +240,136 @@ function homepageScript() {
     };
 
 
-    const encoded =
-      ${encodeConfig.toString()}(config);
+    generateButton.disabled =
+      true;
+
+    generateButton.textContent =
+      "Generating...";
 
 
-    const httpsUrl =
-      window.location.origin +
-      "/" +
-      encoded +
-      "/manifest.json";
+    checkStatus.textContent =
+      "";
 
 
-    const stremioUrl =
-      "stremio://" +
-      window.location.host +
-      "/" +
-      encoded +
-      "/manifest.json";
+    try {
+
+      const response =
+        await fetch(
+          "/create-config",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify(config)
+          }
+        );
 
 
-    manifestUrl.value =
-      httpsUrl;
+      const data =
+        await response.json();
 
-    installButton.href =
-      stremioUrl;
 
-    installButton.classList.remove(
-      "disabled"
-    );
+      if (!response.ok) {
+
+        throw new Error(
+          data.error ||
+          "Failed to create configuration"
+        );
+
+      }
+
+
+      manifestUrl.value =
+        data.manifestUrl;
+
+      installButton.href =
+        data.stremioUrl;
+
+      installButton.classList.remove(
+        "disabled"
+      );
+
+
+      checkStatus.textContent =
+        "Configuration generated.";
+
+      checkStatus.className =
+        "success";
+
+
+      configuration.style.display =
+        "block";
+
+
+    }
+
+    catch (error) {
+
+      console.error(
+        "[ShowBox] Configuration generation failed:",
+        error
+      );
+
+
+      checkStatus.textContent =
+        error.message ||
+        "Failed to create configuration.";
+
+      checkStatus.className =
+        "error";
+
+
+      clearManifest();
+
+    }
+
+    finally {
+
+      generateButton.disabled =
+        false;
+
+      generateButton.textContent =
+        "Generate";
+
+    }
 
   }
 
 
   qualityList.addEventListener(
     "change",
-    updateManifest
+    function () {
+
+      clearManifest();
+
+      checkStatus.textContent =
+        "Settings changed. Generate again to update the addon.";
+
+      checkStatus.className =
+        "";
+
+    }
   );
 
 
   filterList.addEventListener(
     "change",
-    updateManifest
+    function () {
+
+      clearManifest();
+
+      checkStatus.textContent =
+        "Settings changed. Generate again to update the addon.";
+
+      checkStatus.className =
+        "";
+
+    }
   );
 
 
@@ -326,7 +421,13 @@ function homepageScript() {
       }
 
 
-      updateManifest();
+      clearManifest();
+
+      checkStatus.textContent =
+        "Settings changed. Generate again to update the addon.";
+
+      checkStatus.className =
+        "";
 
     }
   );
@@ -334,13 +435,33 @@ function homepageScript() {
 
   minSizeInput.addEventListener(
     "input",
-    updateManifest
+    function () {
+
+      clearManifest();
+
+      checkStatus.textContent =
+        "Settings changed. Generate again to update the addon.";
+
+      checkStatus.className =
+        "";
+
+    }
   );
 
 
   maxSizeInput.addEventListener(
     "input",
-    updateManifest
+    function () {
+
+      clearManifest();
+
+      checkStatus.textContent =
+        "Settings changed. Generate again to update the addon.";
+
+      checkStatus.className =
+        "";
+
+    }
   );
 
 
@@ -353,15 +474,10 @@ function homepageScript() {
       configuration.style.display =
         "none";
 
-      manifestUrl.value = "";
+      clearManifest();
 
-      installButton.classList.add(
-        "disabled"
-      );
-
-      installButton.href = "#";
-
-      checkStatus.textContent = "";
+      checkStatus.textContent =
+        "";
 
     }
   );
@@ -369,7 +485,7 @@ function homepageScript() {
 
   generateButton.addEventListener(
     "click",
-    function () {
+    async function () {
 
       const token =
         tokenInput.value.trim();
@@ -401,7 +517,8 @@ function homepageScript() {
       }
 
 
-      currentToken = token;
+      currentToken =
+        token;
 
 
       checkStatus.textContent =
@@ -415,7 +532,7 @@ function homepageScript() {
         "block";
 
 
-      updateManifest();
+      await createManifest();
 
     }
   );
@@ -454,8 +571,10 @@ function homepageScript() {
 
       setTimeout(
         function () {
+
           copyButton.textContent =
             "Copy";
+
         },
         1500
       );
@@ -475,6 +594,259 @@ export default async (request) => {
 
   const pathname =
     url.pathname;
+
+
+  /* -------------------------------------------------- */
+  /* CREATE CONFIGURATION */
+  /* -------------------------------------------------- */
+
+  if (
+    pathname === "/create-config" &&
+    request.method === "POST"
+  ) {
+
+    try {
+
+      const body =
+        await request.json();
+
+
+      if (
+        !body ||
+        typeof body !== "object" ||
+        Array.isArray(body)
+      ) {
+
+        return new Response(
+          JSON.stringify({
+            error:
+              "Invalid configuration"
+          }),
+          {
+            status: 400,
+
+            headers: {
+              "Content-Type":
+                "application/json; charset=utf-8"
+            }
+          }
+        );
+
+      }
+
+
+      const uiToken =
+        typeof body.uiToken === "string"
+          ? body.uiToken.trim()
+          : "";
+
+
+      if (!uiToken) {
+
+        return new Response(
+          JSON.stringify({
+            error:
+              "ShowBox UI token is required"
+          }),
+          {
+            status: 400,
+
+            headers: {
+              "Content-Type":
+                "application/json; charset=utf-8"
+            }
+          }
+        );
+
+      }
+
+
+      const config = {
+
+        uiToken,
+
+        fileSize:
+          body.fileSize &&
+          typeof body.fileSize === "object"
+
+            ? {
+
+                minGb:
+                  body.fileSize.minGb === null ||
+                  body.fileSize.minGb === undefined ||
+                  body.fileSize.minGb === ""
+                    ? null
+                    : Number(
+                        body.fileSize.minGb
+                      ),
+
+                maxGb:
+                  body.fileSize.maxGb === null ||
+                  body.fileSize.maxGb === undefined ||
+                  body.fileSize.maxGb === ""
+                    ? null
+                    : Number(
+                        body.fileSize.maxGb
+                      )
+
+              }
+
+            : {
+                minGb: null,
+                maxGb: null
+              },
+
+
+        qualities:
+          Array.isArray(body.qualities)
+
+            ? body.qualities
+                .filter(
+                  item =>
+                    item &&
+                    typeof item.name === "string"
+                )
+                .map(item => ({
+                  name:
+                    item.name,
+
+                  enabled:
+                    item.enabled !== false
+                }))
+
+            : [],
+
+
+        filters:
+          body.filters &&
+          typeof body.filters === "object"
+
+            ? {
+                cam:
+                  body.filters.cam !== false
+              }
+
+            : {
+                cam: true
+              }
+
+      };
+
+
+      if (
+        config.fileSize.minGb !== null &&
+        !Number.isFinite(
+          config.fileSize.minGb
+        )
+      ) {
+
+        config.fileSize.minGb =
+          null;
+
+      }
+
+
+      if (
+        config.fileSize.maxGb !== null &&
+        !Number.isFinite(
+          config.fileSize.maxGb
+        )
+      ) {
+
+        config.fileSize.maxGb =
+          null;
+
+      }
+
+
+      if (
+        config.fileSize.minGb !== null &&
+        config.fileSize.maxGb !== null &&
+        config.fileSize.minGb >
+          config.fileSize.maxGb
+      ) {
+
+        return new Response(
+          JSON.stringify({
+            error:
+              "Minimum size cannot be greater than maximum size"
+          }),
+          {
+            status: 400,
+
+            headers: {
+              "Content-Type":
+                "application/json; charset=utf-8"
+            }
+          }
+        );
+
+      }
+
+
+      const configId =
+        await createConfig(config);
+
+
+      const manifestUrl =
+        `${url.origin}/${configId}/manifest.json`;
+
+
+      const stremioUrl =
+        `stremio://${url.host}/${configId}/manifest.json`;
+
+
+      return new Response(
+        JSON.stringify({
+
+          configId,
+
+          manifestUrl,
+
+          stremioUrl
+
+        }),
+        {
+          status: 200,
+
+          headers: {
+            "Content-Type":
+              "application/json; charset=utf-8",
+
+            "Cache-Control":
+              "no-store"
+          }
+        }
+      );
+
+    }
+
+    catch (error) {
+
+      console.error(
+        "[ShowBox] Config creation failed:",
+        error
+      );
+
+
+      return new Response(
+        JSON.stringify({
+          error:
+            "Failed to create configuration"
+        }),
+        {
+          status: 500,
+
+          headers: {
+            "Content-Type":
+              "application/json; charset=utf-8"
+          }
+        }
+      );
+
+    }
+
+  }
 
 
   /* -------------------------------------------------- */
@@ -513,15 +885,19 @@ export default async (request) => {
           [],
 
         behaviorHints: {
+
           configurable:
             true,
 
           configurationRequired:
             false
+
         },
 
         config: [
+
           {
+
             key:
               "uiToken",
 
@@ -533,18 +909,22 @@ export default async (request) => {
 
             required:
               true
+
           }
+
         ]
 
       }),
 
       {
         headers: {
+
           "Content-Type":
             "application/json",
 
           "Cache-Control":
             "no-store"
+
         }
       }
 
@@ -751,6 +1131,11 @@ h1 {
 
 #generateButton:active {
   transform: scale(.985);
+}
+
+#generateButton:disabled {
+  opacity: .55;
+  cursor: default;
 }
 
 #checkStatus {
@@ -1624,6 +2009,7 @@ export const config = {
 
   path: [
     "/",
+    "/create-config",
     "/manifest.json",
     "/:config/manifest.json"
   ]
