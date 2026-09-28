@@ -350,6 +350,9 @@ function homepageScript() {
   const maxSizeInput =
     document.getElementById("maxSize");
 
+  const fileSizeStatus =
+    document.getElementById("fileSizeStatus");
+
   const manifestUrl =
     document.getElementById("manifestUrl");
 
@@ -432,6 +435,82 @@ function homepageScript() {
   }
 
 
+  function validateFileSizeInputs() {
+
+    const fileSize =
+      getFileSizeConfig();
+
+
+    let error = "";
+
+
+    if (
+      fileSize.minGb !== null &&
+      (
+        !Number.isFinite(fileSize.minGb) ||
+        fileSize.minGb < 0 ||
+        fileSize.minGb > 200
+      )
+    ) {
+
+      error =
+        "Minimum file size must be between 0 and 200 GB.";
+
+    }
+
+
+    else if (
+      fileSize.maxGb !== null &&
+      (
+        !Number.isFinite(fileSize.maxGb) ||
+        fileSize.maxGb < 0 ||
+        fileSize.maxGb > 200
+      )
+    ) {
+
+      error =
+        "Maximum file size must be between 0 and 200 GB.";
+
+    }
+
+
+    else if (
+      fileSize.minGb !== null &&
+      fileSize.maxGb !== null &&
+      fileSize.minGb >
+        fileSize.maxGb
+    ) {
+
+      error =
+        "Minimum size cannot be greater than maximum size.";
+
+    }
+
+
+    if (error) {
+
+      fileSizeStatus.textContent =
+        error;
+
+      fileSizeStatus.className =
+        "filter-error";
+
+      return false;
+
+    }
+
+
+    fileSizeStatus.textContent =
+      "";
+
+    fileSizeStatus.className =
+      "";
+
+    return true;
+
+  }
+
+
   function clearManifest() {
 
     manifestUrl.value = "";
@@ -475,58 +554,9 @@ function homepageScript() {
     }
 
 
-    const fileSize =
-      getFileSizeConfig();
-
-
     if (
-      (
-        fileSize.minGb !== null &&
-        (
-          !Number.isFinite(
-            fileSize.minGb
-          ) ||
-          fileSize.minGb < 0 ||
-          fileSize.minGb > 200
-        )
-      ) ||
-      (
-        fileSize.maxGb !== null &&
-        (
-          !Number.isFinite(
-            fileSize.maxGb
-          ) ||
-          fileSize.maxGb < 0 ||
-          fileSize.maxGb > 200
-        )
-      )
+      !validateFileSizeInputs()
     ) {
-
-      checkStatus.textContent =
-        "File size must be between 0 and 200 GB.";
-
-      checkStatus.className =
-        "error";
-
-      clearManifest();
-
-      return;
-
-    }
-
-
-    if (
-      fileSize.minGb !== null &&
-      fileSize.maxGb !== null &&
-      fileSize.minGb >
-        fileSize.maxGb
-    ) {
-
-      checkStatus.textContent =
-        "Minimum size cannot be greater than maximum size.";
-
-      checkStatus.className =
-        "error";
 
       clearManifest();
 
@@ -540,7 +570,8 @@ function homepageScript() {
       uiToken:
         currentToken,
 
-      fileSize,
+      fileSize:
+        getFileSizeConfig(),
 
       qualities,
 
@@ -759,11 +790,7 @@ function homepageScript() {
 
       clearManifest();
 
-      checkStatus.textContent =
-        "Settings changed. Generate again to update the addon.";
-
-      checkStatus.className =
-        "";
+      validateFileSizeInputs();
 
     }
   );
@@ -775,11 +802,7 @@ function homepageScript() {
 
       clearManifest();
 
-      checkStatus.textContent =
-        "Settings changed. Generate again to update the addon.";
-
-      checkStatus.className =
-        "";
+      validateFileSizeInputs();
 
     }
   );
@@ -834,6 +857,17 @@ function homepageScript() {
 
         checkStatus.className =
           "error";
+
+        return;
+
+      }
+
+
+      if (
+        !validateFileSizeInputs()
+      ) {
+
+        clearManifest();
 
         return;
 
@@ -1841,6 +1875,19 @@ h1 {
     #50545f;
 }
 
+.filter-error {
+  min-height: 18px;
+
+  margin-top: 10px;
+  padding: 0 7px;
+
+  color:
+    var(--error);
+
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 
 /* -------------------------------------------------- */
 /* QUALITY */
@@ -2392,6 +2439,10 @@ Max (GB)
 </div>
 
 </div>
+
+<div
+  id="fileSizeStatus"
+></div>
 
 </section>
 
