@@ -982,7 +982,7 @@ export default async (request,context)=>{
     .settings-title{
       margin:0;
       color:var(--text);
-      font-size:29px;
+      font-size:clamp(40pc, 1.75rem + 4vw, 72px)
       line-height:1.15;
       font-weight:700;
       letter-spacing:-.7px;
@@ -1326,7 +1326,7 @@ export default async (request,context)=>{
       .settings-title,
       .section-title,
       .configuration-title{
-        font-size:clamp(32px, 1.5rem + 2.5vw, 56px)⁠;
+        font-size:27;
       }
 
       .size-fields{
