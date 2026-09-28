@@ -22,7 +22,9 @@ const DEFAULT_FILTERS = {
 
 
 const MAX_CONFIG_BODY_BYTES = 16 * 1024;
+
 const MAX_QUALITY_ITEMS = 20;
+
 const MAX_FILE_SIZE_GB = 200;
 
 
@@ -137,6 +139,10 @@ function normalizeQualities(qualities) {
 
   }
 
+
+  /*
+   * Preserve the user's quality order.
+   */
 
   const ordered = [];
 
@@ -422,6 +428,17 @@ async function getConfigFromRequest(request) {
     null;
 
 
+  /*
+   * Supported formats:
+   *
+   * /configure/<config>
+   *
+   * /<config>/configure
+   *
+   * The second format is used by Nuvio.
+   */
+
+
   let match =
     pathname.match(
       /^\/configure\/([^/]+)$/
@@ -461,6 +478,11 @@ async function getConfigFromRequest(request) {
   }
 
 
+  /*
+   * First try the new persistent
+   * Netlify Blobs configuration.
+   */
+
   const storedConfig =
     await getConfig(
       configValue
@@ -488,6 +510,13 @@ async function getConfigFromRequest(request) {
 
   }
 
+
+  /*
+   * Legacy Base64 configuration support.
+   *
+   * This keeps previously generated
+   * addon URLs working.
+   */
 
   const legacyConfig =
     decodeConfig(
@@ -576,13 +605,9 @@ export default async function handler(
 
 <style>
 
-* {
-  box-sizing: border-box;
-}
-
 body {
   margin: 0;
-  padding: clamp(32px, 6vw, 72px) 20px;
+  padding: 40px 20px;
   background: #111;
   color: #fff;
   font-family:
@@ -590,24 +615,20 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+  text-align: center;
 }
 
 .card {
-  width: min(760px, 100%);
+  max-width: 560px;
   margin: auto;
   background: #17181d;
-  padding: clamp(28px, 5vw, 44px);
-  border-radius: 22px;
-}
-
-h2 {
-  font-size: clamp(24px, 4vw, 32px);
+  padding: 28px;
+  border-radius: 18px;
 }
 
 p {
   color: #aaa;
-  line-height: 1.6;
-  font-size: clamp(14px, 2vw, 16px);
+  line-height: 1.5;
 }
 
 </style>
@@ -656,6 +677,11 @@ an existing addon configuration.
   }
 
 
+  /*
+   * The token is deliberately never exposed
+   * to browser-side JavaScript.
+   */
+
   const uiToken =
     typeof existingConfig.uiToken === "string"
       ? existingConfig.uiToken
@@ -680,11 +706,24 @@ an existing addon configuration.
     );
 
 
+  /*
+   * POST
+   *
+   * Save the new configuration while
+   * preserving the existing token.
+   */
+
   if (
     request.method === "POST"
   ) {
 
     try {
+
+      /*
+       * Read the request as text first so we
+       * can enforce an application-level
+       * body-size limit before JSON parsing.
+       */
 
       const requestBody =
         await request.text();
@@ -796,6 +835,12 @@ an existing addon configuration.
         );
 
 
+      /*
+       * Preserve the existing configuration.
+       *
+       * Most importantly, preserve uiToken.
+       */
+
       const newConfig = {
 
         ...existingConfig,
@@ -834,6 +879,14 @@ an existing addon configuration.
         configId;
 
 
+      /*
+       * New/legacy configurations get
+       * migrated to a permanent ID.
+       *
+       * Existing Blob configurations
+       * keep their exact same ID.
+       */
+
       if (!finalConfigId) {
 
         finalConfigId =
@@ -852,6 +905,11 @@ an existing addon configuration.
 
       }
 
+
+      /*
+       * The manifest URL remains tied
+       * to the same persistent configuration ID.
+       */
 
       const manifestUrl =
         `${requestUrl.origin}/${finalConfigId}/manifest.json`;
@@ -889,6 +947,12 @@ an existing addon configuration.
     }
 
     catch (error) {
+
+      console.error(
+        "[Configure] Save error:",
+        error?.message
+      );
+
 
       const message =
         error?.message ||
@@ -934,6 +998,13 @@ an existing addon configuration.
 
   }
 
+
+  /*
+   * Only expose safe configuration
+   * values to browser JavaScript.
+   *
+   * uiToken is intentionally NOT included.
+   */
 
   const publicConfig = {
 
@@ -1024,28 +1095,13 @@ an existing addon configuration.
   box-sizing: border-box;
 }
 
-:root {
-  color-scheme: dark;
-}
-
-html {
-  background: #111;
-}
-
 body {
   margin: 0;
 
   padding:
-    clamp(28px, 5vw, 64px)
-    20px
-    clamp(48px, 7vw, 80px);
+    24px 16px 40px;
 
   background:
-    radial-gradient(
-      circle at 50% -15%,
-      rgba(255,255,255,.045),
-      transparent 38%
-    ),
     #111;
 
   color:
@@ -1054,18 +1110,15 @@ body {
   font-family:
     -apple-system,
     BlinkMacSystemFont,
-    "SF Pro Display",
-    "SF Pro Text",
     "Segoe UI",
     sans-serif;
-
-  -webkit-font-smoothing:
-    antialiased;
 }
 
 .container {
-  width:
-    min(820px, 100%);
+  width: 100%;
+
+  max-width:
+    560px;
 
   margin:
     0 auto;
@@ -1073,33 +1126,30 @@ body {
 
 h1 {
   margin:
-    8px 0 10px;
+    8px 0 8px;
 
   font-size:
-    clamp(32px, 5vw, 48px);
-
-  line-height:
-    1;
+    27px;
 
   font-weight:
-    750;
+    700;
 
   letter-spacing:
-    -1.8px;
+    -0.5px;
 }
 
 .subtitle {
   margin:
-    0 0 clamp(28px, 4vw, 42px);
+    0 0 26px;
 
   color:
     #9b9ca3;
 
   font-size:
-    clamp(14px, 2vw, 17px);
+    15px;
 
   line-height:
-    1.55;
+    1.5;
 }
 
 .card {
@@ -1110,24 +1160,24 @@ h1 {
     1px solid #24252c;
 
   border-radius:
-    clamp(18px, 2.5vw, 24px);
+    18px;
 
   padding:
-    clamp(20px, 3vw, 30px);
+    20px;
 
   margin-bottom:
-    clamp(16px, 2.5vw, 22px);
+    16px;
 }
 
 .card-title {
   font-size:
-    clamp(18px, 2.4vw, 21px);
+    17px;
 
   font-weight:
     650;
 
   margin-bottom:
-    7px;
+    6px;
 }
 
 .card-description {
@@ -1135,13 +1185,13 @@ h1 {
     #92939b;
 
   font-size:
-    clamp(13px, 1.8vw, 15px);
+    13px;
 
   line-height:
-    1.5;
+    1.45;
 
   margin-bottom:
-    22px;
+    18px;
 }
 
 .size-row {
@@ -1149,7 +1199,7 @@ h1 {
     flex;
 
   gap:
-    clamp(12px, 2vw, 18px);
+    12px;
 }
 
 .size-field {
@@ -1165,10 +1215,10 @@ label {
     #a5a6ae;
 
   font-size:
-    clamp(13px, 1.7vw, 14px);
+    13px;
 
   margin-bottom:
-    8px;
+    7px;
 }
 
 input[type="number"] {
@@ -1176,13 +1226,13 @@ input[type="number"] {
     100%;
 
   height:
-    clamp(46px, 6vw, 54px);
+    45px;
 
   border:
     1px solid #303139;
 
   border-radius:
-    12px;
+    11px;
 
   background:
     #20222a;
@@ -1191,10 +1241,10 @@ input[type="number"] {
     #fff;
 
   padding:
-    0 14px;
+    0 13px;
 
   font-size:
-    clamp(14px, 2vw, 16px);
+    15px;
 
   outline:
     none;
@@ -1206,12 +1256,16 @@ input[type="number"]:focus {
 }
 
 
+/* -------------------------------------------------- */
+/* FILE SIZE VALIDATION */
+/* -------------------------------------------------- */
+
 .file-size-error {
   min-height:
-    20px;
+    18px;
 
   margin-top:
-    11px;
+    10px;
 
   color:
     #ff9b9b;
@@ -1224,6 +1278,10 @@ input[type="number"]:focus {
 }
 
 
+/* -------------------------------------------------- */
+/* QUALITY */
+/* -------------------------------------------------- */
+
 .quality-list {
   display:
     flex;
@@ -1232,7 +1290,7 @@ input[type="number"]:focus {
     column;
 
   gap:
-    10px;
+    8px;
 }
 
 .quality-row {
@@ -1243,24 +1301,19 @@ input[type="number"]:focus {
     center;
 
   gap:
-    14px;
+    12px;
 
   min-height:
-    clamp(52px, 7vw, 62px);
+    48px;
 
   padding:
-    9px 12px;
+    8px 10px;
 
   background:
     #20222a;
 
   border-radius:
-    12px;
-}
-
-.quality-row > input[type="checkbox"] {
-  flex:
-    0 0 auto;
+    11px;
 }
 
 .quality-name {
@@ -1268,7 +1321,7 @@ input[type="number"]:focus {
     1;
 
   font-size:
-    clamp(15px, 2.2vw, 17px);
+    15px;
 }
 
 .quality-controls {
@@ -1276,21 +1329,21 @@ input[type="number"]:focus {
     flex;
 
   gap:
-    7px;
+    6px;
 }
 
 .quality-controls button {
   width:
-    clamp(36px, 5vw, 42px);
+    34px;
 
   height:
-    clamp(36px, 5vw, 42px);
+    34px;
 
   border:
     0;
 
   border-radius:
-    10px;
+    9px;
 
   background:
     #2b2d36;
@@ -1299,7 +1352,7 @@ input[type="number"]:focus {
     #ddd;
 
   font-size:
-    clamp(17px, 2.5vw, 20px);
+    17px;
 }
 
 .quality-controls button:active {
@@ -1320,7 +1373,7 @@ input[type="number"]:focus {
     column;
 
   gap:
-    10px;
+    8px;
 }
 
 .filter-row {
@@ -1331,16 +1384,16 @@ input[type="number"]:focus {
     center;
 
   min-height:
-    clamp(52px, 7vw, 62px);
+    48px;
 
   padding:
-    9px 12px;
+    8px 10px;
 
   background:
     #20222a;
 
   border-radius:
-    12px;
+    11px;
 }
 
 .filter-label {
@@ -1351,7 +1404,7 @@ input[type="number"]:focus {
     center;
 
   gap:
-    14px;
+    12px;
 
   margin:
     0;
@@ -1360,7 +1413,7 @@ input[type="number"]:focus {
     #fff;
 
   font-size:
-    clamp(15px, 2.2vw, 17px);
+    15px;
 
   cursor:
     pointer;
@@ -1368,10 +1421,10 @@ input[type="number"]:focus {
 
 input[type="checkbox"] {
   width:
-    clamp(19px, 2.7vw, 22px);
+    19px;
 
   height:
-    clamp(19px, 2.7vw, 22px);
+    19px;
 
   accent-color:
     #fff;
@@ -1382,13 +1435,13 @@ button.main {
     100%;
 
   height:
-    clamp(50px, 6vw, 58px);
+    47px;
 
   border:
     0;
 
   border-radius:
-    13px;
+    12px;
 
   background:
     #fff;
@@ -1397,13 +1450,13 @@ button.main {
     #111;
 
   font-size:
-    clamp(15px, 2vw, 17px);
+    15px;
 
   font-weight:
     650;
 
   margin-top:
-    20px;
+    18px;
 }
 
 button.main:active {
@@ -1417,12 +1470,16 @@ button.main:disabled {
 }
 
 
+/* -------------------------------------------------- */
+/* RESULT */
+/* -------------------------------------------------- */
+
 .result {
   display:
     none;
 
   margin-top:
-    18px;
+    16px;
 }
 
 .result.visible {
@@ -1435,10 +1492,10 @@ button.main:disabled {
     100%;
 
   padding:
-    14px;
+    12px;
 
   border-radius:
-    12px;
+    11px;
 
   background:
     #20222a;
@@ -1447,10 +1504,10 @@ button.main:disabled {
     #aaa;
 
   font-size:
-    clamp(12px, 1.7vw, 14px);
+    12px;
 
   line-height:
-    1.5;
+    1.45;
 
   word-break:
     break-all;
@@ -1464,10 +1521,10 @@ button.main:disabled {
     flex;
 
   gap:
-    12px;
+    10px;
 
   margin-top:
-    13px;
+    12px;
 }
 
 .result-buttons button {
@@ -1475,16 +1532,16 @@ button.main:disabled {
     1;
 
   height:
-    clamp(46px, 6vw, 54px);
+    44px;
 
   border:
     0;
 
   border-radius:
-    12px;
+    11px;
 
   font-size:
-    clamp(14px, 1.9vw, 16px);
+    14px;
 
   font-weight:
     600;
@@ -1511,7 +1568,7 @@ button.main:disabled {
     20px;
 
   padding:
-    15px;
+    14px;
 
   border-radius:
     12px;
@@ -1523,15 +1580,10 @@ button.main:disabled {
     #8f9098;
 
   font-size:
-    clamp(12px, 1.7vw, 14px);
+    13px;
 
   line-height:
-    1.55;
-}
-
-.note + .note {
-  margin-top:
-    8px;
+    1.5;
 }
 
 .status {
@@ -1539,10 +1591,10 @@ button.main:disabled {
     none;
 
   margin-top:
-    13px;
+    12px;
 
   padding:
-    12px 13px;
+    11px 12px;
 
   border-radius:
     10px;
@@ -1560,55 +1612,6 @@ button.main:disabled {
 .status.visible {
   display:
     block;
-}
-
-
-@media (max-width: 600px) {
-
-  body {
-    padding:
-      26px 12px 48px;
-  }
-
-  .container {
-    width:
-      100%;
-  }
-
-  h1 {
-    font-size:
-      34px;
-
-    letter-spacing:
-      -1.4px;
-  }
-
-  .subtitle {
-    font-size:
-      13px;
-
-    margin-bottom:
-      26px;
-  }
-
-  .card {
-    padding:
-      18px;
-
-    border-radius:
-      18px;
-  }
-
-  .size-row {
-    gap:
-      9px;
-  }
-
-  .result-buttons {
-    flex-direction:
-      column;
-  }
-
 }
 
 </style>
@@ -1641,6 +1644,7 @@ Leave a field empty for no limit.
 
 
 <div class="size-row">
+
 
 <div class="size-field">
 
@@ -1677,6 +1681,7 @@ Maximum (GB)
 
 </div>
 
+
 </div>
 
 
@@ -1684,6 +1689,7 @@ Maximum (GB)
   id="fileSizeError"
   class="file-size-error"
 ></div>
+
 
 </div>
 
@@ -1799,12 +1805,6 @@ Install in Stremio
 On iOS/iPadOS, if Stremio does not open automatically,
 copy the manifest URL and add it manually through
 Stremio's Add-ons page.
-
-</div>
-
-<div class="note">
-
-On Nuvio, reinstalling isn't required — it syncs automatically.
 
 </div>
 
@@ -2327,6 +2327,12 @@ async function saveConfiguration() {
 
   catch (error) {
 
+    console.error(
+      "[Configure] Save failed:",
+      error?.message
+    );
+
+
     showStatus(
       error.message ||
       "Something went wrong."
@@ -2347,6 +2353,11 @@ async function saveConfiguration() {
 
 }
 
+
+/*
+ * File-size validation happens immediately
+ * whenever either field changes.
+ */
 
 minSizeInput.addEventListener(
   "input",
@@ -2371,6 +2382,11 @@ maxSizeInput.addEventListener(
   }
 );
 
+
+/*
+ * Changing the CAM filter invalidates
+ * the previously generated manifest.
+ */
 
 camFilter.addEventListener(
   "change",
@@ -2447,7 +2463,7 @@ installButton.addEventListener(
     const stremioUrl =
       "stremio://" +
       url.replace(
-        /^https?:\/\//,
+        /^https?:\\/\\//,
         ""
       );
 
@@ -2491,6 +2507,12 @@ saveButton.addEventListener(
   saveConfiguration
 );
 
+
+/*
+ * Validate the stored values on initial load
+ * as well. This protects the UI if an older
+ * configuration contains an invalid value.
+ */
 
 validateFileSizeInputs();
 
