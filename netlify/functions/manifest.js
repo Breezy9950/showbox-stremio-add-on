@@ -2474,7 +2474,7 @@ h1 {
 
   .container {
     width:
-      calc(100% - 24px);
+      calc(100% - 28px);
 
     padding:
       38px 0 60px;
