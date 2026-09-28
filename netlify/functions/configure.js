@@ -4,7 +4,8 @@ import {
   saveConfig,
   createConfigureSession,
   getConfigureSession,
-  recordConfigureActivity
+  recordConfigureActivity,
+  checkConfigureSession
 } from "./config-store.js";
 
 const DEFAULT_QUALITIES = [
@@ -49,11 +50,16 @@ function decodeConfig(value) {
 
 function normalizeQualities(qualities) {
   if (!Array.isArray(qualities)) {
-    return DEFAULT_QUALITIES.map(item => ({ ...item }));
+    return DEFAULT_QUALITIES.map(item => ({
+      ...item
+    }));
   }
 
   const allowed = new Map(
-    DEFAULT_QUALITIES.map(item => [item.name, item])
+    DEFAULT_QUALITIES.map(item => [
+      item.name,
+      item
+    ])
   );
 
   const result = [];
@@ -90,8 +96,13 @@ function normalizeQualities(qualities) {
 }
 
 function normalizeFilters(filters) {
-  if (!filters || typeof filters !== "object") {
-    return { ...DEFAULT_FILTERS };
+  if (
+    !filters ||
+    typeof filters !== "object"
+  ) {
+    return {
+      ...DEFAULT_FILTERS
+    };
   }
 
   return {
@@ -100,7 +111,10 @@ function normalizeFilters(filters) {
 }
 
 function normalizeFileSize(fileSize) {
-  if (!fileSize || typeof fileSize !== "object") {
+  if (
+    !fileSize ||
+    typeof fileSize !== "object"
+  ) {
     return {
       minGb: null,
       maxGb: null
@@ -128,7 +142,10 @@ function normalizeFileSize(fileSize) {
 }
 
 function validateFileSize(fileSize) {
-  if (!fileSize || typeof fileSize !== "object") {
+  if (
+    !fileSize ||
+    typeof fileSize !== "object"
+  ) {
     return {
       minGb: null,
       maxGb: null
@@ -149,17 +166,30 @@ function validateFileSize(fileSize) {
       ? null
       : Number(fileSize.maxGb);
 
-  if (min !== null && !Number.isFinite(min)) {
-    throw new Error("Invalid minimum file size");
+  if (
+    min !== null &&
+    !Number.isFinite(min)
+  ) {
+    throw new Error(
+      "Invalid minimum file size"
+    );
   }
 
-  if (max !== null && !Number.isFinite(max)) {
-    throw new Error("Invalid maximum file size");
+  if (
+    max !== null &&
+    !Number.isFinite(max)
+  ) {
+    throw new Error(
+      "Invalid maximum file size"
+    );
   }
 
   if (
     min !== null &&
-    (min < 0 || min > MAX_FILE_SIZE_GB)
+    (
+      min < 0 ||
+      min > MAX_FILE_SIZE_GB
+    )
   ) {
     throw new Error(
       "Minimum file size must be between 0 and 200 GB"
@@ -168,7 +198,10 @@ function validateFileSize(fileSize) {
 
   if (
     max !== null &&
-    (max < 0 || max > MAX_FILE_SIZE_GB)
+    (
+      max < 0 ||
+      max > MAX_FILE_SIZE_GB
+    )
   ) {
     throw new Error(
       "Maximum file size must be between 0 and 200 GB"
@@ -193,22 +226,29 @@ function validateFileSize(fileSize) {
 
 async function getConfigFromRequest(request) {
   const url = new URL(request.url);
-  const pathname = url.pathname.replace(/\/+$/, "");
+
+  const pathname =
+    url.pathname.replace(
+      /\/+$/,
+      ""
+    );
 
   let configValue = null;
 
-  let match = pathname.match(
-    /^\/configure\/([^/]+)$/
-  );
+  let match =
+    pathname.match(
+      /^\/configure\/([^/]+)$/
+    );
 
   if (match) {
     configValue = match[1];
   }
 
   if (!configValue) {
-    match = pathname.match(
-      /^\/([^/]+)\/configure$/
-    );
+    match =
+      pathname.match(
+        /^\/([^/]+)\/configure$/
+      );
 
     if (match) {
       configValue = match[1];
@@ -219,7 +259,10 @@ async function getConfigFromRequest(request) {
     return null;
   }
 
-  const storedConfig = await getConfig(configValue);
+  const storedConfig =
+    await getConfig(
+      configValue
+    );
 
   if (
     storedConfig &&
@@ -233,13 +276,18 @@ async function getConfigFromRequest(request) {
     };
   }
 
-  const legacyConfig = decodeConfig(configValue);
+  const legacyConfig =
+    decodeConfig(
+      configValue
+    );
 
   if (
     !legacyConfig ||
     typeof legacyConfig !== "object" ||
     Array.isArray(legacyConfig) ||
-    Object.keys(legacyConfig).length === 0
+    Object.keys(
+      legacyConfig
+    ).length === 0
   ) {
     return null;
   }
@@ -251,31 +299,45 @@ async function getConfigFromRequest(request) {
   };
 }
 
-function jsonResponse(data, status = 200) {
+function jsonResponse(
+  data,
+  status = 200
+) {
   return new Response(
     JSON.stringify(data),
     {
       status,
       headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-        "Referrer-Policy": "no-referrer"
+        "Content-Type":
+          "application/json; charset=utf-8",
+        "Cache-Control":
+          "no-store",
+        "X-Content-Type-Options":
+          "nosniff",
+        "Referrer-Policy":
+          "no-referrer"
       }
     }
   );
 }
 
-function htmlResponse(html, status = 200) {
+function htmlResponse(
+  html,
+  status = 200
+) {
   return new Response(
     html,
     {
       status,
       headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-        "Referrer-Policy": "no-referrer"
+        "Content-Type":
+          "text/html; charset=utf-8",
+        "Cache-Control":
+          "no-store",
+        "X-Content-Type-Options":
+          "nosniff",
+        "Referrer-Policy":
+          "no-referrer"
       }
     }
   );
@@ -305,31 +367,6 @@ p{color:#aaa;line-height:1.5}
 `;
 }
 
-function expiredPage() {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Configure Expired</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;padding:40px 20px;background:#111;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:center}
-.card{max-width:560px;margin:auto;background:#17181d;border:1px solid #24252c;padding:28px;border-radius:18px}
-p{color:#999;line-height:1.5}
-</style>
-</head>
-<body>
-<div class="card">
-<h2>Configure session expired</h2>
-<p>This Configure session has expired because there was no activity for 10 minutes.</p>
-<p>Open Configure again from Stremio to start a new session.</p>
-</div>
-</body>
-</html>
-`;
-}
-
 export const config = {
   path: [
     "/configure/:config",
@@ -337,28 +374,47 @@ export const config = {
   ]
 };
 
-export default async function handler(request) {
-  const configData = await getConfigFromRequest(request);
+export default async function handler(
+  request
+) {
+  const configData =
+    await getConfigFromRequest(
+      request
+    );
 
-  if (!configData || !configData.config) {
-    return htmlResponse(invalidConfigPage(), 400);
+  if (
+    !configData ||
+    !configData.config
+  ) {
+    return htmlResponse(
+      invalidConfigPage(),
+      400
+    );
   }
 
-  const existingConfig = configData.config;
-  const configId = configData.id;
+  const existingConfig =
+    configData.config;
 
-  if (request.method === "POST") {
+  const configId =
+    configData.id;
+
+  if (
+    request.method === "POST"
+  ) {
     try {
-      const requestBody = await request.text();
+      const requestBody =
+        await request.text();
 
       if (
         new TextEncoder()
           .encode(requestBody)
-          .byteLength > MAX_CONFIG_BODY_BYTES
+          .byteLength >
+        MAX_CONFIG_BODY_BYTES
       ) {
         return jsonResponse(
           {
-            error: "Configuration request is too large"
+            error:
+              "Configuration request is too large"
           },
           413
         );
@@ -367,9 +423,14 @@ export default async function handler(request) {
       let body;
 
       try {
-        body = JSON.parse(requestBody);
+        body =
+          JSON.parse(
+            requestBody
+          );
       } catch {
-        throw new Error("Invalid JSON");
+        throw new Error(
+          "Invalid JSON"
+        );
       }
 
       if (
@@ -377,21 +438,32 @@ export default async function handler(request) {
         typeof body !== "object" ||
         Array.isArray(body)
       ) {
-        throw new Error("Invalid request");
+        throw new Error(
+          "Invalid request"
+        );
       }
 
-      if (body.action === "create-session") {
-        const session = await createConfigureSession();
+      if (
+        body.action ===
+        "create-session"
+      ) {
+        const session =
+          await createConfigureSession();
 
         return jsonResponse({
-          sessionId: session.id
+          sessionId:
+            session.id
         });
       }
 
-      if (body.action === "activity") {
-        const session = await getConfigureSession(
-          body.sessionId
-        );
+      if (
+        body.action ===
+        "check-session"
+      ) {
+        const session =
+          await getConfigureSession(
+            body.sessionId
+          );
 
         if (!session) {
           return jsonResponse(
@@ -403,7 +475,49 @@ export default async function handler(request) {
           );
         }
 
-        if (session.state === "expired") {
+        if (
+          session.state ===
+          "expired"
+        ) {
+          return jsonResponse(
+            {
+              ok: false,
+              state: "expired"
+            },
+            410
+          );
+        }
+
+        return jsonResponse({
+          ok: true,
+          state:
+            session.state || "active"
+        });
+      }
+
+      if (
+        body.action ===
+        "activity"
+      ) {
+        const session =
+          await getConfigureSession(
+            body.sessionId
+          );
+
+        if (!session) {
+          return jsonResponse(
+            {
+              ok: false,
+              state: "invalid"
+            },
+            403
+          );
+        }
+
+        if (
+          session.state ===
+          "expired"
+        ) {
           return jsonResponse(
             {
               ok: false,
@@ -421,63 +535,75 @@ export default async function handler(request) {
         if (!activity.ok) {
           return jsonResponse(
             activity,
-            activity.state === "expired" ? 410 : 403
+            activity.state ===
+              "expired"
+              ? 410
+              : 403
           );
         }
 
-        return jsonResponse(activity);
+        return jsonResponse(
+          activity
+        );
       }
 
-      if (body.action === "check-session") {
-        const session = await getConfigureSession(
-          body.sessionId
-        );
-
-        if (!session) {
-          return jsonResponse(
-            {
-              ok: false,
-              state: "invalid"
-            },
-            403
+      if (
+        body.action ===
+        "check-activity"
+      ) {
+        const result =
+          await checkConfigureSession(
+            body.sessionId
           );
-        }
 
-        if (session.state === "expired") {
+        if (
+          result.state ===
+          "expired"
+        ) {
           return jsonResponse(
-            {
-              ok: false,
-              state: "expired"
-            },
+            result,
             410
           );
         }
 
-        return jsonResponse({
-          ok: true,
-          state: session.state
-        });
+        if (!result.ok) {
+          return jsonResponse(
+            result,
+            403
+          );
+        }
+
+        return jsonResponse(
+          result
+        );
       }
 
-      const sessionId = body.sessionId;
+      const sessionId =
+        body.sessionId;
 
-      const session = await getConfigureSession(
-        sessionId
-      );
+      const session =
+        await getConfigureSession(
+          sessionId
+        );
 
       if (!session) {
         return jsonResponse(
           {
-            error: "Configure session is invalid"
+            error:
+              "Configure session is invalid"
           },
           403
         );
       }
 
-      if (session.state === "expired") {
+      if (
+        session.state ===
+        "expired"
+      ) {
         return jsonResponse(
           {
-            error: "Configure session has expired"
+            error:
+              "Configure session has expired"
           },
           410
         );
@@ -492,54 +618,82 @@ export default async function handler(request) {
         return jsonResponse(
           {
             error:
-              activity.state === "expired"
+              activity.state ===
+              "expired"
                 ? "Configure session has expired"
                 : "Configure session is invalid"
           },
-          activity.state === "expired" ? 410 : 403
+          activity.state ===
+            "expired"
+            ? 410
+            : 403
         );
       }
 
       if (
-        Array.isArray(body.qualities) &&
-        body.qualities.length > MAX_QUALITY_ITEMS
+        Array.isArray(
+          body.qualities
+        ) &&
+        body.qualities.length >
+          MAX_QUALITY_ITEMS
       ) {
-        throw new Error("Too many quality entries");
+        throw new Error(
+          "Too many quality entries"
+        );
       }
 
       const newQualities =
-        normalizeQualities(body.qualities);
+        normalizeQualities(
+          body.qualities
+        );
 
       const newFileSize =
-        validateFileSize(body.fileSize);
+        validateFileSize(
+          body.fileSize
+        );
 
       const newFilters =
-        normalizeFilters(body.filters);
+        normalizeFilters(
+          body.filters
+        );
 
       const uiToken =
-        typeof existingConfig.uiToken === "string"
+        typeof existingConfig.uiToken ===
+        "string"
           ? existingConfig.uiToken
           : "";
 
       const newConfig = {
         ...existingConfig,
         uiToken,
-        fileSize: newFileSize,
-        qualities: newQualities.map(item => ({
-          name: item.name,
-          enabled: item.enabled
-        })),
-        filters: newFilters
+        fileSize:
+          newFileSize,
+        qualities:
+          newQualities.map(
+            item => ({
+              name:
+                item.name,
+              enabled:
+                item.enabled
+            })
+          ),
+        filters:
+          newFilters
       };
 
-      const requestUrl = new URL(request.url);
+      const requestUrl =
+        new URL(
+          request.url
+        );
 
-      let finalConfigId = configId;
+      let finalConfigId =
+        configId;
 
       if (!finalConfigId) {
-        finalConfigId = await createConfig(
-          newConfig
-        );
+        finalConfigId =
+          await createConfig(
+            newConfig
+          );
       } else {
         await saveConfig(
           finalConfigId,
@@ -563,17 +717,14 @@ export default async function handler(request) {
         error?.message ||
         "Invalid configuration";
 
-      const status =
-        message ===
-        "Configuration request is too large"
-          ? 413
-          : 400;
-
       return jsonResponse(
         {
           error: message
         },
-        status
+        message ===
+          "Configuration request is too large"
+          ? 413
+          : 400
       );
     }
   }
@@ -593,35 +744,56 @@ export default async function handler(request) {
       existingConfig.filters
     );
 
-  const publicConfig = {
-    qualities,
-    fileSize,
-    filters
-  };
-
   const qualitiesJson =
     JSON.stringify(
-      publicConfig.qualities
+      qualities
     )
-      .replace(/</g, "\\u003c")
-      .replace(/>/g, "\\u003e")
-      .replace(/&/g, "\\u0026");
+      .replace(
+        /</g,
+        "\\u003c"
+      )
+      .replace(
+        />/g,
+        "\\u003e"
+      )
+      .replace(
+        /&/g,
+        "\\u0026"
+      );
 
   const fileSizeJson =
     JSON.stringify(
-      publicConfig.fileSize
+      fileSize
     )
-      .replace(/</g, "\\u003c")
-      .replace(/>/g, "\\u003e")
-      .replace(/&/g, "\\u0026");
+      .replace(
+        /</g,
+        "\\u003c"
+      )
+      .replace(
+        />/g,
+        "\\u003e"
+      )
+      .replace(
+        /&/g,
+        "\\u0026"
+      );
 
   const filtersJson =
     JSON.stringify(
-      publicConfig.filters
+      filters
     )
-      .replace(/</g, "\\u003c")
-      .replace(/>/g, "\\u003e")
-      .replace(/&/g, "\\u0026");
+      .replace(
+        /</g,
+        "\\u003c"
+      )
+      .replace(
+        />/g,
+        "\\u003e"
+      )
+      .replace(
+        /&/g,
+        "\\u0026"
+      );
 
   const html = `
 <!DOCTYPE html>
@@ -634,7 +806,7 @@ export default async function handler(request) {
 *{box-sizing:border-box}
 body{margin:0;padding:24px 16px 40px;background:#111;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .container{width:100%;max-width:560px;margin:0 auto}
-h1{margin:8px 0;font-size:27px;font-weight:700;letter-spacing:-.5px}
+h1{margin:8px 0 8px;font-size:27px;font-weight:700;letter-spacing:-.5px}
 .subtitle{margin:0 0 26px;color:#9b9ca3;font-size:15px;line-height:1.5}
 .card{background:#17181d;border:1px solid #24252c;border-radius:18px;padding:20px;margin-bottom:16px}
 .card-title{font-size:17px;font-weight:650;margin-bottom:6px}
@@ -645,19 +817,17 @@ label{display:block;color:#a5a6ae;font-size:13px;margin-bottom:7px}
 input[type=number]{width:100%;height:45px;border:1px solid #303139;border-radius:11px;background:#20222a;color:#fff;padding:0 13px;font-size:15px;outline:none}
 input[type=number]:focus{border-color:#62646e}
 .file-size-error{min-height:18px;margin-top:10px;color:#ff9b9b;font-size:13px;line-height:1.45}
-.quality-list,.filter-list{display:flex;flex-direction:column;gap:8px}
+.quality-list{display:flex;flex-direction:column;gap:8px}
 .quality-row{display:flex;align-items:center;gap:12px;min-height:48px;padding:8px 10px;background:#20222a;border-radius:11px}
-.quality-row>input{flex:0 0 auto}
 .quality-name{flex:1;font-size:15px}
 .quality-controls{display:flex;gap:6px}
 .quality-controls button{width:34px;height:34px;border:0;border-radius:9px;background:#2b2d36;color:#ddd;font-size:17px}
-.quality-controls button:active{background:#383a45}
 .quality-controls button:disabled{opacity:.3}
+.filter-list{display:flex;flex-direction:column;gap:8px}
 .filter-row{display:flex;align-items:center;min-height:48px;padding:8px 10px;background:#20222a;border-radius:11px}
 .filter-label{display:flex;align-items:center;gap:12px;margin:0;color:#fff;font-size:15px;cursor:pointer}
 input[type=checkbox]{width:19px;height:19px;accent-color:#fff}
 button.main{width:100%;height:47px;border:0;border-radius:12px;background:#fff;color:#111;font-size:15px;font-weight:650;margin-top:18px}
-button.main:active{opacity:.8}
 button.main:disabled{opacity:.5}
 .result{display:none;margin-top:16px}
 .result.visible{display:block}
@@ -744,14 +914,14 @@ On iOS/iPadOS, if Stremio does not open automatically, copy the manifest URL and
 </div>
 
 <div id="sessionWarning" class="session-warning">
-<strong>Configure session will expire soon</strong>
-<span id="sessionCountdown">5:00</span> remaining. Interact with the page to keep it open.
+<strong>Configure session activity detected</strong>
+<span id="sessionWarningText">The session will expire after the next missed check.</span>
 </div>
 
 <div id="expiredOverlay" class="expired-overlay">
 <div class="expired-box">
 <h2>Configure session expired</h2>
-<p>This Configure session expired after 10 minutes without activity.</p>
+<p>This Configure session expired because there was no activity during two consecutive server checks.</p>
 <p>Open Configure again from Stremio to start a new session.</p>
 </div>
 </div>
@@ -773,21 +943,18 @@ const manifestUrl=document.getElementById("manifestUrl");
 const copyButton=document.getElementById("copy");
 const installButton=document.getElementById("install");
 const sessionWarning=document.getElementById("sessionWarning");
-const sessionCountdown=document.getElementById("sessionCountdown");
+const sessionWarningText=document.getElementById("sessionWarningText");
 const expiredOverlay=document.getElementById("expiredOverlay");
 
-const SESSION_IDLE_MS=5*60*1000;
-const SESSION_WARNING_MS=5*60*1000;
-const ACTIVITY_SYNC_MS=60*1000;
+const CHECK_INTERVAL=150000;
+const ACTIVITY_SYNC_INTERVAL=60000;
 
 let sessionId=null;
-let lastActivity=Date.now();
-let lastServerSync=0;
-let warningTimer=null;
-let inactivityTimer=null;
-let countdownTimer=null;
 let expired=false;
-let syncing=false;
+let lastActivity=Date.now();
+let lastActivitySync=0;
+let activitySyncing=false;
+let checkTimer=null;
 
 function showStatus(message){
   status.textContent=message;
@@ -803,13 +970,6 @@ function invalidateResult(){
   result.classList.remove("visible");
 }
 
-function formatTime(ms){
-  const total=Math.max(0,Math.ceil(ms/1000));
-  const minutes=Math.floor(total/60);
-  const seconds=total%60;
-  return String(minutes)+":"+String(seconds).padStart(2,"0");
-}
-
 function permanentlyExpire(){
   if(expired){
     return;
@@ -817,11 +977,10 @@ function permanentlyExpire(){
 
   expired=true;
 
-  clearTimeout(inactivityTimer);
-  clearTimeout(warningTimer);
-  clearInterval(countdownTimer);
+  clearTimeout(checkTimer);
 
   sessionWarning.classList.remove("visible");
+
   saveButton.disabled=true;
 
   expiredOverlay.classList.add("visible");
@@ -831,90 +990,48 @@ function permanentlyExpire(){
   }catch{}
 }
 
-function startInactivityTimer(){
-  clearTimeout(inactivityTimer);
-
-  if(expired){
-    return;
-  }
-
-  inactivityTimer=setTimeout(
-    startWarning,
-    SESSION_IDLE_MS
-  );
-}
-
-function startWarning(){
-  if(expired){
-    return;
-  }
-
-  sessionWarning.classList.add("visible");
-
-  const warningStarted=Date.now();
-
-  clearInterval(countdownTimer);
-
-  countdownTimer=setInterval(()=>{
-    if(expired){
-      clearInterval(countdownTimer);
-      return;
-    }
-
-    const remaining=
-      SESSION_WARNING_MS-
-      (Date.now()-warningStarted);
-
-    sessionCountdown.textContent=
-      formatTime(remaining);
-
-    if(remaining<=0){
-      clearInterval(countdownTimer);
-      permanentlyExpire();
-    }
-  },1000);
-
-  clearTimeout(warningTimer);
-
-  warningTimer=setTimeout(
-    permanentlyExpire,
-    SESSION_WARNING_MS
-  );
-}
-
-async function syncActivity(force=false){
-  if(!sessionId||expired||syncing){
+async function sendActivity(force=false){
+  if(
+    !sessionId||
+    expired||
+    activitySyncing
+  ){
     return;
   }
 
   const now=Date.now();
 
   if(
-    !force &&
-    now-lastServerSync<ACTIVITY_SYNC_MS
+    !force&&
+    now-lastActivitySync<
+      ACTIVITY_SYNC_INTERVAL
   ){
     return;
   }
 
-  syncing=true;
+  activitySyncing=true;
 
   try{
-    const response=await fetch(
-      window.location.pathname,
-      {
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-          action:"activity",
-          sessionId
-        }),
-        cache:"no-store"
-      }
-    );
+    const response=
+      await fetch(
+        window.location.pathname,
+        {
+          method:"POST",
+          headers:{
+            "Content-Type":
+              "application/json"
+          },
+          body:JSON.stringify({
+            action:"activity",
+            sessionId
+          }),
+          cache:"no-store"
+        }
+      );
 
-    if(response.status===410){
+    if(
+      response.status===410
+    ){
       permanentlyExpire();
       return;
     }
@@ -923,19 +1040,27 @@ async function syncActivity(force=false){
       return;
     }
 
-    const data=await response.json();
+    const data=
+      await response.json();
 
-    if(!data.ok){
-      if(data.state==="expired"){
-        permanentlyExpire();
-      }
+    if(
+      data.state==="expired"
+    ){
+      permanentlyExpire();
       return;
     }
 
-    lastServerSync=Date.now();
+    if(data.ok){
+      lastActivitySync=
+        Date.now();
+
+      sessionWarning.classList.remove(
+        "visible"
+      );
+    }
   }catch{
   }finally{
-    syncing=false;
+    activitySyncing=false;
   }
 }
 
@@ -946,51 +1071,130 @@ function registerActivity(){
 
   lastActivity=Date.now();
 
-  clearTimeout(warningTimer);
-  clearInterval(countdownTimer);
+  sessionWarning.classList.remove(
+    "visible"
+  );
 
-  sessionWarning.classList.remove("visible");
-
-  startInactivityTimer();
-
-  syncActivity(false);
+  sendActivity(false);
 }
 
-async function createSession(){
-  try{
-    const existing=
-      sessionStorage.getItem(
-        "showboxConfigureSession"
-      );
+async function checkServerSession(){
+  if(
+    !sessionId||
+    expired
+  ){
+    return;
+  }
 
-    if(existing){
-      const response=await fetch(
+  try{
+    const response=
+      await fetch(
         window.location.pathname,
         {
           method:"POST",
           headers:{
-            "Content-Type":"application/json"
+            "Content-Type":
+              "application/json"
           },
           body:JSON.stringify({
-            action:"check-session",
-            sessionId:existing
+            action:"check-activity",
+            sessionId
           }),
           cache:"no-store"
         }
       );
 
-      if(response.ok){
-        const data=await response.json();
+    if(
+      response.status===410
+    ){
+      permanentlyExpire();
+      return;
+    }
 
-        if(data.ok){
-          sessionId=existing;
-          lastActivity=Date.now();
-          lastServerSync=Date.now();
-          startInactivityTimer();
+    if(!response.ok){
+      return;
+    }
 
-          if(data.state==="warning"){
-            startWarning();
+    const data=
+      await response.json();
+
+    if(
+      data.state==="expired"
+    ){
+      permanentlyExpire();
+      return;
+    }
+
+    if(
+      data.state==="warning"
+    ){
+      sessionWarning.classList.add(
+        "visible"
+      );
+
+      sessionWarningText.textContent=
+        "No activity was detected during the first check. Interact with the page before the next check to keep this session open.";
+    }else{
+      sessionWarning.classList.remove(
+        "visible"
+      );
+    }
+  }catch{
+  }
+
+  if(!expired){
+    checkTimer=
+      setTimeout(
+        checkServerSession,
+        CHECK_INTERVAL
+      );
+  }
+}
+
+async function createSession(){
+  try{
+    const stored=
+      sessionStorage.getItem(
+        "showboxConfigureSession"
+      );
+
+    if(stored){
+      const response=
+        await fetch(
+          window.location.pathname,
+          {
+            method:"POST",
+            headers:{
+              "Content-Type":
+                "application/json"
+            },
+            body:JSON.stringify({
+              action:"check-session",
+              sessionId:stored
+            }),
+            cache:"no-store"
           }
+        );
+
+      if(response.ok){
+        const data=
+          await response.json();
+
+        if(
+          data.ok&&
+          data.state!=="expired"
+        ){
+          sessionId=stored;
+          lastActivity=
+            Date.now();
+          lastActivitySync=
+            Date.now();
+
+          checkTimer=
+            setTimeout(
+              checkServerSession,
+              CHECK_INTERVAL
+            );
 
           return true;
         }
@@ -1001,41 +1205,56 @@ async function createSession(){
       );
     }
 
-    const response=await fetch(
-      window.location.pathname,
-      {
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-          action:"create-session"
-        }),
-        cache:"no-store"
-      }
-    );
+    const response=
+      await fetch(
+        window.location.pathname,
+        {
+          method:"POST",
+          headers:{
+            "Content-Type":
+              "application/json"
+          },
+          body:JSON.stringify({
+            action:"create-session"
+          }),
+          cache:"no-store"
+        }
+      );
 
     if(!response.ok){
-      throw new Error("Unable to start Configure session");
+      throw new Error(
+        "Unable to start Configure session"
+      );
     }
 
-    const data=await response.json();
+    const data=
+      await response.json();
 
     if(!data.sessionId){
-      throw new Error("Unable to start Configure session");
+      throw new Error(
+        "Unable to start Configure session"
+      );
     }
 
-    sessionId=data.sessionId;
+    sessionId=
+      data.sessionId;
 
     sessionStorage.setItem(
       "showboxConfigureSession",
       sessionId
     );
 
-    lastActivity=Date.now();
-    lastServerSync=Date.now();
+    lastActivity=
+      Date.now();
 
-    startInactivityTimer();
+    lastActivitySync=
+      Date.now();
+
+    checkTimer=
+      setTimeout(
+        checkServerSession,
+        CHECK_INTERVAL
+      );
 
     return true;
   }catch(error){
@@ -1053,129 +1272,209 @@ async function createSession(){
 function renderQualities(){
   qualityList.innerHTML="";
 
-  qualities.forEach((quality,index)=>{
-    const row=document.createElement("div");
-    row.className="quality-row";
+  qualities.forEach(
+    (quality,index)=>{
+      const row=
+        document.createElement(
+          "div"
+        );
 
-    const checkbox=document.createElement("input");
-    checkbox.type="checkbox";
-    checkbox.checked=quality.enabled;
+      row.className=
+        "quality-row";
 
-    checkbox.addEventListener(
-      "change",
-      ()=>{
-        registerActivity();
-        quality.enabled=checkbox.checked;
-        invalidateResult();
-      }
-    );
+      const checkbox=
+        document.createElement(
+          "input"
+        );
 
-    const name=document.createElement("div");
-    name.className="quality-name";
-    name.textContent=quality.name;
+      checkbox.type=
+        "checkbox";
 
-    const controls=document.createElement("div");
-    controls.className="quality-controls";
+      checkbox.checked=
+        quality.enabled;
 
-    const up=document.createElement("button");
-    up.type="button";
-    up.textContent="↑";
-    up.disabled=index===0;
+      checkbox.addEventListener(
+        "change",
+        ()=>{
+          registerActivity();
 
-    up.addEventListener(
-      "click",
-      ()=>{
-        registerActivity();
+          quality.enabled=
+            checkbox.checked;
 
-        if(index===0){
-          return;
+          invalidateResult();
         }
+      );
 
-        const temp=qualities[index-1];
-        qualities[index-1]=qualities[index];
-        qualities[index]=temp;
+      const name=
+        document.createElement(
+          "div"
+        );
 
-        invalidateResult();
-        renderQualities();
-      }
-    );
+      name.className=
+        "quality-name";
 
-    const down=document.createElement("button");
-    down.type="button";
-    down.textContent="↓";
-    down.disabled=
-      index===qualities.length-1;
+      name.textContent=
+        quality.name;
 
-    down.addEventListener(
-      "click",
-      ()=>{
-        registerActivity();
+      const controls=
+        document.createElement(
+          "div"
+        );
 
-        if(index===qualities.length-1){
-          return;
+      controls.className=
+        "quality-controls";
+
+      const up=
+        document.createElement(
+          "button"
+        );
+
+      up.type=
+        "button";
+
+      up.textContent=
+        "↑";
+
+      up.disabled=
+        index===0;
+
+      up.addEventListener(
+        "click",
+        ()=>{
+          registerActivity();
+
+          if(index===0){
+            return;
+          }
+
+          const temp=
+            qualities[index-1];
+
+          qualities[index-1]=
+            qualities[index];
+
+          qualities[index]=
+            temp;
+
+          invalidateResult();
+          renderQualities();
         }
+      );
 
-        const temp=qualities[index+1];
-        qualities[index+1]=qualities[index];
-        qualities[index]=temp;
+      const down=
+        document.createElement(
+          "button"
+        );
 
-        invalidateResult();
-        renderQualities();
-      }
-    );
+      down.type=
+        "button";
 
-    controls.appendChild(up);
-    controls.appendChild(down);
+      down.textContent=
+        "↓";
 
-    row.appendChild(checkbox);
-    row.appendChild(name);
-    row.appendChild(controls);
+      down.disabled=
+        index===
+        qualities.length-1;
 
-    qualityList.appendChild(row);
-  });
+      down.addEventListener(
+        "click",
+        ()=>{
+          registerActivity();
+
+          if(
+            index===
+            qualities.length-1
+          ){
+            return;
+          }
+
+          const temp=
+            qualities[index+1];
+
+          qualities[index+1]=
+            qualities[index];
+
+          qualities[index]=
+            temp;
+
+          invalidateResult();
+          renderQualities();
+        }
+      );
+
+      controls.appendChild(up);
+      controls.appendChild(down);
+
+      row.appendChild(checkbox);
+      row.appendChild(name);
+      row.appendChild(controls);
+
+      qualityList.appendChild(row);
+    }
+  );
 }
 
 function getFileSizeConfig(){
-  const minValue=minSizeInput.value.trim();
-  const maxValue=maxSizeInput.value.trim();
+  const minValue=
+    minSizeInput.value.trim();
+
+  const maxValue=
+    maxSizeInput.value.trim();
 
   return {
-    minGb:minValue===""?null:Number(minValue),
-    maxGb:maxValue===""?null:Number(maxValue)
+    minGb:
+      minValue===""
+        ? null
+        : Number(minValue),
+    maxGb:
+      maxValue===""
+        ? null
+        : Number(maxValue)
   };
 }
 
 function validateFileSizeInputs(){
-  const value=getFileSizeConfig();
+  const value=
+    getFileSizeConfig();
+
   let error="";
 
   if(
-    value.minGb!==null &&
+    minSizeInput.value.trim()!==""&&
     (
-      !Number.isFinite(value.minGb)||
+      !Number.isFinite(
+        value.minGb
+      )||
       value.minGb<0||
       value.minGb>200
     )
   ){
-    error="Minimum size must be between 0 and 200 GB.";
+    error=
+      "Minimum size must be between 0 and 200 GB.";
   }else if(
-    value.maxGb!==null &&
+    maxSizeInput.value.trim()!==""&&
     (
-      !Number.isFinite(value.maxGb)||
+      !Number.isFinite(
+        value.maxGb
+      )||
       value.maxGb<0||
       value.maxGb>200
     )
   ){
-    error="Maximum size must be between 0 and 200 GB.";
+    error=
+      "Maximum size must be between 0 and 200 GB.";
   }else if(
     value.minGb!==null&&
     value.maxGb!==null&&
-    value.minGb>value.maxGb
+    value.minGb>
+      value.maxGb
   ){
-    error="Minimum size cannot be greater than maximum size.";
+    error=
+      "Minimum size cannot be greater than maximum size.";
   }
 
-  fileSizeError.textContent=error;
+  fileSizeError.textContent=
+    error;
 
   if(error){
     invalidateResult();
@@ -1190,7 +1489,6 @@ async function saveConfiguration(){
   hideStatus();
 
   if(!validateFileSizeInputs()){
-    invalidateResult();
     return;
   }
 
@@ -1198,47 +1496,56 @@ async function saveConfiguration(){
     return;
   }
 
-  const currentFileSize=getFileSizeConfig();
-
   saveButton.disabled=true;
-  saveButton.textContent="Saving...";
+  saveButton.textContent=
+    "Saving...";
 
   const config={
-    qualities:qualities.map(item=>({
-      name:item.name,
-      enabled:item.enabled
-    })),
-    fileSize:currentFileSize,
+    qualities:
+      qualities.map(
+        item=>({
+          name:item.name,
+          enabled:item.enabled
+        })
+      ),
+    fileSize:
+      getFileSizeConfig(),
     filters:{
-      cam:camFilter.checked
+      cam:
+        camFilter.checked
     }
   };
 
   try{
-    await syncActivity(true);
+    await sendActivity(true);
 
     if(expired){
       return;
     }
 
-    const response=await fetch(
-      window.location.pathname,
-      {
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-          ...config,
-          sessionId
-        }),
-        cache:"no-store"
-      }
-    );
+    const response=
+      await fetch(
+        window.location.pathname,
+        {
+          method:"POST",
+          headers:{
+            "Content-Type":
+              "application/json"
+          },
+          body:JSON.stringify({
+            ...config,
+            sessionId
+          }),
+          cache:"no-store"
+        }
+      );
 
-    const data=await response.json();
+    const data=
+      await response.json();
 
-    if(response.status===410){
+    if(
+      response.status===410
+    ){
       permanentlyExpire();
       return;
     }
@@ -1256,15 +1563,19 @@ async function saveConfiguration(){
     manifestUrl.textContent=
       data.manifestUrl;
 
-    result.classList.add("visible");
+    result.classList.add(
+      "visible"
+    );
 
     showStatus(
       "Configuration saved."
     );
 
     window.scrollTo({
-      top:document.body.scrollHeight,
-      behavior:"smooth"
+      top:
+        document.body.scrollHeight,
+      behavior:
+        "smooth"
     });
   }catch(error){
     if(!expired){
@@ -1313,22 +1624,30 @@ copyButton.addEventListener(
   async ()=>{
     registerActivity();
 
-    const url=manifestUrl.textContent;
+    const url=
+      manifestUrl.textContent;
 
     if(!url){
       return;
     }
 
     try{
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(
+        url
+      );
 
-      copyButton.textContent="Copied!";
+      copyButton.textContent=
+        "Copied!";
 
-      setTimeout(()=>{
-        if(!expired){
-          copyButton.textContent="Copy";
-        }
-      },1500);
+      setTimeout(
+        ()=>{
+          if(!expired){
+            copyButton.textContent=
+              "Copy";
+          }
+        },
+        1500
+      );
     }catch{
       showStatus(
         "Copy failed. Select the URL manually."
@@ -1342,17 +1661,30 @@ installButton.addEventListener(
   ()=>{
     registerActivity();
 
-    const url=manifestUrl.textContent;
+    const url=
+      manifestUrl.textContent;
 
-    if(!url||expired){
+    if(
+      !url||
+      expired
+    ){
       return;
     }
 
     const stremioUrl=
       "stremio://"+
-      url.replace(/^https?:\/\//,"");
+      url
+        .replace(
+          "https://",
+          ""
+        )
+        .replace(
+          "http://",
+          ""
+        );
 
-    window.location.href=stremioUrl;
+    window.location.href=
+      stremioUrl;
   }
 );
 
@@ -1361,7 +1693,9 @@ document.addEventListener(
   ()=>{
     registerActivity();
   },
-  {passive:true}
+  {
+    passive:true
+  }
 );
 
 document.addEventListener(
@@ -1369,7 +1703,9 @@ document.addEventListener(
   ()=>{
     registerActivity();
   },
-  {passive:true}
+  {
+    passive:true
+  }
 );
 
 document.addEventListener(
@@ -1377,15 +1713,19 @@ document.addEventListener(
   ()=>{
     registerActivity();
   },
-  {passive:true}
+  {
+    passive:true
+  }
 );
 
 if(fileSize.minGb!==null){
-  minSizeInput.value=fileSize.minGb;
+  minSizeInput.value=
+    fileSize.minGb;
 }
 
 if(fileSize.maxGb!==null){
-  maxSizeInput.value=fileSize.maxGb;
+  maxSizeInput.value=
+    fileSize.maxGb;
 }
 
 camFilter.checked=
@@ -1406,5 +1746,7 @@ createSession();
 </html>
 `;
 
-  return htmlResponse(html);
+  return htmlResponse(
+    html
+  );
 }
