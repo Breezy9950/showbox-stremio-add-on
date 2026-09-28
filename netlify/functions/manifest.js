@@ -1540,15 +1540,15 @@ body {
 
 .container {
   width:
-    min(900px, calc(100% - 40px));
+    min(680px, calc(100% - 28px));
 
   margin:
     auto;
 
   padding:
-    clamp(44px, 7vw, 78px)
+    48px
     0
-    clamp(60px, 8vw, 90px);
+    70px;
 }
 
 
@@ -1561,7 +1561,7 @@ h1 {
     0;
 
   font-size:
-    clamp(38px, 6vw, 58px);
+    48px;
 
   line-height:
     1;
@@ -1570,21 +1570,21 @@ h1 {
     750;
 
   letter-spacing:
-    -2px;
+    -1.8px;
 }
 
 .subtitle {
   max-width:
-    620px;
+    520px;
 
   margin:
-    16px 0 0;
+    14px 0 0;
 
   color:
     var(--muted);
 
   font-size:
-    clamp(15px, 2vw, 18px);
+    14px;
 
   line-height:
     1.55;
@@ -1600,15 +1600,13 @@ h1 {
     block;
 
   margin:
-    clamp(34px, 5vw, 48px)
-    0
-    10px;
+    38px 0 9px;
 
   color:
     var(--muted-2);
 
   font-size:
-    clamp(11px, 1.5vw, 13px);
+    11px;
 
   font-weight:
     700;
@@ -1625,10 +1623,10 @@ h1 {
     100%;
 
   height:
-    clamp(54px, 7vw, 64px);
+    54px;
 
   padding:
-    0 18px;
+    0 16px;
 
   border:
     1px solid var(--border-light);
@@ -1646,7 +1644,7 @@ h1 {
     var(--text);
 
   font-size:
-    clamp(15px, 2vw, 17px);
+    14px;
 
   transition:
     border-color .15s ease,
@@ -1671,10 +1669,10 @@ h1 {
     100%;
 
   height:
-    clamp(52px, 6vw, 60px);
+    50px;
 
   margin-top:
-    13px;
+    12px;
 
   padding:
     0 20px;
@@ -1692,7 +1690,7 @@ h1 {
     var(--black);
 
   font-size:
-    clamp(15px, 2vw, 17px);
+    14px;
 
   font-weight:
     700;
@@ -1725,16 +1723,16 @@ h1 {
 
 #checkStatus {
   min-height:
-    20px;
+    18px;
 
   margin-top:
-    11px;
+    10px;
 
   color:
     var(--muted-2);
 
   font-size:
-    clamp(12px, 1.7vw, 14px);
+    12px;
 }
 
 .success {
@@ -1757,7 +1755,7 @@ h1 {
     none;
 
   margin-top:
-    clamp(42px, 6vw, 58px);
+    42px;
 }
 
 
@@ -1774,7 +1772,7 @@ h1 {
     var(--text);
 
   font-size:
-    clamp(30px, 4vw, 38px);
+    29px;
 
   line-height:
     1.15;
@@ -1783,22 +1781,22 @@ h1 {
     700;
 
   letter-spacing:
-    -.9px;
+    -.7px;
 }
 
 .section-description,
 .description {
   margin:
-    8px 0 17px;
+    6px 0 14px;
 
   color:
     var(--muted-2);
 
   font-size:
-    clamp(13px, 1.8vw, 15px);
+    12px;
 
   line-height:
-    1.5;
+    1.45;
 }
 
 
@@ -1808,7 +1806,7 @@ h1 {
 
 .filter-card {
   padding:
-    clamp(15px, 2.5vw, 20px);
+    14px;
 
   border:
     1px solid var(--border);
@@ -1822,13 +1820,13 @@ h1 {
 
 .filter-heading {
   padding:
-    6px 8px 14px;
+    5px 7px 12px;
 
   color:
     var(--muted-2);
 
   font-size:
-    clamp(11px, 1.5vw, 13px);
+    11px;
 
   font-weight:
     700;
@@ -1842,7 +1840,7 @@ h1 {
 
 .filter-option {
   padding:
-    clamp(17px, 2.5vw, 23px);
+    17px;
 
   border:
     1px solid var(--border-light);
@@ -1862,16 +1860,16 @@ h1 {
     center;
 
   gap:
-    10px;
+    9px;
 
   margin:
-    0 0 6px;
+    0 0 5px;
 
   color:
     var(--text);
 
   font-size:
-    clamp(17px, 2.4vw, 20px);
+    17px;
 
   font-weight:
     650;
@@ -1882,10 +1880,10 @@ h1 {
 
 .help-button {
   width:
-    25px;
+    24px;
 
   height:
-    25px;
+    24px;
 
   padding:
     0;
@@ -1920,10 +1918,10 @@ h1 {
     1fr 1fr;
 
   gap:
-    clamp(10px, 2vw, 16px);
+    10px;
 
   margin-top:
-    16px;
+    14px;
 }
 
 .size-field label {
@@ -1931,13 +1929,13 @@ h1 {
     block;
 
   margin:
-    0 0 8px;
+    0 0 7px;
 
   color:
     var(--muted-2);
 
   font-size:
-    clamp(11px, 1.5vw, 13px);
+    11px;
 
   font-weight:
     600;
@@ -1951,10 +1949,10 @@ h1 {
     100%;
 
   height:
-    clamp(50px, 6vw, 58px);
+    52px;
 
   padding:
-    0 15px;
+    0 14px;
 
   border:
     1px solid var(--border-light);
@@ -1972,7 +1970,7 @@ h1 {
     var(--text);
 
   font-size:
-    clamp(14px, 2vw, 16px);
+    14px;
 }
 
 .size-input::placeholder {
@@ -1987,19 +1985,19 @@ h1 {
 
 .filter-error {
   min-height:
-    20px;
+    18px;
 
   margin-top:
-    11px;
+    10px;
 
   padding:
-    0 8px;
+    0 7px;
 
   color:
     var(--error);
 
   font-size:
-    clamp(12px, 1.7vw, 14px);
+    12px;
 
   line-height:
     1.45;
@@ -2012,7 +2010,7 @@ h1 {
 
 .quality-section {
   margin-top:
-    clamp(38px, 6vw, 54px);
+    38px;
 }
 
 .quality-list {
@@ -2023,10 +2021,10 @@ h1 {
     column;
 
   gap:
-    10px;
+    8px;
 
   padding:
-    clamp(8px, 1.5vw, 11px);
+    8px;
 
   border:
     1px solid var(--border);
@@ -2049,10 +2047,10 @@ h1 {
     space-between;
 
   min-height:
-    clamp(62px, 7vw, 74px);
+    62px;
 
   padding:
-    12px 14px 12px 16px;
+    11px 12px 11px 14px;
 
   border-radius:
     var(--radius-md);
@@ -2081,13 +2079,13 @@ h1 {
     center;
 
   gap:
-    13px;
+    12px;
 
   color:
     var(--text);
 
   font-size:
-    clamp(16px, 2.2vw, 18px);
+    15px;
 
   font-weight:
     600;
@@ -2098,10 +2096,10 @@ h1 {
 
 .quality-checkbox {
   width:
-    clamp(20px, 2.7vw, 23px);
+    20px;
 
   height:
-    clamp(20px, 2.7vw, 23px);
+    20px;
 
   margin:
     0;
@@ -2115,15 +2113,15 @@ h1 {
     flex;
 
   gap:
-    7px;
+    6px;
 }
 
 .move-button {
   width:
-    clamp(38px, 5vw, 46px);
+    38px;
 
   height:
-    clamp(38px, 5vw, 46px);
+    36px;
 
   padding:
     0;
@@ -2141,7 +2139,7 @@ h1 {
     var(--text-soft);
 
   font-size:
-    clamp(17px, 2.5vw, 21px);
+    16px;
 
   cursor:
     pointer;
@@ -2172,7 +2170,7 @@ h1 {
 
 .filter-section {
   margin-top:
-    clamp(38px, 6vw, 54px);
+    38px;
 }
 
 .filter-setting-list {
@@ -2183,10 +2181,10 @@ h1 {
     column;
 
   gap:
-    10px;
+    8px;
 
   padding:
-    clamp(8px, 1.5vw, 11px);
+    8px;
 
   border:
     1px solid var(--border);
@@ -2206,10 +2204,10 @@ h1 {
     center;
 
   min-height:
-    clamp(62px, 7vw, 74px);
+    62px;
 
   padding:
-    12px 16px;
+    11px 14px;
 
   border-radius:
     var(--radius-md);
@@ -2229,13 +2227,13 @@ h1 {
     center;
 
   gap:
-    13px;
+    12px;
 
   color:
     var(--text);
 
   font-size:
-    clamp(16px, 2.2vw, 18px);
+    15px;
 
   font-weight:
     600;
@@ -2246,10 +2244,10 @@ h1 {
 
 .filter-setting-checkbox {
   width:
-    clamp(20px, 2.7vw, 23px);
+    20px;
 
   height:
-    clamp(20px, 2.7vw, 23px);
+    20px;
 
   margin:
     0;
@@ -2265,21 +2263,21 @@ h1 {
 
 #result {
   margin-top:
-    clamp(42px, 6vw, 58px);
+    40px;
 }
 
 .result-label {
   display:
     block;
 
-  margin-bottom:
-    10px;
+  margin:
+    0 0 9px;
 
   color:
     var(--muted-2);
 
   font-size:
-    clamp(11px, 1.5vw, 13px);
+    11px;
 
   font-weight:
     700;
@@ -2296,7 +2294,7 @@ h1 {
     flex;
 
   gap:
-    12px;
+    9px;
 }
 
 #manifestUrl {
@@ -2307,10 +2305,10 @@ h1 {
     0;
 
   height:
-    clamp(52px, 6vw, 60px);
+    50px;
 
   padding:
-    0 15px;
+    0 14px;
 
   border:
     1px solid var(--border-light);
@@ -2328,12 +2326,15 @@ h1 {
     var(--text-soft);
 
   font-size:
-    clamp(12px, 1.7vw, 14px);
+    12px;
 }
 
 #copyButton {
   width:
-    clamp(90px, 12vw, 110px);
+    90px;
+
+  height:
+    50px;
 
   border:
     0;
@@ -2348,7 +2349,7 @@ h1 {
     var(--text);
 
   font-size:
-    clamp(13px, 1.8vw, 15px);
+    13px;
 
   font-weight:
     650;
@@ -2376,10 +2377,10 @@ h1 {
     100%;
 
   height:
-    clamp(52px, 6vw, 60px);
+    51px;
 
   margin-top:
-    12px;
+    9px;
 
   border:
     1px solid var(--border-light);
@@ -2394,7 +2395,7 @@ h1 {
     var(--black);
 
   font-size:
-    clamp(14px, 1.9vw, 16px);
+    14px;
 
   font-weight:
     700;
@@ -2423,27 +2424,50 @@ h1 {
 }
 
 .note {
-  margin-top:
-    13px;
+  margin:
+    11px 3px 1px;
 
   color:
     var(--muted-2);
 
   font-size:
-    clamp(12px, 1.7vw, 14px);
+    11px;
 
   line-height:
-    1.55;
-}
-
-.note + .note {
-  margin-top:
-    7px;
+    1.5;
 }
 
 
 /* -------------------------------------------------- */
-/* RESPONSIVE */
+/* TABLET */
+/* -------------------------------------------------- */
+
+@media (min-width: 601px) and (max-width: 1024px) {
+
+  .container {
+    width:
+      min(740px, calc(100% - 40px));
+  }
+
+}
+
+
+/* -------------------------------------------------- */
+/* DESKTOP */
+/* -------------------------------------------------- */
+
+@media (min-width: 1025px) {
+
+  .container {
+    width:
+      min(780px, calc(100% - 48px));
+  }
+
+}
+
+
+/* -------------------------------------------------- */
+/* MOBILE */
 /* -------------------------------------------------- */
 
 @media (max-width: 600px) {
@@ -2453,7 +2477,7 @@ h1 {
       calc(100% - 24px);
 
     padding:
-      36px 0 56px;
+      38px 0 60px;
   }
 
   h1 {
@@ -2472,7 +2496,7 @@ h1 {
   .section-title,
   .configuration-title {
     font-size:
-      28px;
+      27px;
   }
 
   .size-fields {
@@ -2493,9 +2517,6 @@ h1 {
   #copyButton {
     width:
       100%;
-
-    height:
-      50px;
   }
 
 }
