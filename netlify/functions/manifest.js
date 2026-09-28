@@ -1538,17 +1538,22 @@ body {
     antialiased;
 }
 
+
+/* -------------------------------------------------- */
+/* CONTAINER */
+/* -------------------------------------------------- */
+
 .container {
   width:
-    min(680px, calc(100% - 28px));
+    calc(100% - 24px);
 
   margin:
     auto;
 
   padding:
-    48px
+    36px
     0
-    70px;
+    56px;
 }
 
 
@@ -1561,7 +1566,7 @@ h1 {
     0;
 
   font-size:
-    48px;
+    38px;
 
   line-height:
     1;
@@ -1570,7 +1575,7 @@ h1 {
     750;
 
   letter-spacing:
-    -1.8px;
+    -1.5px;
 }
 
 .subtitle {
@@ -1584,7 +1589,7 @@ h1 {
     var(--muted);
 
   font-size:
-    14px;
+    13px;
 
   line-height:
     1.55;
@@ -1600,7 +1605,7 @@ h1 {
     block;
 
   margin:
-    38px 0 9px;
+    32px 0 8px;
 
   color:
     var(--muted-2);
@@ -1623,10 +1628,10 @@ h1 {
     100%;
 
   height:
-    54px;
+    48px;
 
   padding:
-    0 16px;
+    0 14px;
 
   border:
     1px solid var(--border-light);
@@ -1669,13 +1674,13 @@ h1 {
     100%;
 
   height:
-    50px;
+    48px;
 
   margin-top:
-    12px;
+    10px;
 
   padding:
-    0 20px;
+    0 18px;
 
   border:
     0;
@@ -1755,7 +1760,7 @@ h1 {
     none;
 
   margin-top:
-    42px;
+    36px;
 }
 
 
@@ -1772,7 +1777,7 @@ h1 {
     var(--text);
 
   font-size:
-    29px;
+    28px;
 
   line-height:
     1.15;
@@ -1787,7 +1792,7 @@ h1 {
 .section-description,
 .description {
   margin:
-    6px 0 14px;
+    6px 0 12px;
 
   color:
     var(--muted-2);
@@ -1806,7 +1811,7 @@ h1 {
 
 .filter-card {
   padding:
-    14px;
+    10px;
 
   border:
     1px solid var(--border);
@@ -1820,7 +1825,7 @@ h1 {
 
 .filter-heading {
   padding:
-    5px 7px 12px;
+    4px 6px 10px;
 
   color:
     var(--muted-2);
@@ -1840,7 +1845,7 @@ h1 {
 
 .filter-option {
   padding:
-    17px;
+    14px;
 
   border:
     1px solid var(--border-light);
@@ -1860,16 +1865,16 @@ h1 {
     center;
 
   gap:
-    9px;
+    8px;
 
   margin:
-    0 0 5px;
+    0 0 4px;
 
   color:
     var(--text);
 
   font-size:
-    17px;
+    16px;
 
   font-weight:
     650;
@@ -1880,10 +1885,10 @@ h1 {
 
 .help-button {
   width:
-    24px;
+    22px;
 
   height:
-    24px;
+    22px;
 
   padding:
     0;
@@ -1918,10 +1923,10 @@ h1 {
     1fr 1fr;
 
   gap:
-    10px;
+    9px;
 
   margin-top:
-    14px;
+    12px;
 }
 
 .size-field label {
@@ -1929,7 +1934,7 @@ h1 {
     block;
 
   margin:
-    0 0 7px;
+    0 0 6px;
 
   color:
     var(--muted-2);
@@ -1949,10 +1954,10 @@ h1 {
     100%;
 
   height:
-    52px;
+    48px;
 
   padding:
-    0 14px;
+    0 13px;
 
   border:
     1px solid var(--border-light);
@@ -1988,10 +1993,10 @@ h1 {
     18px;
 
   margin-top:
-    10px;
+    9px;
 
   padding:
-    0 7px;
+    0 6px;
 
   color:
     var(--error);
@@ -2010,7 +2015,7 @@ h1 {
 
 .quality-section {
   margin-top:
-    38px;
+    34px;
 }
 
 .quality-list {
@@ -2021,10 +2026,10 @@ h1 {
     column;
 
   gap:
-    8px;
+    7px;
 
   padding:
-    8px;
+    7px;
 
   border:
     1px solid var(--border);
@@ -2047,10 +2052,10 @@ h1 {
     space-between;
 
   min-height:
-    62px;
+    54px;
 
   padding:
-    11px 12px 11px 14px;
+    9px 10px 9px 12px;
 
   border-radius:
     var(--radius-md);
@@ -2079,13 +2084,13 @@ h1 {
     center;
 
   gap:
-    12px;
+    10px;
 
   color:
     var(--text);
 
   font-size:
-    15px;
+    14px;
 
   font-weight:
     600;
@@ -2096,10 +2101,10 @@ h1 {
 
 .quality-checkbox {
   width:
-    20px;
+    18px;
 
   height:
-    20px;
+    18px;
 
   margin:
     0;
@@ -2113,15 +2118,15 @@ h1 {
     flex;
 
   gap:
-    6px;
+    5px;
 }
 
 .move-button {
   width:
-    38px;
+    34px;
 
   height:
-    36px;
+    34px;
 
   padding:
     0;
@@ -2139,7 +2144,7 @@ h1 {
     var(--text-soft);
 
   font-size:
-    16px;
+    15px;
 
   cursor:
     pointer;
@@ -2170,7 +2175,7 @@ h1 {
 
 .filter-section {
   margin-top:
-    38px;
+    34px;
 }
 
 .filter-setting-list {
@@ -2181,10 +2186,10 @@ h1 {
     column;
 
   gap:
-    8px;
+    7px;
 
   padding:
-    8px;
+    7px;
 
   border:
     1px solid var(--border);
@@ -2204,10 +2209,10 @@ h1 {
     center;
 
   min-height:
-    62px;
+    54px;
 
   padding:
-    11px 14px;
+    9px 12px;
 
   border-radius:
     var(--radius-md);
@@ -2227,13 +2232,13 @@ h1 {
     center;
 
   gap:
-    12px;
+    10px;
 
   color:
     var(--text);
 
   font-size:
-    15px;
+    14px;
 
   font-weight:
     600;
@@ -2244,10 +2249,10 @@ h1 {
 
 .filter-setting-checkbox {
   width:
-    20px;
+    18px;
 
   height:
-    20px;
+    18px;
 
   margin:
     0;
@@ -2263,7 +2268,7 @@ h1 {
 
 #result {
   margin-top:
-    40px;
+    36px;
 }
 
 .result-label {
@@ -2271,7 +2276,7 @@ h1 {
     block;
 
   margin:
-    0 0 9px;
+    0 0 8px;
 
   color:
     var(--muted-2);
@@ -2293,8 +2298,11 @@ h1 {
   display:
     flex;
 
+  flex-direction:
+    column;
+
   gap:
-    9px;
+    8px;
 }
 
 #manifestUrl {
@@ -2304,11 +2312,14 @@ h1 {
   min-width:
     0;
 
+  width:
+    100%;
+
   height:
-    50px;
+    48px;
 
   padding:
-    0 14px;
+    0 13px;
 
   border:
     1px solid var(--border-light);
@@ -2331,7 +2342,7 @@ h1 {
 
 #copyButton {
   width:
-    90px;
+    100%;
 
   height:
     50px;
@@ -2377,10 +2388,10 @@ h1 {
     100%;
 
   height:
-    51px;
+    50px;
 
   margin-top:
-    9px;
+    8px;
 
   border:
     1px solid var(--border-light);
@@ -2425,7 +2436,7 @@ h1 {
 
 .note {
   margin:
-    11px 3px 1px;
+    10px 3px 1px;
 
   color:
     var(--muted-2);
@@ -2447,6 +2458,225 @@ h1 {
   .container {
     width:
       min(740px, calc(100% - 40px));
+
+    padding:
+      48px 0 70px;
+  }
+
+  h1 {
+    font-size:
+      48px;
+
+    letter-spacing:
+      -1.8px;
+  }
+
+  .subtitle {
+    font-size:
+      14px;
+  }
+
+  .title {
+    margin:
+      38px 0 9px;
+  }
+
+  #tokenInput {
+    height:
+      54px;
+
+    padding:
+      0 16px;
+  }
+
+  #generateButton {
+    height:
+      50px;
+
+    margin-top:
+      12px;
+
+    padding:
+      0 20px;
+  }
+
+  #configuration {
+    margin-top:
+      42px;
+  }
+
+  .section-title,
+  .configuration-title {
+    font-size:
+      29px;
+  }
+
+  .section-description,
+  .description {
+    margin:
+      6px 0 14px;
+  }
+
+  .filter-card {
+    padding:
+      14px;
+  }
+
+  .filter-heading {
+    padding:
+      5px 7px 12px;
+  }
+
+  .filter-option {
+    padding:
+      17px;
+  }
+
+  .filter-option-title {
+    font-size:
+      17px;
+
+    gap:
+      9px;
+  }
+
+  .help-button {
+    width:
+      24px;
+
+    height:
+      24px;
+  }
+
+  .size-fields {
+    gap:
+      10px;
+
+    margin-top:
+      14px;
+  }
+
+  .size-field label {
+    margin:
+      0 0 7px;
+  }
+
+  .size-input {
+    height:
+      52px;
+
+    padding:
+      0 14px;
+  }
+
+  .filter-error {
+    margin-top:
+      10px;
+
+    padding:
+      0 7px;
+  }
+
+  .quality-section,
+  .filter-section {
+    margin-top:
+      38px;
+  }
+
+  .quality-list,
+  .filter-setting-list {
+    gap:
+      8px;
+
+    padding:
+      8px;
+  }
+
+  .quality-row,
+  .filter-setting-row {
+    min-height:
+      62px;
+  }
+
+  .quality-row {
+    padding:
+      11px 12px 11px 14px;
+  }
+
+  .quality-name,
+  .filter-setting-name {
+    gap:
+      12px;
+
+    font-size:
+      15px;
+  }
+
+  .quality-checkbox,
+  .filter-setting-checkbox {
+    width:
+      20px;
+
+    height:
+      20px;
+  }
+
+  .move-buttons {
+    gap:
+      6px;
+  }
+
+  .move-button {
+    width:
+      38px;
+
+    height:
+      36px;
+
+    font-size:
+      16px;
+  }
+
+  #result {
+    margin-top:
+      40px;
+  }
+
+  .result-row {
+    flex-direction:
+      row;
+
+    gap:
+      9px;
+  }
+
+  #manifestUrl {
+    height:
+      50px;
+
+    padding:
+      0 14px;
+  }
+
+  #copyButton {
+    width:
+      90px;
+
+    height:
+      50px;
+  }
+
+  #installButton {
+    height:
+      51px;
+
+    margin-top:
+      9px;
+  }
+
+  .note {
+    margin:
+      11px 3px 1px;
   }
 
 }
@@ -2461,62 +2691,225 @@ h1 {
   .container {
     width:
       min(780px, calc(100% - 48px));
-  }
-
-}
-
-
-/* -------------------------------------------------- */
-/* MOBILE */
-/* -------------------------------------------------- */
-
-@media (max-width: 600px) {
-
-  .container {
-    width:
-      calc(100% - 28px);
 
     padding:
-      36px 0 56px;
+      48px 0 70px;
   }
 
   h1 {
     font-size:
-      38px;
+      48px;
 
     letter-spacing:
-      -1.5px;
+      -1.8px;
   }
 
   .subtitle {
     font-size:
-      13px;
+      14px;
+  }
+
+  .title {
+    margin:
+      38px 0 9px;
+  }
+
+  #tokenInput {
+    height:
+      54px;
+
+    padding:
+      0 16px;
+  }
+
+  #generateButton {
+    height:
+      50px;
+
+    margin-top:
+      12px;
+
+    padding:
+      0 20px;
+  }
+
+  #configuration {
+    margin-top:
+      42px;
   }
 
   .section-title,
   .configuration-title {
     font-size:
-      27px;
+      29px;
   }
 
-  .size-fields {
+  .section-description,
+  .description {
+    margin:
+      6px 0 14px;
+  }
+
+  .filter-card {
+    padding:
+      14px;
+  }
+
+  .filter-heading {
+    padding:
+      5px 7px 12px;
+  }
+
+  .filter-option {
+    padding:
+      17px;
+  }
+
+  .filter-option-title {
+    font-size:
+      17px;
+
     gap:
       9px;
   }
 
-  .size-input {
-    font-size:
+  .help-button {
+    width:
+      24px;
+
+    height:
+      24px;
+  }
+
+  .size-fields {
+    gap:
+      10px;
+
+    margin-top:
       14px;
+  }
+
+  .size-field label {
+    margin:
+      0 0 7px;
+  }
+
+  .size-input {
+    height:
+      52px;
+
+    padding:
+      0 14px;
+  }
+
+  .filter-error {
+    margin-top:
+      10px;
+
+    padding:
+      0 7px;
+  }
+
+  .quality-section,
+  .filter-section {
+    margin-top:
+      38px;
+  }
+
+  .quality-list,
+  .filter-setting-list {
+    gap:
+      8px;
+
+    padding:
+      8px;
+  }
+
+  .quality-row,
+  .filter-setting-row {
+    min-height:
+      62px;
+  }
+
+  .quality-row {
+    padding:
+      11px 12px 11px 14px;
+  }
+
+  .quality-name,
+  .filter-setting-name {
+    gap:
+      12px;
+
+    font-size:
+      15px;
+  }
+
+  .quality-checkbox,
+  .filter-setting-checkbox {
+    width:
+      20px;
+
+    height:
+      20px;
+  }
+
+  .move-buttons {
+    gap:
+      6px;
+  }
+
+  .move-button {
+    width:
+      38px;
+
+    height:
+      36px;
+
+    font-size:
+      16px;
+  }
+
+  #result {
+    margin-top:
+      40px;
   }
 
   .result-row {
     flex-direction:
-      column;
+      row;
+
+    gap:
+      9px;
+  }
+
+  #manifestUrl {
+    height:
+      50px;
+
+    padding:
+      0 14px;
   }
 
   #copyButton {
     width:
-      100%;
+      90px;
+
+    height:
+      50px;
+  }
+
+  #installButton {
+    height:
+      51px;
+
+    margin-top:
+      9px;
+  }
+
+  .note {
+    margin:
+      11px 3px 1px;
   }
 
 }
