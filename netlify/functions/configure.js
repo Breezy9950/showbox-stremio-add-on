@@ -21,6 +21,13 @@ const DEFAULT_FILTERS = {
 };
 
 
+const MAX_CONFIG_BODY_BYTES = 16 * 1024;
+
+const MAX_QUALITY_ITEMS = 20;
+
+const MAX_FILE_SIZE_GB = 200;
+
+
 function decodeConfig(value) {
   try {
     if (!value) return {};
@@ -207,6 +214,111 @@ function normalizeFileSize(fileSize) {
         ? max
         : null
 
+  };
+}
+
+
+function validateFileSize(fileSize) {
+
+  if (
+    !fileSize ||
+    typeof fileSize !== "object"
+  ) {
+
+    return {
+      minGb: null,
+      maxGb: null
+    };
+
+  }
+
+
+  const min =
+    fileSize.minGb === null ||
+    fileSize.minGb === undefined ||
+    fileSize.minGb === ""
+      ? null
+      : Number(fileSize.minGb);
+
+
+  const max =
+    fileSize.maxGb === null ||
+    fileSize.maxGb === undefined ||
+    fileSize.maxGb === ""
+      ? null
+      : Number(fileSize.maxGb);
+
+
+  if (
+    min !== null &&
+    !Number.isFinite(min)
+  ) {
+
+    throw new Error(
+      "Invalid minimum file size"
+    );
+
+  }
+
+
+  if (
+    max !== null &&
+    !Number.isFinite(max)
+  ) {
+
+    throw new Error(
+      "Invalid maximum file size"
+    );
+
+  }
+
+
+  if (
+    min !== null &&
+    (
+      min < 0 ||
+      min > MAX_FILE_SIZE_GB
+    )
+  ) {
+
+    throw new Error(
+      "Minimum file size must be between 0 and 200 GB"
+    );
+
+  }
+
+
+  if (
+    max !== null &&
+    (
+      max < 0 ||
+      max > MAX_FILE_SIZE_GB
+    )
+  ) {
+
+    throw new Error(
+      "Maximum file size must be between 0 and 200 GB"
+    );
+
+  }
+
+
+  if (
+    min !== null &&
+    max !== null &&
+    min > max
+  ) {
+
+    throw new Error(
+      "Minimum size cannot be greater than maximum size"
+    );
+
+  }
+
+
+  return {
+    minGb: min,
+    maxGb: max
   };
 }
 
@@ -419,7 +531,16 @@ an existing addon configuration.
 
         headers: {
           "Content-Type":
-            "text/html; charset=utf-8"
+            "text/html; charset=utf-8",
+
+          "X-Content-Type-Options":
+            "nosniff",
+
+          "Referrer-Policy":
+            "no-referrer",
+
+          "Cache-Control":
+            "no-store"
         }
       }
     );
@@ -467,8 +588,78 @@ an existing addon configuration.
 
     try {
 
+      /*
+       * Read the request as text first so we
+       * can enforce a hard application-level
+       * body-size limit before JSON parsing.
+       */
+
+      const requestBody =
+        await request.text();
+
+
+      if (
+        new TextEncoder().encode(
+          requestBody
+        ).length >
+        MAX_CONFIG_BODY_BYTES
+      ) {
+
+        return new Response(
+          JSON.stringify({
+            error:
+              "Configuration request is too large"
+          }),
+          {
+            status: 413,
+
+            headers: {
+              "Content-Type":
+                "application/json; charset=utf-8",
+
+              "Cache-Control":
+                "no-store",
+
+              "X-Content-Type-Options":
+                "nosniff",
+
+              "Referrer-Policy":
+                "no-referrer"
+            }
+          }
+        );
+
+      }
+
+
       const body =
-        await request.json();
+        JSON.parse(requestBody);
+
+
+      if (
+        !body ||
+        typeof body !== "object" ||
+        Array.isArray(body)
+      ) {
+
+        throw new Error(
+          "Invalid configuration"
+        );
+
+      }
+
+
+      if (
+        Array.isArray(body.qualities) &&
+        body.qualities.length >
+          MAX_QUALITY_ITEMS
+      ) {
+
+        throw new Error(
+          "Too many quality entries"
+        );
+
+      }
 
 
       const newQualities =
@@ -477,45 +668,16 @@ an existing addon configuration.
         );
 
 
-      const minGb =
-        body.fileSize?.minGb === null ||
-        body.fileSize?.minGb === undefined ||
-        body.fileSize?.minGb === ""
-          ? null
-          : Number(
-              body.fileSize.minGb
-            );
-
-
-      const maxGb =
-        body.fileSize?.maxGb === null ||
-        body.fileSize?.maxGb === undefined ||
-        body.fileSize?.maxGb === ""
-          ? null
-          : Number(
-              body.fileSize.maxGb
-            );
+      const newFileSize =
+        validateFileSize(
+          body.fileSize
+        );
 
 
       const newFilters =
         normalizeFilters(
           body.filters
         );
-
-
-      const newFileSize = {
-
-        minGb:
-          Number.isFinite(minGb)
-            ? minGb
-            : null,
-
-        maxGb:
-          Number.isFinite(maxGb)
-            ? maxGb
-            : null
-
-      };
 
 
       /*
@@ -605,7 +767,13 @@ an existing addon configuration.
               "application/json; charset=utf-8",
 
             "Cache-Control":
-              "no-store"
+              "no-store",
+
+            "X-Content-Type-Options":
+              "nosniff",
+
+            "Referrer-Policy":
+              "no-referrer"
 
           }
         }
@@ -623,14 +791,33 @@ an existing addon configuration.
       return new Response(
         JSON.stringify({
           error:
-            "Invalid configuration"
+            error.message ===
+              "Configuration request is too large"
+              ? error.message
+              : error.message ||
+                "Invalid configuration"
         }),
         {
-          status: 400,
+          status:
+            error.message ===
+              "Configuration request is too large"
+              ? 413
+              : 400,
 
           headers: {
+
             "Content-Type":
-              "application/json; charset=utf-8"
+              "application/json; charset=utf-8",
+
+            "Cache-Control":
+              "no-store",
+
+            "X-Content-Type-Options":
+              "nosniff",
+
+            "Referrer-Policy":
+              "no-referrer"
+
           }
         }
       );
@@ -1122,6 +1309,7 @@ Minimum (GB)
   id="minSize"
   type="number"
   min="0"
+  max="200"
   step="0.1"
   placeholder="No minimum"
 >
@@ -1139,6 +1327,7 @@ Maximum (GB)
   id="maxSize"
   type="number"
   min="0"
+  max="200"
   step="0.1"
   placeholder="No maximum"
 >
@@ -1562,6 +1751,40 @@ async function saveConfiguration() {
 
   if (
     fileSize.minGb !== null &&
+    (
+      !Number.isFinite(fileSize.minGb) ||
+      fileSize.minGb < 0 ||
+      fileSize.minGb > 200
+    )
+  ) {
+
+    showStatus(
+      "Minimum size must be between 0 and 200 GB."
+    );
+
+    return;
+  }
+
+
+  if (
+    fileSize.maxGb !== null &&
+    (
+      !Number.isFinite(fileSize.maxGb) ||
+      fileSize.maxGb < 0 ||
+      fileSize.maxGb > 200
+    )
+  ) {
+
+    showStatus(
+      "Maximum size must be between 0 and 200 GB."
+    );
+
+    return;
+  }
+
+
+  if (
+    fileSize.minGb !== null &&
     fileSize.maxGb !== null &&
     fileSize.minGb >
       fileSize.maxGb
@@ -1813,7 +2036,14 @@ saveButton.addEventListener(
           "text/html; charset=utf-8",
 
         "Cache-Control":
-          "no-store"
+          "no-store",
+
+        "X-Content-Type-Options":
+          "nosniff",
+
+        "Referrer-Policy":
+          "no-referrer"
+
       }
     }
   );
