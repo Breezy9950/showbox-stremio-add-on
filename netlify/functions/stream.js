@@ -6,7 +6,7 @@ import {
 
 
 const FETCH_TIMEOUT_MS =
-  30_000;
+  10_000;
 
 const MAX_FILE_SIZE_GB =
   200;
