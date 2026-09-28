@@ -327,6 +327,11 @@ function homepageScript() {
       filters: getFilterConfig()
     };
 
+    console.log(
+  "[ShowBox] Homepage config being sent:",
+  JSON.stringify(config)
+);
+
     generateButton.disabled = true;
     generateButton.textContent = "Generating...";
     checkStatus.textContent = "";
@@ -557,6 +562,15 @@ export default async (request, context) => {
         );
       }
 
+      console.log(
+  "[ShowBox] Homepage config received:",
+  JSON.stringify({
+    qualities: body?.qualities,
+    filters: body?.filters,
+    fileSize: body?.fileSize
+  })
+);
+      
       if (
         !body ||
         typeof body !== "object" ||
