@@ -1,6 +1,7 @@
 {
   "type": "module",
-  "dependencies": {    
+  "dependencies": {
+    "crypto-js": "^4.2.0"
     "@netlify/blobs": "^10.0.0"
   }
 }
