@@ -2299,27 +2299,33 @@ h1 {
     flex;
 
   flex-direction:
-    column;
+    row;
+
+  align-items:
+    stretch;
 
   gap:
     8px;
+
+  width:
+    100%;
 }
 
 #manifestUrl {
   flex:
-    1;
+    1 1 auto;
 
   min-width:
     0;
 
   width:
-    100%;
+    0;
 
   height:
-    48px;
+    50px;
 
   padding:
-    0 13px;
+    0 12px;
 
   border:
     1px solid var(--border-light);
@@ -2337,12 +2343,15 @@ h1 {
     var(--text-soft);
 
   font-size:
-    12px;
+    11px;
 }
 
 #copyButton {
+  flex:
+    0 0 72px;
+
   width:
-    100%;
+    72px;
 
   height:
     50px;
@@ -2360,7 +2369,7 @@ h1 {
     var(--text);
 
   font-size:
-    13px;
+    12px;
 
   font-weight:
     650;
@@ -2659,6 +2668,9 @@ h1 {
   }
 
   #copyButton {
+    flex:
+      0 0 90px;
+
     width:
       90px;
 
@@ -2892,6 +2904,9 @@ h1 {
   }
 
   #copyButton {
+    flex:
+      0 0 90px;
+
     width:
       90px;
 
