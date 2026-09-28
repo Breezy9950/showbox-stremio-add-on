@@ -2477,7 +2477,7 @@ h1 {
       calc(100% - 28px);
 
     padding:
-      38px 0 60px;
+      36px 0 56px;
   }
 
   h1 {
