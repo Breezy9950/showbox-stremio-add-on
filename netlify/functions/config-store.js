@@ -1,221 +1,200 @@
-import { getStore } from "@netlify/blobs";
+import {getStore} from "@netlify/blobs";
 
-const CONFIG_STORE = "showbox-configs";
-const CONFIGURE_SESSION_STORE = "showbox-configure-sessions";
-const CHECK_INTERVAL_MS = 150 * 1000;
+const CONFIG_STORE="showbox-configs";
+const HOMEPAGE_SESSION_STORE="showbox-homepage-sessions";
+const CONFIGURE_SESSION_STORE="showbox-configure-sessions";
 
-function getConfigStore() {
+const HOMEPAGE_SESSION_TTL_MS=60*60*1000;
+const CONFIGURE_SESSION_TTL_MS=5*60*1000;
+
+function getStoreByName(name){
   return getStore({
-    name: CONFIG_STORE,
-    consistency: "strong"
+    name,
+    consistency:"strong"
   });
 }
 
-function getConfigureSessionStore() {
-  return getStore({
-    name: CONFIGURE_SESSION_STORE,
-    consistency: "strong"
-  });
+function validId(id){
+  return typeof id==="string"&&/^[a-f0-9]{32}$/i.test(id);
 }
 
-function validId(id) {
-  return typeof id === "string" && /^[a-f0-9]{32}$/i.test(id);
+function createId(){
+  return crypto.randomUUID().replace(/-/g,"");
 }
 
-export async function createConfig(config) {
-  const store = getConfigStore();
-  const id = crypto.randomUUID().replace(/-/g, "");
+export async function createConfig(config){
+  const store=getStoreByName(CONFIG_STORE);
+  const id=createId();
 
-  await store.setJSON(id, config, {
-    onlyIfNew: true
+  await store.setJSON(id,config,{
+    onlyIfNew:true
   });
 
   return id;
 }
 
-export async function getConfig(id) {
-  if (!validId(id)) {
+export async function getConfig(id){
+  if(!validId(id)){
     return null;
   }
 
-  const store = getConfigStore();
+  const store=getStoreByName(CONFIG_STORE);
 
-  return await store.get(id, {
-    type: "json",
-    consistency: "strong"
+  return await store.get(id,{
+    type:"json",
+    consistency:"strong"
   });
 }
 
-export async function saveConfig(id, config) {
-  if (!validId(id)) {
+export async function saveConfig(id,config){
+  if(!validId(id)){
     throw new Error("Invalid configuration ID");
   }
 
-  const store = getConfigStore();
+  const store=getStoreByName(CONFIG_STORE);
 
-  await store.setJSON(id, config);
+  await store.setJSON(id,config);
 }
 
-export async function createConfigureSession() {
-  const store = getConfigureSessionStore();
-  const id = crypto.randomUUID().replace(/-/g, "");
-  const now = Date.now();
+async function createSession(storeName,ttlMs,data={}){
+  const store=getStoreByName(storeName);
+  const id=createId();
+  const createdAt=Date.now();
+  const expiresAt=createdAt+ttlMs;
 
   await store.setJSON(
     id,
     {
-      createdAt: now,
-      lastActivityAt: now,
-      missedChecks: 0,
-      state: "active"
+      ...data,
+      createdAt,
+      expiresAt,
+      state:"active"
     },
     {
-      onlyIfNew: true
+      onlyIfNew:true
     }
   );
 
   return {
     id,
-    createdAt: now
+    createdAt,
+    expiresAt
   };
 }
 
-export async function getConfigureSession(id) {
-  if (!validId(id)) {
+async function getActiveSession(storeName,id){
+  if(!validId(id)){
     return null;
   }
 
-  const store = getConfigureSessionStore();
+  const store=getStoreByName(storeName);
 
-  return await store.get(id, {
-    type: "json",
-    consistency: "strong"
+  const session=await store.get(id,{
+    type:"json",
+    consistency:"strong"
+  });
+
+  if(!session||typeof session!=="object"){
+    return null;
+  }
+
+  const expiresAt=Number(session.expiresAt);
+
+  if(!Number.isFinite(expiresAt)){
+    return null;
+  }
+
+  if(Date.now()>=expiresAt){
+    if(session.state!=="expired"){
+      await store.setJSON(id,{
+        ...session,
+        state:"expired",
+        expiredAt:Date.now()
+      });
+    }
+
+    return null;
+  }
+
+  if(session.state==="expired"){
+    return null;
+  }
+
+  return session;
+}
+
+export async function createHomepageSession(){
+  return await createSession(
+    HOMEPAGE_SESSION_STORE,
+    HOMEPAGE_SESSION_TTL_MS
+  );
+}
+
+export async function getHomepageSession(id){
+  return await getActiveSession(
+    HOMEPAGE_SESSION_STORE,
+    id
+  );
+}
+
+export async function setHomepageSessionToken(id,uiToken){
+  if(typeof uiToken!=="string"||!uiToken){
+    throw new Error(
+      "ShowBox UI token is required"
+    );
+  }
+
+  const store=getStoreByName(
+    HOMEPAGE_SESSION_STORE
+  );
+
+  const session=await getActiveSession(
+    HOMEPAGE_SESSION_STORE,
+    id
+  );
+
+  if(!session){
+    throw new Error(
+      "Configuration session is invalid or expired"
+    );
+  }
+
+  await store.setJSON(id,{
+    ...session,
+    uiToken
   });
 }
 
-export async function recordConfigureActivity(id) {
-  if (!validId(id)) {
-    return {
-      ok: false,
-      state: "invalid"
-    };
-  }
-
-  const store = getConfigureSessionStore();
-
-  const session = await store.get(id, {
-    type: "json",
-    consistency: "strong"
-  });
-
-  if (!session || typeof session !== "object") {
-    return {
-      ok: false,
-      state: "invalid"
-    };
-  }
-
-  if (session.state === "expired") {
-    return {
-      ok: false,
-      state: "expired"
-    };
-  }
-
-  const now = Date.now();
-
-  await store.setJSON(id, {
-    ...session,
-    lastActivityAt: now,
-    missedChecks: 0,
-    state: "active"
-  });
-
-  return {
-    ok: true,
-    state: "active",
-    lastActivityAt: now
-  };
+export async function createConfigureSession(){
+  return await createSession(
+    CONFIGURE_SESSION_STORE,
+    CONFIGURE_SESSION_TTL_MS
+  );
 }
 
-export async function checkConfigureSession(id) {
-  if (!validId(id)) {
+export async function getConfigureSession(id){
+  return await getActiveSession(
+    CONFIGURE_SESSION_STORE,
+    id
+  );
+}
+
+export async function checkConfigureSession(id){
+  const session=await getActiveSession(
+    CONFIGURE_SESSION_STORE,
+    id
+  );
+
+  if(!session){
     return {
-      ok: false,
-      state: "invalid"
+      ok:false,
+      state:"expired"
     };
   }
-
-  const store = getConfigureSessionStore();
-
-  const session = await store.get(id, {
-    type: "json",
-    consistency: "strong"
-  });
-
-  if (!session || typeof session !== "object") {
-    return {
-      ok: false,
-      state: "invalid"
-    };
-  }
-
-  if (session.state === "expired") {
-    return {
-      ok: false,
-      state: "expired"
-    };
-  }
-
-  const now = Date.now();
-  const lastActivityAt = Number(session.lastActivityAt);
-
-  if (!Number.isFinite(lastActivityAt)) {
-    return {
-      ok: false,
-      state: "invalid"
-    };
-  }
-
-  const elapsed = now - lastActivityAt;
-
-  if (elapsed < CHECK_INTERVAL_MS) {
-    return {
-      ok: true,
-      state: "active",
-      missedChecks: 0
-    };
-  }
-
-  const missedChecks =
-    Number(session.missedChecks) || 0;
-
-  const nextMissedChecks =
-    missedChecks + 1;
-
-  if (nextMissedChecks >= 2) {
-    await store.setJSON(id, {
-      ...session,
-      missedChecks: nextMissedChecks,
-      state: "expired",
-      expiredAt: now
-    });
-
-    return {
-      ok: false,
-      state: "expired"
-    };
-  }
-
-  await store.setJSON(id, {
-    ...session,
-    missedChecks: nextMissedChecks,
-    state: "warning"
-  });
 
   return {
-    ok: true,
-    state: "warning",
-    missedChecks: nextMissedChecks
+    ok:true,
+    state:"active",
+    expiresAt:Number(session.expiresAt)
   };
 }
