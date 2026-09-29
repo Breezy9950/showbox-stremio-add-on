@@ -56,13 +56,10 @@ function jsonResponse(
       headers:{
         "Content-Type":
           "application/json; charset=utf-8",
-
         "Cache-Control":
           "no-store",
-
         "X-Content-Type-Options":
           "nosniff",
-
         "Referrer-Policy":
           "no-referrer"
       }
@@ -346,13 +343,79 @@ function expiredResponse(){
       headers:{
         "Content-Type":
           "text/plain; charset=utf-8",
-
         "Cache-Control":
           "no-store",
-
         "X-Content-Type-Options":
           "nosniff",
+        "Referrer-Policy":
+          "no-referrer"
+      }
+    }
+  );
+}
 
+function invalidConfigResponse(){
+  return new Response(
+    `
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1"
+>
+<title>ShowBox</title>
+<style>
+*{
+  box-sizing:border-box;
+}
+body{
+  margin:0;
+  padding:32px 16px;
+  background:#0d0e11;
+  color:#f1f1f3;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+.card{
+  width:min(560px,100%);
+  margin:auto;
+  padding:28px;
+  border-radius:18px;
+  background:#17181d;
+}
+p{
+  color:#aaa;
+  line-height:1.5;
+}
+</style>
+</head>
+<body>
+<div class="card">
+<h2>
+Invalid configuration
+</h2>
+<p>
+This Configure page must be opened using
+an existing addon configuration.
+</p>
+</div>
+</body>
+</html>
+`,
+    {
+      status:400,
+      headers:{
+        "Content-Type":
+          "text/html; charset=utf-8",
+        "Cache-Control":
+          "no-store",
+        "X-Content-Type-Options":
+          "nosniff",
         "Referrer-Policy":
           "no-referrer"
       }
@@ -379,95 +442,7 @@ export default async function handler(
     );
 
   if(!configData){
-    return new Response(
-      `
-<!doctype html>
-
-<html lang="en">
-
-<head>
-
-<meta charset="UTF-8">
-
-<meta
-  name="viewport"
-  content="width=device-width,initial-scale=1"
->
-
-<title>ShowBox</title>
-
-<style>
-
-*{
-  box-sizing:border-box;
-}
-
-body{
-  margin:0;
-  padding:32px 16px;
-  background:#0d0e11;
-  color:#f1f1f3;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-}
-
-.card{
-  width:min(560px,100%);
-  margin:auto;
-  padding:28px;
-  border-radius:18px;
-  background:#17181d;
-}
-
-p{
-  color:#aaa;
-  line-height:1.5;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<div class="card">
-
-<h2>
-Invalid configuration
-</h2>
-
-<p>
-This Configure page must be opened using
-an existing addon configuration.
-</p>
-
-</div>
-
-</body>
-
-</html>
-`,
-      {
-        status:400,
-
-        headers:{
-          "Content-Type":
-            "text/html; charset=utf-8",
-
-          "Cache-Control":
-            "no-store",
-
-          "X-Content-Type-Options":
-            "nosniff",
-
-          "Referrer-Policy":
-            "no-referrer"
-        }
-      }
-    );
+    return invalidConfigResponse();
   }
 
   const configId=
@@ -476,43 +451,21 @@ an existing addon configuration.
   const existingConfig=
     configData.config;
 
-  let sessionId=
-    url.searchParams.get(
-      "session"
-    );
-
-  let session;
-
+  /*
+   * GET:
+   *
+   * Create one temporary session and
+   * render the page immediately.
+   *
+   * POST:
+   *
+   * Read sessionId from the JSON body.
+   * The session is therefore NOT required
+   * to be present in the URL.
+   */
   if(
-    request.method==="GET"&&
-    !sessionId
+    request.method==="POST"
   ){
-    /*
-     * Create the temporary session and
-     * render immediately.
-     *
-     * No redirect and no second session
-     * lookup are needed.
-     */
-    session=
-      await createConfigureSession();
-
-    sessionId=
-      session.id;
-  }
-
-  else{
-    session=
-      await getConfigureSession(
-        sessionId
-      );
-
-    if(!session){
-      return expiredResponse();
-    }
-  }
-
-  if(request.method==="POST"){
     try{
       const contentLength=
         request.headers.get(
@@ -590,8 +543,29 @@ an existing addon configuration.
       }
 
       if(
-        body.sessionId!==sessionId
+        body.action!=="save"
       ){
+        return jsonResponse(
+          {
+            error:
+              "Invalid configuration action"
+          },
+          400
+        );
+      }
+
+      /*
+       * IMPORTANT:
+       *
+       * The session ID comes from the
+       * POST body, not from ?session=.
+       */
+      const sessionId=
+        typeof body.sessionId==="string"
+          ?body.sessionId
+          :"";
+
+      if(!sessionId){
         return jsonResponse(
           {
             error:
@@ -602,12 +576,9 @@ an existing addon configuration.
       }
 
       /*
-       * Re-read the session immediately
-       * before saving.
-       *
-       * This makes expiration server
-       * authoritative even if the browser
-       * timer has not fired yet.
+       * This is the authoritative expiration
+       * check. getConfigureSession() returns
+       * null once expiresAt has passed.
        */
       const activeSession=
         await getConfigureSession(
@@ -616,18 +587,6 @@ an existing addon configuration.
 
       if(!activeSession){
         return expiredResponse();
-      }
-
-      if(
-        body.action!=="save"
-      ){
-        return jsonResponse(
-          {
-            error:
-              "Invalid configuration action"
-          },
-          400
-        );
       }
 
       if(
@@ -681,13 +640,9 @@ an existing addon configuration.
 
       const newConfig={
         ...existingConfig,
-
         uiToken,
-
         fileSize,
-
         qualities,
-
         filters
       };
 
@@ -743,6 +698,17 @@ an existing addon configuration.
       );
     }
   }
+
+  /*
+   * Only GET reaches this point.
+   *
+   * Create exactly one 5-minute session.
+   */
+  const session=
+    await createConfigureSession();
+
+  const sessionId=
+    session.id;
 
   const qualities=
     normalizeQualities(
@@ -2249,9 +2215,16 @@ async function saveConfiguration(){
   setStatus("");
 
   try{
+    /*
+     * Use the current pathname rather
+     * than relying on a ?session= query.
+     *
+     * The session ID is explicitly sent
+     * in the JSON body.
+     */
     const response=
       await fetch(
-        window.location.href,
+        window.location.pathname,
         {
           method:"POST",
 
