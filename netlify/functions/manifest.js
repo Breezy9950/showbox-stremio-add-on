@@ -2206,13 +2206,13 @@ h1{
 
   .container{
     width:
-      calc(100% - 20px);
+      calc(100% - 24px);
 
     padding:
-      38px 0 60px;
+      35px 0 60px;
   }
 
-  h1{
+  .settings-title{
     font-size:40px;
   }
 
