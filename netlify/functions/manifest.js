@@ -1564,7 +1564,7 @@ body{
   margin:auto;
 
   padding:
-    clamp(32px,5vw,56px)
+    20px
     0
     clamp(50px,6vw,80px);
 }
@@ -1701,8 +1701,6 @@ h1{
 
 #configuration{
   display:none;
-
-  margin-top:24px;
 }
 
 .settings-header{
