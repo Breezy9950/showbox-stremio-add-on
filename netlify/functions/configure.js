@@ -39,7 +39,7 @@ const DEFAULT_QUALITIES=[
 
 const MAX_CONFIG_BODY_BYTES=
   16*1024;
-
+const CONFIGURE_SESSION_MS=5*60*1000;
 const MAX_QUALITY_ITEMS=
   DEFAULT_QUALITIES.length;
 
@@ -704,8 +704,10 @@ export default async function handler(
    *
    * Create exactly one 5-minute session.
    */
-  const session=
-    await createConfigureSession();
+ const session=
+  await createConfigureSession(
+    CONFIGURE_SESSION_MS
+  );
 
   const sessionId=
     session.id;
