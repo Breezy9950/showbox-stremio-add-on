@@ -37,10 +37,18 @@ const DEFAULT_QUALITIES=[
   }
 ];
 
-const MAX_BODY=16*1024;
-const MAX_GB=200;
+const MAX_CONFIG_BODY_BYTES=
+  16*1024;
 
-function json(body,status=200){
+const MAX_QUALITY_ITEMS=
+  DEFAULT_QUALITIES.length;
+
+const MAX_FILE_SIZE_GB=200;
+
+function jsonResponse(
+  body,
+  status=200
+){
   return new Response(
     JSON.stringify(body),
     {
@@ -48,10 +56,13 @@ function json(body,status=200){
       headers:{
         "Content-Type":
           "application/json; charset=utf-8",
+
         "Cache-Control":
           "no-store",
+
         "X-Content-Type-Options":
           "nosniff",
+
         "Referrer-Policy":
           "no-referrer"
       }
@@ -59,33 +70,28 @@ function json(body,status=200){
   );
 }
 
-function html(body,status=200){
-  return new Response(
-    body,
-    {
-      status,
-      headers:{
-        "Content-Type":
-          "text/html; charset=utf-8",
-        "Cache-Control":
-          "no-store",
-        "X-Content-Type-Options":
-          "nosniff",
-        "Referrer-Policy":
-          "no-referrer"
-      }
-    }
-  );
-}
-
-function decode(value){
+function decodeConfig(
+  value
+){
   try{
+    if(!value){
+      return {};
+    }
+
     let base64=
       value
-        .replace(/-/g,"+")
-        .replace(/_/g,"/");
+        .replace(
+          /-/g,
+          "+"
+        )
+        .replace(
+          /_/g,
+          "/"
+        );
 
-    while(base64.length%4){
+    while(
+      base64.length%4
+    ){
       base64+="=";
     }
 
@@ -95,15 +101,21 @@ function decode(value){
           base64,
           "base64"
         )
-        .toString("utf8")
+        .toString(
+          "utf8"
+        )
     );
-  }catch{
+  }
+
+  catch{
     return {};
   }
 }
 
-function normalizeQualities(input){
-  if(!Array.isArray(input)){
+function normalizeQualities(
+  qualities
+){
+  if(!Array.isArray(qualities)){
     return DEFAULT_QUALITIES.map(
       item=>({...item})
     );
@@ -119,31 +131,38 @@ function normalizeQualities(input){
       )
     );
 
-  const seen=new Set();
   const result=[];
+  const used=new Set();
 
-  for(const item of input){
+  for(
+    const item of qualities
+  ){
     if(
       !item||
       typeof item!=="object"||
       !allowed.has(item.name)||
-      seen.has(item.name)
+      used.has(item.name)
     ){
       continue;
     }
 
-    seen.add(item.name);
-
     result.push({
       name:item.name,
-      enabled:item.enabled===true
+      enabled:
+        item.enabled===true
     });
+
+    used.add(
+      item.name
+    );
   }
 
   for(
     const item of DEFAULT_QUALITIES
   ){
-    if(!seen.has(item.name)){
+    if(
+      !used.has(item.name)
+    ){
       result.push({
         ...item
       });
@@ -153,10 +172,30 @@ function normalizeQualities(input){
   return result;
 }
 
-function normalizeSize(value){
+function normalizeFilters(
+  filters
+){
   if(
-    !value||
-    typeof value!=="object"
+    !filters||
+    typeof filters!=="object"
+  ){
+    return {
+      cam:true
+    };
+  }
+
+  return {
+    cam:
+      filters.cam!==false
+  };
+}
+
+function normalizeFileSize(
+  fileSize
+){
+  if(
+    !fileSize||
+    typeof fileSize!=="object"
   ){
     return {
       minGb:null,
@@ -165,18 +204,22 @@ function normalizeSize(value){
   }
 
   const min=
-    value.minGb===null||
-    value.minGb===undefined||
-    value.minGb===""
+    fileSize.minGb===null||
+    fileSize.minGb===undefined||
+    fileSize.minGb===""
       ?null
-      :Number(value.minGb);
+      :Number(
+        fileSize.minGb
+      );
 
   const max=
-    value.maxGb===null||
-    value.maxGb===undefined||
-    value.maxGb===""
+    fileSize.maxGb===null||
+    fileSize.maxGb===undefined||
+    fileSize.maxGb===""
       ?null
-      :Number(value.maxGb);
+      :Number(
+        fileSize.maxGb
+      );
 
   return {
     minGb:
@@ -191,105 +234,73 @@ function normalizeSize(value){
   };
 }
 
-function validateSize(value){
-  const min=
-    value?.minGb===null||
-    value?.minGb===undefined||
-    value?.minGb===""
-      ?null
-      :Number(value.minGb);
-
-  const max=
-    value?.maxGb===null||
-    value?.maxGb===undefined||
-    value?.maxGb===""
-      ?null
-      :Number(value.maxGb);
-
-  if(
-    min!==null&&
-    !Number.isFinite(min)
-  ){
-    throw new Error(
-      "Invalid minimum file size"
+function validateFileSize(
+  fileSize
+){
+  const normalized=
+    normalizeFileSize(
+      fileSize
     );
-  }
 
   if(
-    max!==null&&
-    !Number.isFinite(max)
-  ){
-    throw new Error(
-      "Invalid maximum file size"
-    );
-  }
-
-  if(
-    min!==null&&
+    normalized.minGb!==null&&
     (
-      min<0||
-      min>MAX_GB
+      normalized.minGb<0||
+      normalized.minGb>
+        MAX_FILE_SIZE_GB
     )
   ){
     throw new Error(
-      "Minimum file size must be between 0 and 200 GB"
+      "Minimum size must be between 0 and 200 GB."
     );
   }
 
   if(
-    max!==null&&
+    normalized.maxGb!==null&&
     (
-      max<0||
-      max>MAX_GB
+      normalized.maxGb<0||
+      normalized.maxGb>
+        MAX_FILE_SIZE_GB
     )
   ){
     throw new Error(
-      "Maximum file size must be between 0 and 200 GB"
+      "Maximum size must be between 0 and 200 GB."
     );
   }
 
   if(
-    min!==null&&
-    max!==null&&
-    min>max
+    normalized.minGb!==null&&
+    normalized.maxGb!==null&&
+    normalized.minGb>
+      normalized.maxGb
   ){
     throw new Error(
-      "Minimum size cannot be greater than maximum size"
+      "Minimum size cannot be greater than maximum size."
     );
   }
 
-  return {
-    minGb:min,
-    maxGb:max
-  };
-}
-
-function normalizeFilters(value){
-  return {
-    cam:
-      !value||
-      typeof value!=="object"
-        ?true
-        :value.cam!==false
-  };
+  return normalized;
 }
 
 async function getConfigFromRequest(
   request
 ){
-  const path=
-    new URL(request.url)
-      .pathname
-      .replace(
-        /\/+$/,
-        ""
-      );
+  const url=
+    new URL(
+      request.url
+    );
+
+  const pathname=
+    url.pathname.replace(
+      /\/+$/,
+      ""
+    );
 
   const match=
-    path.match(
+    pathname.match(
       /^\/configure\/([^/]+)$/
     )||
-    path.match(
+    pathname.match(
       /^\/([^/]+)\/configure$/
     );
 
@@ -297,10 +308,13 @@ async function getConfigFromRequest(
     return null;
   }
 
-  const id=match[1];
+  const configValue=
+    match[1];
 
   const stored=
-    await getConfig(id);
+    await getConfig(
+      configValue
+    );
 
   if(
     stored&&
@@ -308,19 +322,23 @@ async function getConfigFromRequest(
     !Array.isArray(stored)
   ){
     return {
-      id,
+      id:configValue,
       config:stored
     };
   }
 
   const legacy=
-    decode(id);
+    decodeConfig(
+      configValue
+    );
 
   if(
     !legacy||
     typeof legacy!=="object"||
     Array.isArray(legacy)||
-    !Object.keys(legacy).length
+    !Object.keys(
+      legacy
+    ).length
   ){
     return null;
   }
@@ -329,6 +347,28 @@ async function getConfigFromRequest(
     id:null,
     config:legacy
   };
+}
+
+function expiredResponse(){
+  return new Response(
+    "Not Found",
+    {
+      status:404,
+      headers:{
+        "Content-Type":
+          "text/plain; charset=utf-8",
+
+        "Cache-Control":
+          "no-store",
+
+        "X-Content-Type-Options":
+          "nosniff",
+
+        "Referrer-Policy":
+          "no-referrer"
+      }
+    }
+  );
 }
 
 export const config={
@@ -341,14 +381,20 @@ export const config={
 export default async function handler(
   request
 ){
-  const data=
+  const url=
+    new URL(
+      request.url
+    );
+
+  const configData=
     await getConfigFromRequest(
       request
     );
 
-  if(!data){
-    return html(
-`<!doctype html>
+  if(!configData){
+    return new Response(
+      `
+<!doctype html>
 <html>
 <head>
 <meta
@@ -362,7 +408,11 @@ body{
   padding:40px 20px;
   background:#111;
   color:#fff;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   text-align:center;
 }
 .card{
@@ -374,6 +424,7 @@ body{
 }
 p{
   color:#aaa;
+  line-height:1.5;
 }
 </style>
 </head>
@@ -386,31 +437,106 @@ an existing addon configuration.
 </p>
 </div>
 </body>
-</html>`,
-      400
+</html>
+`,
+      {
+        status:400,
+        headers:{
+          "Content-Type":
+            "text/html; charset=utf-8",
+
+          "Cache-Control":
+            "no-store",
+
+          "X-Content-Type-Options":
+            "nosniff",
+
+          "Referrer-Policy":
+            "no-referrer"
+        }
+      }
     );
   }
 
   const configId=
-    data.id;
+    configData.id;
 
-  const existing=
-    data.config;
+  const existingConfig=
+    configData.config;
+
+  const sessionId=
+    url.searchParams.get(
+      "session"
+    );
+
+  /*
+   * A Configure page must always have
+   * an explicit temporary session.
+   *
+   * The first request creates one and
+   * redirects to the session-bound URL.
+   */
+  if(
+    request.method==="GET"&&
+    !sessionId
+  ){
+    const session=
+      await createConfigureSession();
+
+    const redirectUrl=
+      new URL(
+        request.url
+      );
+
+    redirectUrl.searchParams.set(
+      "session",
+      session.id
+    );
+
+    return new Response(
+      null,
+      {
+        status:302,
+        headers:{
+          Location:
+            redirectUrl.toString(),
+
+          "Cache-Control":
+            "no-store"
+        }
+      }
+    );
+  }
+
+  /*
+   * Every request after the first one
+   * must use the same temporary session.
+   */
+  const session=
+    await checkConfigureSession(
+      sessionId
+    );
+
+  if(!session.ok){
+    return expiredResponse();
+  }
 
   if(
     request.method==="POST"
   ){
     try{
-      const bodyText=
+      const requestBody=
         await request.text();
 
       if(
         new TextEncoder()
-          .encode(bodyText)
+          .encode(
+            requestBody
+          )
           .byteLength>
-        MAX_BODY
+        MAX_CONFIG_BODY_BYTES
       ){
-        return json(
+        return jsonResponse(
           {
             error:
               "Configuration request is too large"
@@ -423,10 +549,18 @@ an existing addon configuration.
 
       try{
         body=
-          JSON.parse(bodyText);
-      }catch{
-        throw new Error(
-          "Invalid JSON"
+          JSON.parse(
+            requestBody
+          );
+      }
+
+      catch{
+        return jsonResponse(
+          {
+            error:
+              "Invalid JSON"
+          },
+          400
         );
       }
 
@@ -435,31 +569,43 @@ an existing addon configuration.
         typeof body!=="object"||
         Array.isArray(body)
       ){
-        throw new Error(
-          "Invalid configuration"
+        return jsonResponse(
+          {
+            error:
+              "Invalid configuration"
+          },
+          400
         );
       }
 
-      const session=
-        await checkConfigureSession(
-          body.sessionId
-        );
-
-      if(!session.ok){
-        return json(
+      if(
+        body.sessionId!==
+        sessionId
+      ){
+        return jsonResponse(
           {
             error:
-              "Configure session has expired"
+              "Configure session is invalid"
           },
-          410
+          403
         );
+      }
+
+      const currentSession=
+        await checkConfigureSession(
+          sessionId
+        );
+
+      if(!currentSession.ok){
+        return expiredResponse();
       }
 
       if(
         Array.isArray(
           body.qualities
         )&&
-        body.qualities.length>20
+        body.qualities.length>
+          MAX_QUALITY_ITEMS
       ){
         throw new Error(
           "Too many quality entries"
@@ -472,7 +618,7 @@ an existing addon configuration.
         );
 
       const fileSize=
-        validateSize(
+        validateFileSize(
           body.fileSize
         );
 
@@ -481,76 +627,89 @@ an existing addon configuration.
           body.filters
         );
 
+      const uiToken=
+        typeof existingConfig.uiToken===
+          "string"
+          ?existingConfig.uiToken
+          :"";
+
       const newConfig={
-        ...existing,
-        uiToken:
-          typeof existing.uiToken===
-            "string"
-            ?existing.uiToken
-            :"",
+        ...existingConfig,
+
+        uiToken,
+
         fileSize,
-        qualities,
+
+        qualities:
+          qualities.map(
+            item=>({
+              name:item.name,
+              enabled:item.enabled
+            })
+          ),
+
         filters
       };
 
-      let finalId=
+      let finalConfigId=
         configId;
 
-      if(!finalId){
-        finalId=
+      if(!finalConfigId){
+        finalConfigId=
           await createConfig(
             newConfig
           );
-      }else{
+      }
+
+      else{
         await saveConfig(
-          finalId,
+          finalConfigId,
           newConfig
         );
       }
 
-      const origin=
-        new URL(
-          request.url
-        ).origin;
-
-      return json({
+      return jsonResponse({
         manifestUrl:
-          `${origin}/${finalId}/manifest.json`
+          `${url.origin}/${finalConfigId}/manifest.json`
       });
     }
 
     catch(error){
-      return json(
+      console.error(
+        "[Configure] Save error:",
+        error?.message
+      );
+
+      const message=
+        error?.message||
+        "Invalid configuration";
+
+      return jsonResponse(
         {
-          error:
-            error.message||
-            "Invalid configuration"
+          error:message
         },
-        error.message===
+        message===
           "Configuration request is too large"
-            ?413
-            :400
+          ?413
+          :400
       );
     }
   }
 
   const qualities=
     normalizeQualities(
-      existing.qualities
+      existingConfig.qualities
     );
 
   const fileSize=
-    normalizeSize(
-      existing.fileSize
+    normalizeFileSize(
+      existingConfig.fileSize
     );
 
   const filters=
     normalizeFilters(
-      existing.filters
+      existingConfig.filters
     );
-
-  const session=
-    await createConfigureSession();
 
   const qualitiesJson=
     JSON.stringify(
@@ -579,30 +738,40 @@ an existing addon configuration.
       filters
     );
 
-  const page=
-`<!doctype html>
+  const html=`
+<!doctype html>
+
 <html lang="en">
+
 <head>
-<meta charset="utf-8">
+
+<meta charset="UTF-8">
+
 <meta
   name="viewport"
   content="width=device-width,initial-scale=1,viewport-fit=cover"
 >
+
 <title>ShowBox</title>
 
 <style>
+
 *{
   box-sizing:border-box;
 }
 
 body{
   margin:0;
+
   padding:
-    clamp(28px,5vw,54px)
+    clamp(32px,5vw,54px)
     16px
     60px;
+
   background:#0d0e11;
+
   color:#f1f1f3;
+
   font-family:
     -apple-system,
     BlinkMacSystemFont,
@@ -616,123 +785,171 @@ body{
       clamp(560px,72vw,760px),
       100%
     );
+
   margin:auto;
 }
 
 h1{
   margin:0;
+
   font-size:
     clamp(30px,5vw,42px);
+
+  line-height:1;
+
   letter-spacing:-1.4px;
 }
 
 .subtitle{
   margin:
     8px 0 28px;
+
   color:#858892;
+
   font-size:13px;
 }
 
 .card{
   padding:18px;
+
   margin-top:16px;
+
   border:
     1px solid #292c34;
+
   border-radius:20px;
+
   background:#15161b;
 }
 
 .card-title{
   font-size:18px;
+
   font-weight:700;
 }
 
 .card-description{
   margin:
     6px 0 18px;
+
   color:#858892;
+
   font-size:12px;
+
   line-height:1.5;
 }
 
 .size-row{
   display:grid;
+
   grid-template-columns:
     1fr 1fr;
+
   gap:10px;
 }
 
 .size-field label{
   display:block;
+
   margin-bottom:7px;
+
   color:#696c75;
+
   font-size:11px;
 }
 
 .size-field input{
   width:100%;
+
   height:50px;
-  padding:0 13px;
+
+  padding:
+    0 13px;
+
   border:
     1px solid #343740;
+
   border-radius:12px;
+
   background:#252831;
+
   color:#fff;
+
   font-size:14px;
+
   outline:0;
 }
 
 .file-size-error{
   min-height:18px;
+
   margin-top:9px;
+
   color:#ff9b9b;
+
   font-size:12px;
 }
 
 .quality-list{
   display:flex;
+
   flex-direction:column;
+
   gap:8px;
 }
 
 .quality-row{
   display:flex;
+
   align-items:center;
+
   justify-content:space-between;
+
   min-height:58px;
-  padding:10px 12px;
+
+  padding:
+    10px 12px;
+
   border-radius:13px;
+
   background:#1d1f25;
 }
 
 .quality-row>input{
   width:20px;
+
   height:20px;
+
   margin:
-    0
-    12px
-    0
-    0;
+    0 12px 0 0;
 }
 
 .quality-name{
   flex:1;
+
   font-size:14px;
+
   font-weight:600;
 }
 
 .quality-controls{
   display:flex;
+
   gap:6px;
 }
 
 .quality-controls button{
   width:36px;
+
   height:36px;
+
   border:
     1px solid #343740;
+
   border-radius:10px;
+
   background:#252831;
+
   color:#c9cad0;
 }
 
@@ -742,33 +959,60 @@ h1{
 
 .filter-row{
   padding:15px;
+
   border-radius:13px;
+
   background:#1d1f25;
 }
 
 .filter-label{
   display:flex;
+
   align-items:center;
+
   gap:12px;
+
   font-size:14px;
+
   font-weight:600;
 }
 
 .filter-label input{
   width:20px;
+
   height:20px;
 }
 
 .main{
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
   width:100%;
+
   height:50px;
+
   margin-top:22px;
+
+  padding:0 20px;
+
   border:0;
+
   border-radius:14px;
+
   background:#f4f4f5;
+
   color:#101115;
+
   font-size:14px;
+
   font-weight:700;
+
+  line-height:1;
+
+  text-align:center;
 }
 
 .main:disabled{
@@ -777,70 +1021,96 @@ h1{
 
 .status{
   min-height:18px;
+
   margin-top:10px;
+
   color:#858892;
+
   font-size:12px;
 }
 
 .result{
   display:none;
+
   margin-top:28px;
 }
 
 .manifest-url{
   overflow:auto;
+
   padding:13px;
+
   border:
     1px solid #343740;
+
   border-radius:12px;
+
   background:#1d1f25;
+
   color:#c9cad0;
+
   font-size:12px;
+
   word-break:break-all;
 }
 
 .result-buttons{
   display:flex;
+
   gap:8px;
+
   margin-top:10px;
 }
 
 .result-buttons button{
   flex:1;
+
   height:46px;
+
   border:0;
+
   border-radius:12px;
+
   font-weight:700;
 }
 
 .copy{
   background:#252831;
+
   color:#fff;
 }
 
 .install{
   background:#f4f4f5;
+
   color:#101115;
 }
 
 .note{
   margin-top:14px;
+
   color:#696c75;
+
   font-size:11px;
+
   line-height:1.5;
 }
 
 @media(max-width:600px){
+
   .container{
     width:
-      calc(100% - 8px);
+      calc(100% - 24px);
   }
 
   .size-row{
     gap:8px;
   }
+
 }
+
 </style>
+
 </head>
 
 <body>
@@ -869,6 +1139,7 @@ Leave a field empty for no limit.
 <div class="size-row">
 
 <div class="size-field">
+
 <label for="minSize">
 Minimum (GB)
 </label>
@@ -881,9 +1152,11 @@ Minimum (GB)
   step="0.1"
   placeholder="No minimum"
 >
+
 </div>
 
 <div class="size-field">
+
 <label for="maxSize">
 Maximum (GB)
 </label>
@@ -896,6 +1169,7 @@ Maximum (GB)
   step="0.1"
   placeholder="No maximum"
 >
+
 </div>
 
 </div>
@@ -958,6 +1232,7 @@ CAM
 <button
   id="save"
   class="main"
+  type="button"
 >
 Save Configuration
 </button>
@@ -988,6 +1263,7 @@ Manifest URL
 <button
   id="copy"
   class="copy"
+  type="button"
 >
 Copy
 </button>
@@ -995,6 +1271,7 @@ Copy
 <button
   id="install"
   class="install"
+  type="button"
 >
 Install in Stremio
 </button>
@@ -1025,7 +1302,7 @@ const filters=
   ${filtersJson};
 
 const sessionId=
-  ${JSON.stringify(session.id)};
+  ${JSON.stringify(sessionId)};
 
 const expiresAt=
   ${session.expiresAt};
@@ -1087,25 +1364,134 @@ const installButton=
 
 let expired=false;
 
-function expire(){
+function permanentlyExpire(){
   if(expired){
     return;
   }
 
   expired=true;
-  saveButton.disabled=true;
 
-  location.href=
-    "/__showbox_configure_expired__";
+  saveButton.disabled=
+    true;
+
+  /*
+   * Replace the current history entry
+   * instead of pushing another one.
+   *
+   * This prevents Back from returning
+   * to the expired Configure page.
+   */
+  history.replaceState(
+    null,
+    "",
+    "/__showbox_configure_expired__"
+  );
+
+  location.replace(
+    "/__showbox_configure_expired__"
+  );
+}
+
+function checkLocalExpiry(){
+  if(
+    Date.now()>=expiresAt
+  ){
+    permanentlyExpire();
+
+    return true;
+  }
+
+  return false;
 }
 
 setTimeout(
-  expire,
+  permanentlyExpire,
   Math.max(
     0,
     expiresAt-Date.now()
   )
 );
+
+/*
+ * Handles Safari/iOS restoring the page
+ * from its back-forward cache.
+ */
+window.addEventListener(
+  "pageshow",
+  event=>{
+    if(
+      event.persisted||
+      Date.now()>=expiresAt
+    ){
+      permanentlyExpire();
+    }
+  }
+);
+
+async function verifySession(){
+  if(
+    expired||
+    checkLocalExpiry()
+  ){
+    return false;
+  }
+
+  try{
+    const response=
+      await fetch(
+        window.location.pathname+
+          window.location.search,
+        {
+          method:"POST",
+
+          headers:{
+            "Content-Type":
+              "application/json"
+          },
+
+          body:
+            JSON.stringify({
+              action:
+                "check-session",
+
+              sessionId
+            }),
+
+          cache:"no-store"
+        }
+      );
+
+    if(
+      response.status===404||
+      response.status===410
+    ){
+      permanentlyExpire();
+
+      return false;
+    }
+
+    if(!response.ok){
+      return false;
+    }
+
+    const data=
+      await response.json();
+
+    if(
+      !data.ok
+    ){
+      permanentlyExpire();
+
+      return false;
+    }
+
+    return true;
+  }
+
+  catch{
+    return true;
+  }
+}
 
 function renderQualities(){
   qualityList.innerHTML="";
@@ -1137,7 +1523,7 @@ function renderQualities(){
           quality.enabled=
             checkbox.checked;
 
-          invalidate();
+          invalidateResult();
         }
       );
 
@@ -1181,15 +1567,17 @@ function renderQualities(){
             return;
           }
 
-          [
-            qualities[index-1],
-            qualities[index]
-          ]=[
-            qualities[index],
-            qualities[index-1]
-          ];
+          const temp=
+            qualities[index-1];
 
-          invalidate();
+          qualities[index-1]=
+            qualities[index];
+
+          qualities[index]=
+            temp;
+
+          invalidateResult();
+
           renderQualities();
         }
       );
@@ -1219,15 +1607,17 @@ function renderQualities(){
             return;
           }
 
-          [
-            qualities[index+1],
-            qualities[index]
-          ]=[
-            qualities[index],
-            qualities[index+1]
-          ];
+          const temp=
+            qualities[index+1];
 
-          invalidate();
+          qualities[index+1]=
+            qualities[index];
+
+          qualities[index]=
+            temp;
+
+          invalidateResult();
+
           renderQualities();
         }
       );
@@ -1268,14 +1658,14 @@ function getFileSize(){
   };
 }
 
-function valid(){
+function validate(){
   const value=
     getFileSize();
 
   let error="";
 
   if(
-    value.minGb!==null&&
+    minSizeInput.value.trim()!==""&&
     (
       !Number.isFinite(
         value.minGb
@@ -1289,7 +1679,7 @@ function valid(){
   }
 
   else if(
-    value.maxGb!==null&&
+    maxSizeInput.value.trim()!==""&&
     (
       !Number.isFinite(
         value.maxGb
@@ -1317,18 +1707,22 @@ function valid(){
   return !error;
 }
 
-function invalidate(){
+function invalidateResult(){
   manifestUrl.textContent="";
+
   result.style.display=
     "none";
 }
 
 async function saveConfiguration(){
-  if(expired){
+  if(
+    expired||
+    !(await verifySession())
+  ){
     return;
   }
 
-  if(!valid()){
+  if(!validate()){
     return;
   }
 
@@ -1343,7 +1737,9 @@ async function saveConfiguration(){
     return;
   }
 
-  saveButton.disabled=true;
+  saveButton.disabled=
+    true;
+
   saveButton.textContent=
     "Saving...";
 
@@ -1352,7 +1748,8 @@ async function saveConfiguration(){
   try{
     const response=
       await fetch(
-        window.location.pathname,
+        window.location.pathname+
+          window.location.search,
         {
           method:"POST",
 
@@ -1374,20 +1771,23 @@ async function saveConfiguration(){
                 cam:
                   camFilter.checked
               }
-            })
+            }),
+
+          cache:"no-store"
         }
       );
 
-    const data=
-      await response.json();
-
     if(
-      response.status===
-      410
+      response.status===404||
+      response.status===410
     ){
-      expire();
+      permanentlyExpire();
+
       return;
     }
+
+    const data=
+      await response.json();
 
     if(!response.ok){
       throw new Error(
@@ -1414,9 +1814,11 @@ async function saveConfiguration(){
   }
 
   catch(error){
-    status.textContent=
-      error.message||
-      "Something went wrong.";
+    if(!expired){
+      status.textContent=
+        error.message||
+        "Something went wrong.";
+    }
   }
 
   finally{
@@ -1433,28 +1835,31 @@ async function saveConfiguration(){
 minSizeInput.addEventListener(
   "input",
   ()=>{
-    invalidate();
-    valid();
+    invalidateResult();
+    validate();
   }
 );
 
 maxSizeInput.addEventListener(
   "input",
   ()=>{
-    invalidate();
-    valid();
+    invalidateResult();
+    validate();
   }
 );
 
 camFilter.addEventListener(
   "change",
-  invalidate
+  invalidateResult
 );
 
 copyButton.addEventListener(
   "click",
   async()=>{
-    if(!manifestUrl.textContent){
+    if(
+      !manifestUrl.textContent||
+      expired
+    ){
       return;
     }
 
@@ -1464,7 +1869,7 @@ copyButton.addEventListener(
       );
 
       copyButton.textContent=
-        "Copied!";
+        "Copied";
 
       setTimeout(
         ()=>{
@@ -1496,20 +1901,23 @@ installButton.addEventListener(
 
     location.href=
       "stremio://"+
-      manifestUrl.textContent
-        .replace(
-          /^https?:\\/\\//,
-          ""
-        );
+      manifestUrl.textContent.replace(
+        /^https?:\\/\\//,
+        ""
+      );
   }
 );
 
-if(fileSize.minGb!==null){
+if(
+  fileSize.minGb!==null
+){
   minSizeInput.value=
     fileSize.minGb;
 }
 
-if(fileSize.maxGb!==null){
+if(
+  fileSize.maxGb!==null
+){
   maxSizeInput.value=
     fileSize.maxGb;
 }
@@ -1518,7 +1926,7 @@ camFilter.checked=
   filters.cam!==false;
 
 renderQualities();
-valid();
+validate();
 
 saveButton.addEventListener(
   "click",
@@ -1528,7 +1936,26 @@ saveButton.addEventListener(
 </script>
 
 </body>
-</html>`;
 
-  return html(page);
+</html>
+`;
+
+  return new Response(
+    html,
+    {
+      headers:{
+        "Content-Type":
+          "text/html; charset=utf-8",
+
+        "Cache-Control":
+          "no-store",
+
+        "X-Content-Type-Options":
+          "nosniff",
+
+        "Referrer-Policy":
+          "no-referrer"
+      }
+    }
+  );
 }
