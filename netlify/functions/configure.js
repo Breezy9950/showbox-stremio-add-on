@@ -635,6 +635,15 @@ On iOS/iPadOS, if Stremio does not open automatically, copy the manifest URL and
 
 </div>
 
+<script>
+window.__SHOWBOX_CONFIG__ = ${JSON.stringify({
+  qualities,
+  fileSize,
+  filters,
+  sessionId: session.id,
+  expiresAt: Number(session.expiresAt)
+}).replace(/</g, "\\u003c")};
+</script>
 <script src="/configure-client.js"></script>
 
 </body>
