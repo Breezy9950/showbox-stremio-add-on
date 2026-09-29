@@ -995,6 +995,7 @@ h1{
 .file-size-inner{
   padding:
     clamp(15px,1.8vw,20px);
+  padding-bottom: clamp(11px,1.2vw,14px);
 
   border:
     1px solid var(--border-light);
@@ -1479,8 +1480,6 @@ h1{
   }
 
   .file-size-inner{
-    padding:13px;
-
     border-radius:11px;
   }
 
