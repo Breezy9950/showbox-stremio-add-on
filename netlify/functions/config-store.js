@@ -203,7 +203,7 @@ export async function setHomepageSessionToken(
 
   if(!session){
     throw new Error(
-      "Configuration session is invalid or expired"
+      "Homepage session is invalid or expired"
     );
   }
 
