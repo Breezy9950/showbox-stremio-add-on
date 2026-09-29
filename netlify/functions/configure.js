@@ -395,19 +395,29 @@ export default async function handler(
     return new Response(
       `
 <!doctype html>
+
 <html>
+
 <head>
+
 <meta
   name="viewport"
   content="width=device-width,initial-scale=1"
 >
+
 <title>ShowBox</title>
+
 <style>
+
+*{
+  box-sizing:border-box;
+}
+
 body{
   margin:0;
-  padding:40px 20px;
-  background:#111;
-  color:#fff;
+  padding:32px 16px;
+  background:#0d0e11;
+  color:#f1f1f3;
   font-family:
     -apple-system,
     BlinkMacSystemFont,
@@ -415,28 +425,41 @@ body{
     sans-serif;
   text-align:center;
 }
+
 .card{
-  max-width:560px;
+  width:min(560px,100%);
   margin:auto;
   padding:28px;
   border-radius:18px;
   background:#17181d;
 }
+
 p{
   color:#aaa;
   line-height:1.5;
 }
+
 </style>
+
 </head>
+
 <body>
+
 <div class="card">
-<h2>Invalid configuration</h2>
+
+<h2>
+Invalid configuration
+</h2>
+
 <p>
 This Configure page must be opened using
 an existing addon configuration.
 </p>
+
 </div>
+
 </body>
+
 </html>
 `,
       {
@@ -785,17 +808,28 @@ an existing addon configuration.
   box-sizing:border-box;
 }
 
+:root{
+  --border:#292c34;
+  --border-light:#30333b;
+  --surface:#15161b;
+  --surface-2:#1d1f25;
+  --input:#252831;
+  --text:#f1f1f3;
+  --muted:#858892;
+  --muted-2:#696c75;
+}
+
 body{
   margin:0;
 
   padding:
-    clamp(32px,5vw,54px)
+    clamp(24px,4vw,54px)
     16px
     60px;
 
   background:#0d0e11;
 
-  color:#f1f1f3;
+  color:var(--text);
 
   font-family:
     -apple-system,
@@ -827,41 +861,112 @@ h1{
 
 .subtitle{
   margin:
-    8px 0 28px;
+    8px 0
+    clamp(20px,3vw,28px);
 
-  color:#858892;
+  color:var(--muted);
 
-  font-size:13px;
+  font-size:
+    clamp(12px,1.2vw,13px);
+
+  line-height:1.45;
 }
 
 .card{
-  padding:18px;
+  padding:
+    clamp(14px,1.6vw,18px);
 
-  margin-top:16px;
+  margin-top:
+    clamp(12px,1.5vw,16px);
 
   border:
-    1px solid #292c34;
+    1px solid var(--border);
 
-  border-radius:20px;
+  border-radius:
+    clamp(16px,2vw,20px);
 
-  background:#15161b;
+  background:var(--surface);
 }
 
 .card-title{
-  font-size:18px;
+  font-size:
+    clamp(16px,1.6vw,18px);
 
   font-weight:700;
+
+  line-height:1.2;
 }
 
 .card-description{
   margin:
-    6px 0 18px;
+    6px 0
+    clamp(14px,1.6vw,18px);
 
-  color:#858892;
+  color:var(--muted);
 
-  font-size:12px;
+  font-size:
+    clamp(11px,1.2vw,12px);
 
   line-height:1.5;
+}
+
+
+/* FILE SIZE */
+
+.file-size-card{
+  padding:
+    clamp(10px,1.1vw,12px);
+
+  border:
+    1px solid var(--border);
+
+  border-radius:
+    clamp(14px,1.8vw,18px);
+
+  background:var(--surface);
+}
+
+.file-size-heading{
+  padding:
+    3px
+    6px
+    clamp(8px,1vw,11px);
+
+  color:var(--muted-2);
+
+  font-size:
+    clamp(9px,1vw,11px);
+
+  font-weight:700;
+
+  letter-spacing:.12em;
+
+  text-transform:uppercase;
+}
+
+.file-size-inner{
+  padding:
+    clamp(14px,1.7vw,18px);
+
+  border:
+    1px solid var(--border-light);
+
+  border-radius:
+    clamp(10px,1.4vw,14px);
+
+  background:var(--surface-2);
+}
+
+.file-size-inner-header{
+  margin-bottom:
+    clamp(12px,1.5vw,16px);
+
+  color:var(--text);
+
+  font-size:
+    clamp(15px,1.6vw,18px);
+
+  font-weight:700;
 }
 
 .size-row{
@@ -870,39 +975,50 @@ h1{
   grid-template-columns:
     1fr 1fr;
 
-  gap:10px;
+  gap:
+    clamp(8px,1vw,10px);
 }
 
 .size-field label{
   display:block;
 
-  margin-bottom:7px;
+  margin-bottom:
+    clamp(5px,1vw,7px);
 
-  color:#696c75;
+  color:var(--muted-2);
 
-  font-size:11px;
+  font-size:
+    clamp(10px,1vw,11px);
 }
 
 .size-field input{
   width:100%;
 
-  height:50px;
+  height:
+    clamp(42px,4vw,50px);
 
   padding:
-    0 13px;
+    0
+    clamp(10px,1.2vw,13px);
 
   border:
     1px solid #343740;
 
-  border-radius:12px;
+  border-radius:
+    clamp(10px,1.3vw,12px);
 
-  background:#252831;
+  background:var(--input);
 
   color:#fff;
 
-  font-size:14px;
+  font-size:
+    clamp(12px,1.3vw,14px);
 
   outline:0;
+}
+
+.size-field input:focus{
+  border-color:#4a4e59;
 }
 
 .file-size-error{
@@ -912,15 +1028,19 @@ h1{
 
   color:#ff9b9b;
 
-  font-size:12px;
+  font-size:11px;
 }
+
+
+/* QUALITY */
 
 .quality-list{
   display:flex;
 
   flex-direction:column;
 
-  gap:8px;
+  gap:
+    clamp(6px,1vw,8px);
 }
 
 .quality-row{
@@ -930,29 +1050,40 @@ h1{
 
   justify-content:space-between;
 
-  min-height:58px;
+  min-height:
+    clamp(48px,4.5vw,58px);
 
   padding:
-    10px 12px;
+    clamp(8px,1vw,10px)
+    clamp(9px,1.2vw,12px);
 
-  border-radius:13px;
+  border-radius:
+    clamp(11px,1.3vw,13px);
 
-  background:#1d1f25;
+  background:var(--surface-2);
 }
 
 .quality-row>input{
-  width:20px;
+  width:
+    clamp(18px,1.8vw,20px);
 
-  height:20px;
+  height:
+    clamp(18px,1.8vw,20px);
 
   margin:
-    0 12px 0 0;
+    0
+    clamp(9px,1.2vw,12px)
+    0
+    0;
+
+  flex-shrink:0;
 }
 
 .quality-name{
   flex:1;
 
-  font-size:14px;
+  font-size:
+    clamp(13px,1.3vw,14px);
 
   font-weight:600;
 }
@@ -960,34 +1091,48 @@ h1{
 .quality-controls{
   display:flex;
 
-  gap:6px;
+  gap:
+    clamp(5px,.7vw,6px);
 }
 
 .quality-controls button{
-  width:36px;
+  width:
+    clamp(31px,3vw,36px);
 
-  height:36px;
+  height:
+    clamp(31px,3vw,36px);
+
+  padding:0;
 
   border:
     1px solid #343740;
 
-  border-radius:10px;
+  border-radius:
+    clamp(9px,1.1vw,10px);
 
-  background:#252831;
+  background:var(--input);
 
   color:#c9cad0;
+
+  font-size:
+    clamp(13px,1.4vw,15px);
 }
 
 .quality-controls button:disabled{
   opacity:.3;
 }
 
+
+/* FILTERS */
+
 .filter-row{
-  padding:15px;
+  padding:
+    clamp(12px,1.4vw,15px);
 
-  border-radius:13px;
+  border-radius:
+    clamp(11px,1.3vw,13px);
 
-  background:#1d1f25;
+  background:var(--surface-2);
 }
 
 .filter-label{
@@ -995,18 +1140,25 @@ h1{
 
   align-items:center;
 
-  gap:12px;
+  gap:
+    clamp(9px,1.2vw,12px);
 
-  font-size:14px;
+  font-size:
+    clamp(13px,1.3vw,14px);
 
   font-weight:600;
 }
 
 .filter-label input{
-  width:20px;
+  width:
+    clamp(18px,1.8vw,20px);
 
-  height:20px;
+  height:
+    clamp(18px,1.8vw,20px);
 }
+
+
+/* SAVE */
 
 .main{
   display:flex;
@@ -1017,21 +1169,27 @@ h1{
 
   width:100%;
 
-  height:50px;
+  height:
+    clamp(44px,4vw,50px);
 
-  margin-top:22px;
+  margin-top:
+    clamp(18px,2vw,22px);
 
-  padding:0 20px;
+  padding:
+    0
+    clamp(16px,2vw,20px);
 
   border:0;
 
-  border-radius:14px;
+  border-radius:
+    clamp(12px,1.5vw,14px);
 
   background:#f4f4f5;
 
   color:#101115;
 
-  font-size:14px;
+  font-size:
+    clamp(13px,1.3vw,14px);
 
   font-weight:700;
 
@@ -1047,34 +1205,41 @@ h1{
 .status{
   min-height:18px;
 
-  margin-top:10px;
+  margin-top:9px;
 
-  color:#858892;
+  color:var(--muted);
 
-  font-size:12px;
+  font-size:11px;
 }
+
+
+/* RESULT */
 
 .result{
   display:none;
 
-  margin-top:28px;
+  margin-top:
+    clamp(22px,3vw,28px);
 }
 
 .manifest-url{
   overflow:auto;
 
-  padding:13px;
+  padding:
+    clamp(11px,1.2vw,13px);
 
   border:
     1px solid #343740;
 
-  border-radius:12px;
+  border-radius:
+    clamp(10px,1.3vw,12px);
 
-  background:#1d1f25;
+  background:var(--surface-2);
 
   color:#c9cad0;
 
-  font-size:12px;
+  font-size:
+    clamp(11px,1.1vw,12px);
 
   word-break:break-all;
 }
@@ -1090,17 +1255,21 @@ h1{
 .result-buttons button{
   flex:1;
 
-  height:46px;
+  height:
+    clamp(42px,3.8vw,46px);
 
   border:0;
 
-  border-radius:12px;
+  border-radius:
+    clamp(10px,1.3vw,12px);
+
+  font-size:12px;
 
   font-weight:700;
 }
 
 .copy{
-  background:#252831;
+  background:var(--input);
 
   color:#fff;
 }
@@ -1112,24 +1281,228 @@ h1{
 }
 
 .note{
-  margin-top:14px;
+  margin-top:13px;
 
-  color:#696c75;
+  color:var(--muted-2);
 
-  font-size:11px;
+  font-size:10px;
 
   line-height:1.5;
 }
 
+
+/* MOBILE */
+
 @media(max-width:600px){
+
+  body{
+    padding:
+      22px
+      14px
+      50px;
+  }
 
   .container{
     width:
-      calc(100% - 24px);
+      100%;
+  }
+
+  h1{
+    font-size:28px;
+
+    letter-spacing:-1px;
+  }
+
+  .subtitle{
+    margin-top:7px;
+
+    margin-bottom:20px;
+
+    font-size:12px;
+  }
+
+  .card{
+    padding:12px;
+
+    margin-top:12px;
+
+    border-radius:15px;
+  }
+
+  .card-title{
+    font-size:17px;
+  }
+
+  .card-description{
+    margin-top:5px;
+
+    margin-bottom:14px;
+
+    font-size:11px;
+  }
+
+  .file-size-card{
+    padding:10px;
+
+    border-radius:14px;
+  }
+
+  .file-size-heading{
+    padding:
+      2px
+      6px
+      9px;
+
+    font-size:10px;
+  }
+
+  .file-size-inner{
+    padding:14px;
+
+    border-radius:11px;
+  }
+
+  .file-size-inner-header{
+    margin-bottom:13px;
+
+    font-size:16px;
   }
 
   .size-row{
     gap:8px;
+  }
+
+  .size-field label{
+    margin-bottom:5px;
+
+    font-size:10px;
+  }
+
+  .size-field input{
+    height:40px;
+
+    padding:0 10px;
+
+    border-radius:10px;
+
+    font-size:12px;
+  }
+
+  .quality-list{
+    gap:6px;
+  }
+
+  .quality-row{
+    min-height:46px;
+
+    padding:
+      8px
+      10px;
+
+    border-radius:11px;
+  }
+
+  .quality-row>input{
+    width:18px;
+
+    height:18px;
+
+    margin-right:9px;
+  }
+
+  .quality-name{
+    font-size:13px;
+  }
+
+  .quality-controls{
+    gap:5px;
+  }
+
+  .quality-controls button{
+    width:30px;
+
+    height:30px;
+
+    border-radius:9px;
+
+    font-size:13px;
+  }
+
+  .filter-row{
+    padding:12px;
+  }
+
+  .filter-label{
+    gap:9px;
+
+    font-size:13px;
+  }
+
+  .filter-label input{
+    width:18px;
+
+    height:18px;
+  }
+
+  .main{
+    height:44px;
+
+    margin-top:18px;
+
+    border-radius:12px;
+
+    font-size:13px;
+  }
+
+  .result{
+    margin-top:22px;
+  }
+
+  .result-buttons button{
+    height:42px;
+
+    font-size:11px;
+  }
+
+}
+
+
+/* VERY SMALL PHONES */
+
+@media(max-width:380px){
+
+  body{
+    padding-left:12px;
+
+    padding-right:12px;
+  }
+
+  .card{
+    padding:11px;
+  }
+
+  .file-size-card{
+    padding:9px;
+  }
+
+  .file-size-inner{
+    padding:12px;
+  }
+
+  .size-row{
+    gap:7px;
+  }
+
+  .quality-row{
+    padding-left:9px;
+
+    padding-right:9px;
+  }
+
+  .quality-controls button{
+    width:28px;
+
+    height:28px;
   }
 
 }
@@ -1150,15 +1523,17 @@ ShowBox
 Configure your stream preferences.
 </p>
 
-<div class="card">
 
-<div class="card-title">
-File size
+<div class="file-size-card">
+
+<div class="file-size-heading">
+FILE SIZE
 </div>
 
-<div class="card-description">
-Only show files within the selected size range.
-Leave a field empty for no limit.
+<div class="file-size-inner">
+
+<div class="file-size-inner-header">
+Keep streams between
 </div>
 
 <div class="size-row">
@@ -1166,7 +1541,7 @@ Leave a field empty for no limit.
 <div class="size-field">
 
 <label for="minSize">
-Minimum (GB)
+Min (GB)
 </label>
 
 <input
@@ -1183,7 +1558,7 @@ Minimum (GB)
 <div class="size-field">
 
 <label for="maxSize">
-Maximum (GB)
+Max (GB)
 </label>
 
 <input
@@ -1206,6 +1581,9 @@ Maximum (GB)
 
 </div>
 
+</div>
+
+
 <div class="card">
 
 <div class="card-title">
@@ -1213,8 +1591,7 @@ Quality
 </div>
 
 <div class="card-description">
-Enable the qualities you want and use
-the arrows to change their priority.
+Enable the qualities you want and use the arrows to change their priority.
 </div>
 
 <div
@@ -1223,6 +1600,7 @@ the arrows to change their priority.
 ></div>
 
 </div>
+
 
 <div class="card">
 
@@ -1254,6 +1632,7 @@ CAM
 
 </div>
 
+
 <button
   id="save"
   class="main"
@@ -1266,6 +1645,7 @@ Save Configuration
   id="status"
   class="status"
 ></div>
+
 
 <div
   id="result"
@@ -1307,6 +1687,7 @@ Install in Stremio
 
 </div>
 
+
 <div class="note">
 On iOS/iPadOS, if Stremio does not open automatically,
 copy the manifest URL and add it manually through
@@ -1314,6 +1695,7 @@ Stremio's Add-ons page.
 </div>
 
 </div>
+
 
 <script>
 
