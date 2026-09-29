@@ -971,6 +971,10 @@ h1{
 }
 
 .file-size-heading{
+  display:flex;
+  align-items:center;
+  gap:12px;
+
   padding:
     4px
     7px
@@ -1041,7 +1045,7 @@ h1{
   width:100%;
 
   height:
-    clamp(42px,4vw,52px);
+    clamp(38px,3vw,46px);
 
   padding:
     0
@@ -1497,16 +1501,16 @@ h1{
   }
 
   .size-field input{
-    height:40px;
+  height:36px;
 
-    padding:
-      0
-      10px;
+  padding:
+    0
+    10px;
 
-    border-radius:10px;
+  border-radius:9px;
 
-    font-size:12px;
-  }
+  font-size:12px;
+}
 
   .quality-card,
   .filter-card{
@@ -1669,20 +1673,8 @@ h1{
 <header class="header">
 
 <h1>
-Settings
+ShowBox
 </h1>
-
-<p class="subtitle">
-Fine-tune your stream quality and filtering preferences.
-</p>
-
-<button
-  id="backButton"
-  class="back-button"
-  type="button"
->
-← Back
-</button>
 
 </header>
 
@@ -1700,7 +1692,20 @@ Keep streams between the selected minimum and maximum size.
 <div class="file-size-card">
 
 <div class="file-size-heading">
-FILE SIZE
+  <span>FILE SIZE</span>
+
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"/>
+  </svg>
 </div>
 
 <div class="file-size-inner">
@@ -1895,11 +1900,6 @@ const sessionId=
 const expiresAt=
   ${session.expiresAt};
 
-const backButton=
-  document.getElementById(
-    "backButton"
-  );
-
 const qualityList=
   document.getElementById(
     "qualityList"
@@ -2077,17 +2077,6 @@ window.addEventListener(
     if(event.persisted){
       await verifySession();
     }
-  }
-);
-
-backButton.addEventListener(
-  "click",
-  ()=>{
-    if(expired){
-      return;
-    }
-
-    history.back();
   }
 );
 
