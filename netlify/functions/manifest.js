@@ -1570,7 +1570,7 @@ body{
 }
 
 h1{
-  margin:20px 0 0 0;
+  margin:25px 0 0 0;
 
   font-size:
     clamp(34px,5vw,44px);
@@ -1599,7 +1599,7 @@ h1{
   display:block;
 
   margin:
-    20px 0 9px;
+    30px 0 9px;
 
   color:var(--muted-2);
 
