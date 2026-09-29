@@ -37,12 +37,8 @@ const DEFAULT_QUALITIES=[
   }
 ];
 
-const MAX_CONFIG_BODY_BYTES=
-  16*1024;
-
-const MAX_QUALITY_ITEMS=
-  DEFAULT_QUALITIES.length;
-
+const MAX_CONFIG_BODY_BYTES=16*1024;
+const MAX_QUALITY_ITEMS=DEFAULT_QUALITIES.length;
 const MAX_FILE_SIZE_GB=200;
 
 function jsonResponse(
@@ -80,9 +76,7 @@ function decodeConfig(
         .replace(/-/g,"+")
         .replace(/_/g,"/");
 
-    while(
-      base64.length%4
-    ){
+    while(base64.length%4){
       base64+="=";
     }
 
@@ -272,7 +266,7 @@ function validateFileSize(
   return normalized;
 }
 
-async function getConfigFromRequest(
+function getConfigIdFromRequest(
   request
 ){
   const url=
@@ -292,12 +286,22 @@ async function getConfigFromRequest(
       /^\/([^/]+)\/configure$/
     );
 
-  if(!match){
+  return match
+    ?match[1]
+    :null;
+}
+
+async function getConfigFromRequest(
+  request
+){
+  const configValue=
+    getConfigIdFromRequest(
+      request
+    );
+
+  if(!configValue){
     return null;
   }
-
-  const configValue=
-    match[1];
 
   const stored=
     await getConfig(
@@ -424,6 +428,10 @@ an existing addon configuration.
 }
 
 export const config={
+  method:[
+    "GET",
+    "POST"
+  ],
   path:[
     "/configure/:config",
     "/:config/configure"
@@ -435,21 +443,6 @@ export default async function handler(
 ){
   const url=
     new URL(request.url);
-
-  const configData=
-    await getConfigFromRequest(
-      request
-    );
-
-  if(!configData){
-    return invalidConfigResponse();
-  }
-
-  const configId=
-    configData.id;
-
-  const existingConfig=
-    configData.config;
 
   if(
     request.method==="POST"
@@ -482,9 +475,7 @@ export default async function handler(
 
       if(
         new TextEncoder()
-          .encode(
-            requestBody
-          )
+          .encode(requestBody)
           .byteLength>
         MAX_CONFIG_BODY_BYTES
       ){
@@ -566,10 +557,23 @@ export default async function handler(
         return expiredResponse();
       }
 
+      const configData=
+        await getConfigFromRequest(
+          request
+        );
+
+      if(!configData){
+        return invalidConfigResponse();
+      }
+
+      const configId=
+        configData.id;
+
+      const existingConfig=
+        configData.config;
+
       if(
-        Array.isArray(
-          body.qualities
-        )&&
+        Array.isArray(body.qualities)&&
         body.qualities.length>
           MAX_QUALITY_ITEMS
       ){
@@ -642,13 +646,10 @@ export default async function handler(
 
       return jsonResponse({
         ok:true,
-
         configId:
           finalConfigId,
-
         manifestUrl:
           `${url.origin}/${finalConfigId}/manifest.json`,
-
         stremioUrl:
           `stremio://${url.host}/${finalConfigId}/manifest.json`
       });
@@ -670,6 +671,21 @@ export default async function handler(
       );
     }
   }
+
+  const configData=
+    await getConfigFromRequest(
+      request
+    );
+
+  if(!configData){
+    return invalidConfigResponse();
+  }
+
+  const configId=
+    configData.id;
+
+  const existingConfig=
+    configData.config;
 
   const session=
     await createConfigureSession();
@@ -1301,23 +1317,17 @@ body{
 <body>
 <div class="container">
 <header class="header">
-<h1>
-Settings
-</h1>
+<h1>Settings</h1>
 </header>
 
 <section class="section">
-<h2 class="section-title">
-File size
-</h2>
+<h2 class="section-title">File size</h2>
 <p class="section-description">
 Keep streams between the selected minimum and maximum size.
 </p>
 <div class="file-size-card">
 <div class="file-size-heading">
-<span>
-FILE SIZE
-</span>
+<span>FILE SIZE</span>
 <svg
   width="22"
   height="22"
@@ -1337,9 +1347,7 @@ Keep streams between
 </div>
 <div class="size-row">
 <div class="size-field">
-<label for="minSize">
-Min (GB)
-</label>
+<label for="minSize">Min (GB)</label>
 <input
   id="minSize"
   type="number"
@@ -1350,9 +1358,7 @@ Min (GB)
 >
 </div>
 <div class="size-field">
-<label for="maxSize">
-Max (GB)
-</label>
+<label for="maxSize">Max (GB)</label>
 <input
   id="maxSize"
   type="number"
@@ -1372,9 +1378,7 @@ Max (GB)
 </section>
 
 <section class="section">
-<h2 class="section-title">
-Quality settings
-</h2>
+<h2 class="section-title">Quality settings</h2>
 <p class="section-description">
 Enable the qualities you want. Move them up or down to set their priority.
 </p>
@@ -1387,9 +1391,7 @@ Enable the qualities you want. Move them up or down to set their priority.
 </section>
 
 <section class="section">
-<h2 class="section-title">
-Stream filters
-</h2>
+<h2 class="section-title">Stream filters</h2>
 <p class="section-description">
 Enable the stream types you want to keep. These settings do not change quality priority.
 </p>
@@ -1400,9 +1402,7 @@ Enable the stream types you want to keep. These settings do not change quality p
   id="camFilter"
   type="checkbox"
 >
-<span>
-CAM
-</span>
+<span>CAM</span>
 </label>
 </div>
 </div>
@@ -1419,9 +1419,7 @@ Save Configuration
 
 <div id="result">
 <div class="result-card">
-<div class="result-title">
-Manifest URL
-</div>
+<div class="result-title">Manifest URL</div>
 <div id="manifestUrl"></div>
 <div class="result-buttons">
 <button
@@ -1451,75 +1449,44 @@ copy the manifest URL and add it manually through Stremio's Add-ons page.
 <script>
 "use strict";
 
-const qualities=
-  ${qualitiesJson};
-
-const fileSize=
-  ${fileSizeJson};
-
-const filters=
-  ${filtersJson};
-
-const sessionId=
-  ${sessionJson};
-
-const expiresAt=
-  ${expiresAt};
+const qualities=${qualitiesJson};
+const fileSize=${fileSizeJson};
+const filters=${filtersJson};
+const sessionId=${sessionJson};
+const expiresAt=${expiresAt};
 
 const qualityList=
-  document.getElementById(
-    "qualityList"
-  );
+  document.getElementById("qualityList");
 
 const minSizeInput=
-  document.getElementById(
-    "minSize"
-  );
+  document.getElementById("minSize");
 
 const maxSizeInput=
-  document.getElementById(
-    "maxSize"
-  );
+  document.getElementById("maxSize");
 
 const fileSizeError=
-  document.getElementById(
-    "fileSizeError"
-  );
+  document.getElementById("fileSizeError");
 
 const camFilter=
-  document.getElementById(
-    "camFilter"
-  );
+  document.getElementById("camFilter");
 
 const saveButton=
-  document.getElementById(
-    "save"
-  );
+  document.getElementById("save");
 
 const status=
-  document.getElementById(
-    "status"
-  );
+  document.getElementById("status");
 
 const result=
-  document.getElementById(
-    "result"
-  );
+  document.getElementById("result");
 
 const manifestUrl=
-  document.getElementById(
-    "manifestUrl"
-  );
+  document.getElementById("manifestUrl");
 
 const copyButton=
-  document.getElementById(
-    "copy"
-  );
+  document.getElementById("copy");
 
 const installButton=
-  document.getElementById(
-    "install"
-  );
+  document.getElementById("install");
 
 let expired=false;
 
@@ -1537,26 +1504,20 @@ function expire(){
   );
 }
 
-const remaining=
+setTimeout(
+  expire,
   Math.max(
     0,
     expiresAt-Date.now()
-  );
-
-setTimeout(
-  expire,
-  remaining
+  )
 );
 
 function setStatus(
   message,
   type=""
 ){
-  status.textContent=
-    message;
-
-  status.className=
-    type;
+  status.textContent=message;
+  status.className=type;
 }
 
 function renderQualities(){
@@ -1565,26 +1526,16 @@ function renderQualities(){
   qualities.forEach(
     (quality,index)=>{
       const row=
-        document.createElement(
-          "div"
-        );
+        document.createElement("div");
 
-      row.className=
-        "quality-row";
+      row.className="quality-row";
 
       const checkbox=
-        document.createElement(
-          "input"
-        );
+        document.createElement("input");
 
-      checkbox.type=
-        "checkbox";
-
-      checkbox.className=
-        "quality-check";
-
-      checkbox.checked=
-        quality.enabled;
+      checkbox.type="checkbox";
+      checkbox.className="quality-check";
+      checkbox.checked=quality.enabled;
 
       checkbox.addEventListener(
         "change",
@@ -1597,37 +1548,22 @@ function renderQualities(){
       );
 
       const name=
-        document.createElement(
-          "div"
-        );
+        document.createElement("div");
 
-      name.className=
-        "quality-name";
-
-      name.textContent=
-        quality.name;
+      name.className="quality-name";
+      name.textContent=quality.name;
 
       const controls=
-        document.createElement(
-          "div"
-        );
+        document.createElement("div");
 
-      controls.className=
-        "quality-controls";
+      controls.className="quality-controls";
 
       const up=
-        document.createElement(
-          "button"
-        );
+        document.createElement("button");
 
-      up.type=
-        "button";
-
-      up.textContent=
-        "↑";
-
-      up.disabled=
-        index===0;
+      up.type="button";
+      up.textContent="↑";
+      up.disabled=index===0;
 
       up.addEventListener(
         "click",
@@ -1636,35 +1572,26 @@ function renderQualities(){
             return;
           }
 
-          const previous=
-            qualities[index-1];
-
-          qualities[index-1]=
-            qualities[index];
-
-          qualities[index]=
-            previous;
+          [
+            qualities[index-1],
+            qualities[index]
+          ]=[
+            qualities[index],
+            qualities[index-1]
+          ];
 
           invalidateResult();
-
           renderQualities();
         }
       );
 
       const down=
-        document.createElement(
-          "button"
-        );
+        document.createElement("button");
 
-      down.type=
-        "button";
-
-      down.textContent=
-        "↓";
-
+      down.type="button";
+      down.textContent="↓";
       down.disabled=
-        index===
-        qualities.length-1;
+        index===qualities.length-1;
 
       down.addEventListener(
         "click",
@@ -1676,17 +1603,15 @@ function renderQualities(){
             return;
           }
 
-          const next=
-            qualities[index+1];
-
-          qualities[index+1]=
-            qualities[index];
-
-          qualities[index]=
-            next;
+          [
+            qualities[index+1],
+            qualities[index]
+          ]=[
+            qualities[index],
+            qualities[index+1]
+          ];
 
           invalidateResult();
-
           renderQualities();
         }
       );
@@ -1702,9 +1627,7 @@ function renderQualities(){
         controls
       );
 
-      qualityList.appendChild(
-        row
-      );
+      qualityList.appendChild(row);
     }
   );
 }
@@ -1738,9 +1661,7 @@ function validateFileSize(){
   if(
     value.minGb!==null&&
     (
-      !Number.isFinite(
-        value.minGb
-      )||
+      !Number.isFinite(value.minGb)||
       value.minGb<0||
       value.minGb>200
     )
@@ -1752,9 +1673,7 @@ function validateFileSize(){
   else if(
     value.maxGb!==null&&
     (
-      !Number.isFinite(
-        value.maxGb
-      )||
+      !Number.isFinite(value.maxGb)||
       value.maxGb<0||
       value.maxGb>200
     )
@@ -1766,25 +1685,20 @@ function validateFileSize(){
   else if(
     value.minGb!==null&&
     value.maxGb!==null&&
-    value.minGb>
-      value.maxGb
+    value.minGb>value.maxGb
   ){
     error=
       "Minimum size cannot be greater than maximum size.";
   }
 
-  fileSizeError.textContent=
-    error;
+  fileSizeError.textContent=error;
 
   return !error;
 }
 
 function invalidateResult(){
-  result.style.display=
-    "none";
-
+  result.style.display="none";
   manifestUrl.textContent="";
-
   setStatus("");
 }
 
@@ -1793,9 +1707,7 @@ async function saveConfiguration(){
     return;
   }
 
-  if(
-    Date.now()>=expiresAt
-  ){
+  if(Date.now()>=expiresAt){
     expire();
     return;
   }
@@ -1813,15 +1725,11 @@ async function saveConfiguration(){
       "Enable at least one quality.",
       "error"
     );
-
     return;
   }
 
   saveButton.disabled=true;
-
-  saveButton.textContent=
-    "Saving...";
-
+  saveButton.textContent="Saving...";
   setStatus("");
 
   try{
@@ -1841,17 +1749,13 @@ async function saveConfiguration(){
               qualities:
                 qualities.map(
                   quality=>({
-                    name:
-                      quality.name,
-                    enabled:
-                      quality.enabled
+                    name:quality.name,
+                    enabled:quality.enabled
                   })
                 ),
-              fileSize:
-                getFileSize(),
+              fileSize:getFileSize(),
               filters:{
-                cam:
-                  camFilter.checked
+                cam:camFilter.checked
               }
             }),
           cache:"no-store"
@@ -1866,15 +1770,19 @@ async function saveConfiguration(){
       return;
     }
 
+    const text=
+      await response.text();
+
     let data;
 
     try{
       data=
-        await response.json();
+        JSON.parse(text);
     }
 
     catch{
       throw new Error(
+        text||
         "The server returned an invalid response."
       );
     }
@@ -1886,9 +1794,7 @@ async function saveConfiguration(){
       );
     }
 
-    if(
-      !data.manifestUrl
-    ){
+    if(!data.manifestUrl){
       throw new Error(
         "The server did not return a manifest URL."
       );
@@ -1897,8 +1803,7 @@ async function saveConfiguration(){
     manifestUrl.textContent=
       data.manifestUrl;
 
-    result.style.display=
-      "block";
+    result.style.display="block";
 
     setStatus(
       "Configuration saved.",
@@ -1906,10 +1811,8 @@ async function saveConfiguration(){
     );
 
     window.scrollTo({
-      top:
-        document.body.scrollHeight,
-      behavior:
-        "smooth"
+      top:document.body.scrollHeight,
+      behavior:"smooth"
     });
   }
 
@@ -1925,9 +1828,7 @@ async function saveConfiguration(){
 
   finally{
     if(!expired){
-      saveButton.disabled=
-        false;
-
+      saveButton.disabled=false;
       saveButton.textContent=
         "Save Configuration";
     }
@@ -1970,14 +1871,12 @@ copyButton.addEventListener(
         value
       );
 
-      copyButton.textContent=
-        "Copied";
+      copyButton.textContent="Copied";
 
       setTimeout(
         ()=>{
           if(!expired){
-            copyButton.textContent=
-              "Copy";
+            copyButton.textContent="Copy";
           }
         },
         1500
@@ -2003,37 +1902,27 @@ installButton.addEventListener(
       return;
     }
 
-    const stremioUrl=
+    window.location.href=
       "stremio://"+
       value.replace(
         /^https?:\/\//,
         ""
       );
-
-    window.location.href=
-      stremioUrl;
   }
 );
 
-if(
-  fileSize.minGb!==null
-){
-  minSizeInput.value=
-    fileSize.minGb;
+if(fileSize.minGb!==null){
+  minSizeInput.value=fileSize.minGb;
 }
 
-if(
-  fileSize.maxGb!==null
-){
-  maxSizeInput.value=
-    fileSize.maxGb;
+if(fileSize.maxGb!==null){
+  maxSizeInput.value=fileSize.maxGb;
 }
 
 camFilter.checked=
   filters.cam!==false;
 
 renderQualities();
-
 validateFileSize();
 
 saveButton.addEventListener(
