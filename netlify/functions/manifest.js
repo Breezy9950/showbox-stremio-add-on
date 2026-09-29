@@ -2216,7 +2216,6 @@ h1{
     font-size:40px;
   }
 
-  .settings-title,
   .section-title,
   .configuration-title{
     font-size:27px;
