@@ -4,20 +4,17 @@ import {
   getConfig
 } from "./config-store.js";
 
-
 const TMDB_API_KEY =
   "439c478a771f35c05022f9feabcca01c";
 
 const TMDB_BASE_URL =
   "https://api.themoviedb.org/3";
 
-
 // ---------------------------------------------------------
 // Base64URL
 // ---------------------------------------------------------
 
 function decodeBase64Url(value) {
-
   let base64 =
     value
       .replace(/-/g, "+")
@@ -37,15 +34,12 @@ function decodeBase64Url(value) {
     .toString("utf8");
 }
 
-
 // ---------------------------------------------------------
 // Parse legacy Base64 config
 // ---------------------------------------------------------
 
 function parseConfig(rawConfig) {
-
   try {
-
     const decoded =
       decodeBase64Url(
         rawConfig
@@ -54,19 +48,15 @@ function parseConfig(rawConfig) {
     return JSON.parse(
       decoded
     );
-
   } catch (error) {
-
     console.log(
       "[ShowBox] Config parsing failed:",
       error.message
     );
 
     return {};
-
   }
 }
-
 
 // ---------------------------------------------------------
 // Load configured Stremio config
@@ -75,7 +65,6 @@ function parseConfig(rawConfig) {
 async function loadConfig(
   rawConfig
 ) {
-
   /*
    * New configuration IDs are 32-character
    * hexadecimal values stored in Netlify Blobs.
@@ -86,19 +75,16 @@ async function loadConfig(
       rawConfig
     )
   ) {
-
     const storedConfig =
       await getConfig(
         rawConfig
       );
-
 
     if (
       storedConfig &&
       typeof storedConfig === "object" &&
       !Array.isArray(storedConfig)
     ) {
-
       console.log(
         "[ShowBox] Loaded persistent configuration:",
         {
@@ -107,19 +93,14 @@ async function loadConfig(
         }
       );
 
-
       return storedConfig;
-
     }
-
 
     console.log(
       "[ShowBox] Persistent configuration not found:",
       rawConfig
     );
-
   }
-
 
   /*
    * Legacy Base64 configuration.
@@ -134,11 +115,8 @@ async function loadConfig(
       rawConfig
     );
 
-
   return legacyConfig;
-
 }
-
 
 // ---------------------------------------------------------
 // ShowBox token parser
@@ -147,7 +125,6 @@ async function loadConfig(
 function parseSingleToken(
   token
 ) {
-
   if (!token) {
     return null;
   }
@@ -159,7 +136,6 @@ function parseSingleToken(
   }
 
   try {
-
     const decoded =
       JSON.parse(
         Buffer
@@ -170,14 +146,12 @@ function parseSingleToken(
           .toString("utf8")
       );
 
-
     if (
       !decoded ||
       !decoded.encrypt_data
     ) {
       return token;
     }
-
 
     const key =
       CryptoJS.enc.Utf8.parse(
@@ -188,7 +162,6 @@ function parseSingleToken(
       CryptoJS.enc.Utf8.parse(
         "wEiphTn!"
       );
-
 
     const decrypted =
       CryptoJS.TripleDES.decrypt(
@@ -206,12 +179,10 @@ function parseSingleToken(
         CryptoJS.enc.Utf8
       );
 
-
     const result =
       JSON.parse(
         decrypted
       );
-
 
     if (
       result &&
@@ -223,19 +194,15 @@ function parseSingleToken(
     }
 
     return token;
-
   } catch (error) {
-
     console.log(
       "[ShowBox] Token parsing failed:",
       error.message
     );
 
     return token;
-
   }
 }
-
 
 // ---------------------------------------------------------
 // IMDb -> TMDB
@@ -244,37 +211,29 @@ function parseSingleToken(
 async function imdbToTmdb(
   imdbId
 ) {
-
   console.log(
     "[ShowBox] TMDB lookup:",
     imdbId
   );
-
 
   const response =
     await fetch(
       `${TMDB_BASE_URL}/find/${encodeURIComponent(imdbId)}?api_key=${TMDB_API_KEY}&external_source=imdb_id`
     );
 
-
   console.log(
     "[ShowBox] TMDB response:",
     response.status
   );
 
-
   if (!response.ok) {
-
     throw new Error(
       `TMDB lookup failed: HTTP ${response.status}`
     );
-
   }
-
 
   const data =
     await response.json();
-
 
   const movieResults =
     Array.isArray(
@@ -283,7 +242,6 @@ async function imdbToTmdb(
       ? data.movie_results
       : [];
 
-
   const tvResults =
     Array.isArray(
       data.tv_results
@@ -291,35 +249,28 @@ async function imdbToTmdb(
       ? data.tv_results
       : [];
 
-
   const result =
     movieResults[0] ||
     tvResults[0];
-
 
   if (
     !result ||
     !result.id
   ) {
-
     throw new Error(
       `TMDB ID not found for ${imdbId}`
     );
-
   }
-
 
   console.log(
     "[ShowBox] TMDB result:",
     result.id
   );
 
-
   return String(
     result.id
   );
 }
-
 
 // ---------------------------------------------------------
 // TMDB title information
@@ -329,35 +280,26 @@ async function getTMDBDetails(
   tmdbId,
   type
 ) {
-
   try {
-
     const endpoint =
       type === "series"
         ? `/tv/${tmdbId}`
         : `/movie/${tmdbId}`;
-
 
     const response =
       await fetch(
         `${TMDB_BASE_URL}${endpoint}?api_key=${TMDB_API_KEY}`
       );
 
-
     if (!response.ok) {
       return null;
     }
 
-
     return await response.json();
-
   } catch {
-
     return null;
-
   }
 }
-
 
 // ---------------------------------------------------------
 // ShowBox web search: IMDb -> ShowBox media ID
@@ -377,63 +319,48 @@ const SHOWBOX_SEARCH_HEADERS = {
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
 };
 
-
 function parseShowBoxSearchHref(
   html
 ) {
-
   const patterns = [
     /class="film-name[^"]*"[^>]*>\s*<a[^>]+href="([^"]+)"/i,
     /<a[^>]+href="([^"]+)"[^>]*class="[^"]*film-name[^"]*"/i
   ];
 
-
   for (
     const pattern of patterns
   ) {
-
     const match =
       html.match(
         pattern
       );
 
-
     if (
       match?.[1]
     ) {
-
       return new URL(
         match[1],
         SHOWBOX_WEB_API
       ).href;
-
     }
-
   }
-
 
   return null;
 }
 
-
 function parseShowBoxHeadingId(
   html
 ) {
-
   const match =
     html.match(
       /class="heading-name[^"]*"[^>]*>[\s\S]*?<a[^>]+href="([^"]+)"/i
     );
 
-
   if (
     !match?.[1]
   ) {
-
     return null;
-
   }
-
 
   const id =
     match[1]
@@ -441,24 +368,19 @@ function parseShowBoxHeadingId(
       .filter(Boolean)
       .pop();
 
-
   return id || null;
 }
-
 
 async function searchShowBoxMediaId(
   imdbId
 ) {
-
   console.log(
     "[ShowBox] Web search:",
     imdbId
   );
 
-
   const searchUrl =
     `${SHOWBOX_WEB_API}/search?keyword=${encodeURIComponent(imdbId)}`;
-
 
   const searchResponse =
     await fetch(
@@ -469,50 +391,39 @@ async function searchShowBoxMediaId(
       }
     );
 
-
   console.log(
     "[ShowBox] Web search response:",
     searchResponse.status
   );
 
-
   if (
     !searchResponse.ok
   ) {
-
     throw new Error(
       `ShowBox web search failed: HTTP ${searchResponse.status}`
     );
-
   }
-
 
   const searchHtml =
     await searchResponse.text();
-
 
   const detailUrl =
     parseShowBoxSearchHref(
       searchHtml
     );
 
-
   if (
     !detailUrl
   ) {
-
     throw new Error(
       "ShowBox web search result not found"
     );
-
   }
-
 
   console.log(
     "[ShowBox] Web search detail URL:",
     detailUrl
   );
-
 
   const detailResponse =
     await fetch(
@@ -523,54 +434,42 @@ async function searchShowBoxMediaId(
       }
     );
 
-
   console.log(
     "[ShowBox] Web detail response:",
     detailResponse.status
   );
 
-
   if (
     !detailResponse.ok
   ) {
-
     throw new Error(
       `ShowBox web detail failed: HTTP ${detailResponse.status}`
     );
-
   }
-
 
   const detailHtml =
     await detailResponse.text();
-
 
   const showboxId =
     parseShowBoxHeadingId(
       detailHtml
     );
 
-
   if (
     !showboxId
   ) {
-
     throw new Error(
       "ShowBox media ID not found"
     );
-
   }
-
 
   console.log(
     "[ShowBox] Verified media ID:",
     showboxId
   );
 
-
   return showboxId;
 }
-
 
 // ---------------------------------------------------------
 // FebBox share
@@ -580,16 +479,13 @@ async function febboxShare(
   showboxId,
   type
 ) {
-
   const boxType =
     type === "series"
       ? 2
       : 1;
 
-
   const url =
     `https://www.febbox.com/mbp/to_share_page?box_type=${boxType}&mid=${showboxId}&json=1`;
-
 
   console.log(
     "[ShowBox] FebBox share request:",
@@ -599,14 +495,11 @@ async function febboxShare(
     }
   );
 
-
   const response =
     await fetch(url);
 
-
   const text =
     await response.text();
-
 
   console.log(
     "[ShowBox] FebBox share response:",
@@ -619,23 +512,16 @@ async function febboxShare(
     }
   );
 
-
   let data;
 
-
   try {
-
     data =
       JSON.parse(text);
-
   } catch {
-
     throw new Error(
       "FebBox share response was not JSON"
     );
-
   }
-
 
   console.log(
     "[ShowBox] FebBox share JSON:",
@@ -648,38 +534,29 @@ async function febboxShare(
     }
   );
 
-
   if (
     data.code !== 1 ||
     !data.data
   ) {
-
     throw new Error(
       "FebBox share request failed"
     );
-
   }
-
 
   const shareLink =
     data.data.shareLink ||
     data.data.share_link;
 
-
   if (!shareLink) {
-
     throw new Error(
       "FebBox share link missing"
     );
-
   }
-
 
   const shareKey =
     shareLink
       .split("/")
       .pop();
-
 
   console.log(
     "[ShowBox] FebBox share key:",
@@ -691,10 +568,8 @@ async function febboxShare(
     }
   );
 
-
   return shareKey;
 }
-
 
 // ---------------------------------------------------------
 // FebBox root file list
@@ -703,10 +578,8 @@ async function febboxShare(
 async function febboxFileList(
   shareKey
 ) {
-
   const url =
     `https://www.febbox.com/file/file_share_list?share_key=${shareKey}`;
-
 
   const response =
     await fetch(
@@ -719,10 +592,8 @@ async function febboxFileList(
       }
     );
 
-
   const text =
     await response.text();
-
 
   console.log(
     "[ShowBox] FebBox file list:",
@@ -738,23 +609,16 @@ async function febboxFileList(
     }
   );
 
-
   let data;
 
-
   try {
-
     data =
       JSON.parse(text);
-
   } catch {
-
     throw new Error(
       "FebBox file list was not JSON"
     );
-
   }
-
 
   const files =
     data &&
@@ -764,7 +628,6 @@ async function febboxFileList(
     )
       ? data.data.file_list
       : [];
-
 
   console.log(
     "[ShowBox] FebBox file list result:",
@@ -777,7 +640,6 @@ async function febboxFileList(
     }
   );
 
-
   if (
     data.code !== 1 ||
     !data.data ||
@@ -785,17 +647,13 @@ async function febboxFileList(
       data.data.file_list
     )
   ) {
-
     throw new Error(
       "FebBox file list failed"
     );
-
   }
-
 
   return files;
 }
-
 
 // ---------------------------------------------------------
 // FebBox season file list
@@ -805,10 +663,8 @@ async function febboxSeasonFileList(
   shareKey,
   seasonFolder
 ) {
-
   const url =
     `https://www.febbox.com/file/file_share_list?share_key=${shareKey}&parent_id=${seasonFolder.fid}&page=1`;
-
 
   const response =
     await fetch(
@@ -821,10 +677,8 @@ async function febboxSeasonFileList(
       }
     );
 
-
   const text =
     await response.text();
-
 
   console.log(
     "[ShowBox] FebBox episode list:",
@@ -837,23 +691,16 @@ async function febboxSeasonFileList(
     }
   );
 
-
   let data;
 
-
   try {
-
     data =
       JSON.parse(text);
-
   } catch {
-
     throw new Error(
       "FebBox episode list was not JSON"
     );
-
   }
-
 
   if (
     data.code !== 1 ||
@@ -862,17 +709,13 @@ async function febboxSeasonFileList(
       data.data.file_list
     )
   ) {
-
     throw new Error(
       "FebBox episode list failed"
     );
-
   }
-
 
   return data.data.file_list;
 }
-
 
 // ---------------------------------------------------------
 // Find ALL matching FebBox files
@@ -884,12 +727,10 @@ async function findFebboxFiles(
   season,
   episode
 ) {
-
   const rootFiles =
     await febboxFileList(
       shareKey
     );
-
 
   // -------------------------------------------------------
   // Movie
@@ -898,7 +739,6 @@ async function findFebboxFiles(
   if (
     type === "movie"
   ) {
-
     const files =
       rootFiles.filter(
         item =>
@@ -907,15 +747,11 @@ async function findFebboxFiles(
           item.file_name
       );
 
-
     if (!files.length) {
-
       throw new Error(
         "Movie file not found"
       );
-
     }
-
 
     console.log(
       "[ShowBox] Movie files found:",
@@ -930,10 +766,8 @@ async function findFebboxFiles(
       )
     );
 
-
     return files;
   }
-
 
   // -------------------------------------------------------
   // TV season
@@ -942,7 +776,6 @@ async function findFebboxFiles(
   const expectedSeason =
     `season ${season}`
       .toLowerCase();
-
 
   const seasonFolder =
     rootFiles.find(
@@ -955,15 +788,11 @@ async function findFebboxFiles(
           expectedSeason
     );
 
-
   if (!seasonFolder) {
-
     throw new Error(
       `Season folder not found: ${expectedSeason}`
     );
-
   }
-
 
   console.log(
     "[ShowBox] FebBox season folder:",
@@ -976,23 +805,19 @@ async function findFebboxFiles(
     }
   );
 
-
   const files =
     await febboxSeasonFileList(
       shareKey,
       seasonFolder
     );
 
-
   const s2 =
     String(season)
       .padStart(2, "0");
 
-
   const e2 =
     String(episode)
       .padStart(2, "0");
-
 
   const lowerS =
     String(season);
@@ -1000,11 +825,9 @@ async function findFebboxFiles(
   const lowerE =
     String(episode);
 
-
   const matchingFiles =
     files.filter(
       item => {
-
         if (
           !item ||
           !item.file_name
@@ -1012,11 +835,9 @@ async function findFebboxFiles(
           return false;
         }
 
-
         const name =
           item.file_name
             .toLowerCase();
-
 
         return (
           name.includes(
@@ -1026,21 +847,16 @@ async function findFebboxFiles(
             `s${lowerS}e${lowerE}`
           )
         );
-
       }
     );
-
 
   if (
     !matchingFiles.length
   ) {
-
     throw new Error(
       `Episode not found: S${season}E${episode}`
     );
-
   }
-
 
   console.log(
     "[ShowBox] Episode files found:",
@@ -1055,10 +871,8 @@ async function findFebboxFiles(
     )
   );
 
-
   return matchingFiles;
 }
-
 
 // ---------------------------------------------------------
 // FebBox quality list
@@ -1069,12 +883,10 @@ async function febboxQualityList(
   shareKey,
   token
 ) {
-
   const cookieHeader =
     token.startsWith("ui=")
       ? token
       : `ui=${token}`;
-
 
   console.log(
     "[ShowBox] Token diagnostics:",
@@ -1093,10 +905,8 @@ async function febboxQualityList(
     }
   );
 
-
   const qualityUrl =
     `https://www.febbox.com/console/video_quality_list?fid=${file.fid}&share_key=${shareKey}`;
-
 
   console.log(
     "[ShowBox] FebBox quality request:",
@@ -1105,7 +915,6 @@ async function febboxQualityList(
         file.fid
     }
   );
-
 
   const response =
     await fetch(
@@ -1118,20 +927,16 @@ async function febboxQualityList(
       }
     );
 
-
   const contentType =
     response.headers.get(
       "content-type"
     ) || "";
 
-
   const finalUrl =
     response.url;
 
-
   const text =
     await response.text();
-
 
   console.log(
     "[ShowBox] FebBox quality response:",
@@ -1148,61 +953,46 @@ async function febboxQualityList(
     }
   );
 
-
   let data;
 
-
   try {
-
     data =
       JSON.parse(text);
-
 
     console.log(
       "[ShowBox] FebBox quality JSON:",
       JSON.stringify(data)
     );
-
   } catch {
-
     data =
       null;
-
   }
-
 
   if (
     data &&
     data.html
   ) {
-
     return parseFebboxHtml(
       data.html,
       file
     );
-
   }
-
 
   if (
     text.includes(
       "file_quality"
     )
   ) {
-
     return parseFebboxHtml(
       text,
       file
     );
-
   }
-
 
   throw new Error(
     "FebBox quality response missing HTML"
   );
 }
-
 
 // ---------------------------------------------------------
 // Parse FebBox quality HTML
@@ -1212,20 +1002,16 @@ function parseFebboxHtml(
   html,
   file
 ) {
-
   const streams = [];
-
 
   const blocks =
     html.split(
       /(?=<div[^>]*class=["'][^"']*file_quality[^"']*["'][^>]*>)/i
     );
 
-
   for (
     const block of blocks
   ) {
-
     if (
       !block.includes(
         "file_quality"
@@ -1234,39 +1020,32 @@ function parseFebboxHtml(
       continue;
     }
 
-
     const urlMatch =
       block.match(
         /data-url=["']([^"']+)["']/i
       );
 
-
     if (!urlMatch) {
       continue;
     }
-
 
     const qualityMatch =
       block.match(
         /data-quality=["']([^"']+)["']/i
       );
 
-
     const sizeMatch =
       block.match(
         /class=["'][^"']*\bsize\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i
       );
 
-
     const streamUrl =
       urlMatch[1];
-
 
     const quality =
       qualityMatch
         ? qualityMatch[1]
         : "";
-
 
     const size =
       sizeMatch
@@ -1278,9 +1057,7 @@ function parseFebboxHtml(
             .trim()
         : "";
 
-
     streams.push({
-
       url:
         streamUrl,
 
@@ -1294,21 +1071,16 @@ function parseFebboxHtml(
 
       sourceFile:
         file
-
     });
-
   }
-
 
   console.log(
     "[ShowBox] Parsed FebBox qualities:",
     streams.length
   );
 
-
   return streams;
 }
-
 
 // ---------------------------------------------------------
 // Quality label
@@ -1318,14 +1090,12 @@ function getQualityLabel(
   quality,
   fileName
 ) {
-
   const value =
     String(
       quality ||
       fileName ||
       ""
     ).toLowerCase();
-
 
   if (
     value.includes("2160") ||
@@ -1334,13 +1104,11 @@ function getQualityLabel(
     return "4K";
   }
 
-
   if (
     value.includes("1440")
   ) {
     return "1440p";
   }
-
 
   if (
     value.includes("1080")
@@ -1348,13 +1116,11 @@ function getQualityLabel(
     return "1080p";
   }
 
-
   if (
     value.includes("720")
   ) {
     return "720p";
   }
-
 
   if (
     value.includes("480")
@@ -1362,13 +1128,11 @@ function getQualityLabel(
     return "480p";
   }
 
-
   if (
     value.includes("360")
   ) {
     return "360p";
   }
-
 
   if (
     String(quality)
@@ -1378,10 +1142,8 @@ function getQualityLabel(
     return "ORG";
   }
 
-
   return quality || "";
 }
-
 
 // ---------------------------------------------------------
 // Clean filename
@@ -1390,7 +1152,6 @@ function getQualityLabel(
 function cleanFilename(
   value
 ) {
-
   return String(
     value || ""
   )
@@ -1404,7 +1165,6 @@ function cleanFilename(
     );
 }
 
-
 // ---------------------------------------------------------
 // Technical metadata
 // ---------------------------------------------------------
@@ -1413,19 +1173,15 @@ function getTechnicalMetadata(
   fileName,
   quality
 ) {
-
   const name =
     cleanFilename(
       fileName
     );
 
-
   const upper =
     name.toUpperCase();
 
-
   const result = [];
-
 
   // -------------------------------------------------------
   // Source / release type
@@ -1439,11 +1195,9 @@ function getTechnicalMetadata(
       upper
     )
   ) {
-
     result.push(
       "WEB-DL"
     );
-
   } else if (
     /\bWEB[- .]?RIP\b/.test(
       upper
@@ -1452,11 +1206,9 @@ function getTechnicalMetadata(
       upper
     )
   ) {
-
     result.push(
       "WEB-RIP"
     );
-
   } else if (
     /\bBLU[- .]?RAY\b/.test(
       upper
@@ -1465,21 +1217,17 @@ function getTechnicalMetadata(
       upper
     )
   ) {
-
     result.push(
       "BluRay"
     );
-
   } else if (
     /\bBDRIP\b/.test(
       upper
     )
   ) {
-
     result.push(
       "BDRip"
     );
-
   } else if (
     /\bTELECINE\b/.test(
       upper
@@ -1488,23 +1236,18 @@ function getTechnicalMetadata(
       upper
     )
   ) {
-
     result.push(
       "TELECINE"
     );
-
   } else if (
     /\bCAM\b/.test(
       upper
     )
   ) {
-
     result.push(
       "CAM"
     );
-
   }
-
 
   // -------------------------------------------------------
   // Dynamic range
@@ -1518,11 +1261,9 @@ function getTechnicalMetadata(
       upper
     )
   ) {
-
     result.push(
       "DV"
     );
-
   } else if (
     /\bHDR10\+\b/.test(
       upper
@@ -1531,43 +1272,34 @@ function getTechnicalMetadata(
       upper
     )
   ) {
-
     result.push(
       "HDR10+"
     );
-
   } else if (
     /\bHDR10\b/.test(
       upper
     )
   ) {
-
     result.push(
       "HDR10"
     );
-
   } else if (
     /\bHDR\b/.test(
       upper
     )
   ) {
-
     result.push(
       "HDR"
     );
-
   } else if (
     /\bHLG\b/.test(
       upper
     )
   ) {
-
     result.push(
       "HLG"
     );
-
   }
-
 
   // -------------------------------------------------------
   // Audio codec
@@ -1578,66 +1310,52 @@ function getTechnicalMetadata(
       upper
     )
   ) {
-
     result.push(
       "Atmos"
     );
-
   }
-
 
   if (
     /\bDDP[ ._-]?7[ ._-]?1\b/.test(
       upper
     )
   ) {
-
     result.push(
       "DDP7.1"
     );
-
   } else if (
     /\bDDP[ ._-]?5[ ._-]?1\b/.test(
       upper
     )
   ) {
-
     result.push(
       "DDP5.1"
     );
-
   } else if (
     /\bDD[ ._-]?5[ ._-]?1\b/.test(
       upper
     )
   ) {
-
     result.push(
       "DD5.1"
     );
-
   } else if (
     /\bDTS[- .]?(HD|X)?\b/.test(
       upper
     )
   ) {
-
     result.push(
       "DTS"
     );
-
   } else if (
     /\bAAC\b/.test(
       upper
     )
   ) {
-
     result.push(
       "AAC"
     );
-
   }
-
 
   // -------------------------------------------------------
   // Video codec
@@ -1654,11 +1372,9 @@ function getTechnicalMetadata(
       upper
     )
   ) {
-
     result.push(
       "H.265"
     );
-
   } else if (
     /\bAVC\b/.test(
       upper
@@ -1670,27 +1386,21 @@ function getTechnicalMetadata(
       upper
     )
   ) {
-
     result.push(
       "H.264"
     );
-
   } else if (
     /\bAV1\b/.test(
       upper
     )
   ) {
-
     result.push(
       "AV1"
     );
-
   }
-
 
   return result;
 }
-
 
 // ---------------------------------------------------------
 // Normalize language value
@@ -1699,7 +1409,6 @@ function getTechnicalMetadata(
 function normalizeLanguageValue(
   value
 ) {
-
   if (
     value === null ||
     value === undefined
@@ -1707,25 +1416,20 @@ function normalizeLanguageValue(
     return [];
   }
 
-
   if (
     Array.isArray(value)
   ) {
-
     return value.flatMap(
       item =>
         normalizeLanguageValue(
           item
         )
     );
-
   }
-
 
   if (
     typeof value === "object"
   ) {
-
     return [
       value.name,
       value.language,
@@ -1739,9 +1443,7 @@ function normalizeLanguageValue(
             item
           )
       );
-
   }
-
 
   return String(value)
     .split(
@@ -1754,7 +1456,6 @@ function normalizeLanguageValue(
     .filter(Boolean);
 }
 
-
 // ---------------------------------------------------------
 // Detect explicit languages from an object
 // ---------------------------------------------------------
@@ -1763,7 +1464,6 @@ function getLanguagesFromObject(
   object,
   keys
 ) {
-
   if (
     !object ||
     typeof object !== "object"
@@ -1771,39 +1471,29 @@ function getLanguagesFromObject(
     return [];
   }
 
-
   for (
     const key of keys
   ) {
-
     if (
       object[key] !== undefined &&
       object[key] !== null &&
       object[key] !== ""
     ) {
-
       const values =
         normalizeLanguageValue(
           object[key]
         );
 
-
       if (
         values.length
       ) {
-
         return values;
-
       }
-
     }
-
   }
-
 
   return [];
 }
-
 
 // ---------------------------------------------------------
 // Detect explicit languages in filenames
@@ -1812,18 +1502,14 @@ function getLanguagesFromObject(
 function getLanguagesFromFilename(
   fileName
 ) {
-
   const text =
     String(
       fileName || ""
     ).toLowerCase();
 
-
   const languages = [];
 
-
   const known = [
-
     ["english", "English"],
     ["eng", "English"],
 
@@ -1863,9 +1549,7 @@ function getLanguagesFromFilename(
 
     ["russian", "Russian"],
     ["rus", "Russian"]
-
   ];
-
 
   for (
     const [
@@ -1873,31 +1557,24 @@ function getLanguagesFromFilename(
       label
     ] of known
   ) {
-
     const regex =
       new RegExp(
         `(?:^|[ ._\\-()])${token}(?:$|[ ._\\-()])`,
         "i"
       );
 
-
     if (
       regex.test(text) &&
       !languages.includes(label)
     ) {
-
       languages.push(
         label
       );
-
     }
-
   }
-
 
   return languages;
 }
-
 
 // ---------------------------------------------------------
 // Audio / subtitle information
@@ -1906,12 +1583,10 @@ function getLanguagesFromFilename(
 function getAudioLanguages(
   item
 ) {
-
   const object =
     item.sourceFile ||
     item.link ||
     item;
-
 
   const explicit =
     getLanguagesFromObject(
@@ -1928,31 +1603,24 @@ function getAudioLanguages(
       ]
     );
 
-
   if (
     explicit.length
   ) {
-
     return explicit;
-
   }
-
 
   return getLanguagesFromFilename(
     item.fileName
   );
 }
 
-
 function getSubtitleLanguages(
   item
 ) {
-
   const object =
     item.sourceFile ||
     item.link ||
     item;
-
 
   const explicit =
     getLanguagesFromObject(
@@ -1969,21 +1637,16 @@ function getSubtitleLanguages(
       ]
     );
 
-
   if (
     explicit.length
   ) {
-
     return explicit;
-
   }
-
 
   const text =
     String(
       item.fileName || ""
     ).toLowerCase();
-
 
   if (
     /\bno[\s._-]?subs?\b/.test(
@@ -1996,19 +1659,15 @@ function getSubtitleLanguages(
       text
     )
   ) {
-
     return [
       "No included subtitles"
     ];
-
   }
-
 
   return getLanguagesFromFilename(
     item.fileName
   );
 }
-
 
 // ---------------------------------------------------------
 // Title
@@ -2018,55 +1677,43 @@ function buildTitle(
   tmdbDetails,
   type
 ) {
-
   if (!tmdbDetails) {
     return "";
   }
 
-
   if (
     type === "series"
   ) {
-
     return (
       tmdbDetails.name ||
       tmdbDetails.original_name ||
       ""
     );
-
   }
-
 
   const title =
     tmdbDetails.title ||
     tmdbDetails.original_title ||
     "";
 
-
   const releaseDate =
     tmdbDetails.release_date ||
     "";
-
 
   const year =
     releaseDate
       ? releaseDate.slice(0, 4)
       : "";
 
-
   if (
     title &&
     year
   ) {
-
     return `${title} (${year})`;
-
   }
-
 
   return title;
 }
-
 
 // ---------------------------------------------------------
 // Stream technical line
@@ -2075,13 +1722,11 @@ function buildTitle(
 function buildTechnicalLine(
   item
 ) {
-
   const quality =
     getQualityLabel(
       item.quality,
       item.fileName
     );
-
 
   const metadata =
     getTechnicalMetadata(
@@ -2089,43 +1734,32 @@ function buildTechnicalLine(
       item.quality
     );
 
-
   const parts = [];
-
 
   if (
     quality
   ) {
-
     parts.push(
       quality
     );
-
   }
-
 
   for (
     const value of metadata
   ) {
-
     if (
       !parts.includes(value)
     ) {
-
       parts.push(
         value
       );
-
     }
-
   }
-
 
   return parts.join(
     " • "
   );
 }
-
 
 // ---------------------------------------------------------
 // Build stream title
@@ -2138,9 +1772,7 @@ function buildStreamTitle(
   season,
   episode
 ) {
-
   const lines = [];
-
 
   const title =
     buildTitle(
@@ -2148,98 +1780,75 @@ function buildStreamTitle(
       type
     );
 
-
   if (
     title
   ) {
-
     lines.push(
       title
     );
-
   }
-
 
   if (
     type === "series" &&
     Number.isFinite(season) &&
     Number.isFinite(episode)
   ) {
-
     lines.push(
       `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`
     );
-
   }
-
 
   const technical =
     buildTechnicalLine(
       item
     );
 
-
   if (
     technical
   ) {
-
     lines.push(
       technical
     );
-
   }
-
 
   if (
     item.size
   ) {
-
     lines.push(
       item.size
     );
-
   }
-
 
   const audioLanguages =
     getAudioLanguages(
       item
     );
 
-
   if (
     audioLanguages.length
   ) {
-
     lines.push(
       `Audio: ${audioLanguages.join(", ")}`
     );
-
   }
-
 
   const subtitleLanguages =
     getSubtitleLanguages(
       item
     );
 
-
   if (
     subtitleLanguages.length
   ) {
-
     lines.push(
       `Subtitles: ${subtitleLanguages.join(", ")}`
     );
-
   }
-
 
   return lines.join(
     "\n"
   );
 }
-
 
 // ---------------------------------------------------------
 // Build FebBox streams
@@ -2252,17 +1861,14 @@ function buildFebboxStreams(
   season,
   episode
 ) {
-
   return qualityResults.map(
     item => ({
-
       name:
         getQualityLabel(
           item.quality,
           item.fileName
         ) ||
         "ShowBox",
-
 
       title:
         buildStreamTitle(
@@ -2273,23 +1879,18 @@ function buildFebboxStreams(
           episode
         ),
 
-
       url:
         item.url,
 
-
       size:
         item.size,
-
 
       behaviorHints: {
         bingeGroup:
           "showbox"
       },
 
-
       headers: {
-
         Accept:
           "*/*",
 
@@ -2307,13 +1908,10 @@ function buildFebboxStreams(
 
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
       }
-
     })
   );
 }
-
 
 // ---------------------------------------------------------
 // Remove duplicate URLs
@@ -2322,46 +1920,34 @@ function buildFebboxStreams(
 function dedupeStreams(
   streams
 ) {
-
   const seen =
     new Set();
 
-
   return streams.filter(
     stream => {
-
       if (
         !stream ||
         !stream.url
       ) {
-
         return false;
-
       }
-
 
       if (
         seen.has(
           stream.url
         )
       ) {
-
         return false;
-
       }
-
 
       seen.add(
         stream.url
       );
 
-
       return true;
-
     }
   );
 }
-
 
 // =========================================================
 // QUALITY CONFIGURATION
@@ -2377,7 +1963,6 @@ const DEFAULT_QUALITIES = [
   "360p"
 ];
 
-
 // ---------------------------------------------------------
 // Normalize quality configuration
 // ---------------------------------------------------------
@@ -2385,7 +1970,6 @@ const DEFAULT_QUALITIES = [
 function normalizeQualityConfig(
   config
 ) {
-
   /*
    * Old configured addon URLs don't have
    * a qualities property.
@@ -2398,9 +1982,7 @@ function normalizeQualityConfig(
       config?.qualities
     )
   ) {
-
     return {
-
       enabled:
         new Set(
           DEFAULT_QUALITIES
@@ -2411,66 +1993,49 @@ function normalizeQualityConfig(
 
       configured:
         false
-
     };
-
   }
-
 
   const priority = [];
 
   const enabled =
     new Set();
 
-
   for (
     const item of config.qualities
   ) {
-
     if (
       !item ||
       !item.name
     ) {
-
       continue;
-
     }
-
 
     const name =
       getCanonicalQuality(
         item.name
       );
 
-
     if (!name) {
       continue;
     }
 
-
     if (
       !priority.includes(name)
     ) {
-
       priority.push(
         name
       );
-
     }
-
 
     if (
       item.enabled === true
     ) {
-
       enabled.add(
         name
       );
-
     }
-
   }
-
 
   /*
    * Append any default qualities missing
@@ -2480,34 +2045,26 @@ function normalizeQualityConfig(
   for (
     const quality of DEFAULT_QUALITIES
   ) {
-
     if (
       !priority.includes(
         quality
       )
     ) {
-
       priority.push(
         quality
       );
-
     }
-
   }
 
-
   return {
-
     enabled,
 
     priority,
 
     configured:
       true
-
   };
 }
-
 
 // ---------------------------------------------------------
 // Canonical quality name
@@ -2516,7 +2073,6 @@ function normalizeQualityConfig(
 function getCanonicalQuality(
   value
 ) {
-
   const text =
     String(
       value || ""
@@ -2524,81 +2080,58 @@ function getCanonicalQuality(
       .trim()
       .toLowerCase();
 
-
   if (
     text === "org" ||
     text === "original"
   ) {
-
     return "ORG";
-
   }
-
 
   if (
     text === "4k" ||
     text === "2160p" ||
     text === "2160"
   ) {
-
     return "4K";
-
   }
-
 
   if (
     text === "1440p" ||
     text === "1440"
   ) {
-
     return "1440p";
-
   }
-
 
   if (
     text === "1080p" ||
     text === "1080"
   ) {
-
     return "1080p";
-
   }
-
 
   if (
     text === "720p" ||
     text === "720"
   ) {
-
     return "720p";
-
   }
-
 
   if (
     text === "480p" ||
     text === "480"
   ) {
-
     return "480p";
-
   }
-
 
   if (
     text === "360p" ||
     text === "360"
   ) {
-
     return "360p";
-
   }
-
 
   return null;
 }
-
 
 // ---------------------------------------------------------
 // Get quality from stream
@@ -2607,28 +2140,23 @@ function getCanonicalQuality(
 function getStreamQuality(
   stream
 ) {
-
   if (!stream) {
     return "";
   }
-
 
   const name =
     getCanonicalQuality(
       stream.name
     );
 
-
   if (name) {
     return name;
   }
-
 
   const title =
     String(
       stream.title || ""
     );
-
 
   /*
    * The quality is normally the first part
@@ -2640,25 +2168,19 @@ function getStreamQuality(
       "\n"
     )[2] || "";
 
-
   const qualityFromTitle =
     getCanonicalQuality(
       firstLine
     );
 
-
   if (
     qualityFromTitle
   ) {
-
     return qualityFromTitle;
-
   }
-
 
   return "";
 }
-
 
 // ---------------------------------------------------------
 // Apply configured quality settings
@@ -2668,12 +2190,10 @@ function applyQualitySettings(
   streams,
   config
 ) {
-
   const qualityConfig =
     normalizeQualityConfig(
       config
     );
-
 
   /*
    * Old configuration URLs don't have
@@ -2683,21 +2203,16 @@ function applyQualitySettings(
   if (
     !qualityConfig.configured
   ) {
-
     return streams;
-
   }
-
 
   const filtered =
     streams.filter(
       stream => {
-
         const quality =
           getStreamQuality(
             stream
           );
-
 
         /*
          * Keep streams whose quality cannot
@@ -2708,14 +2223,11 @@ function applyQualitySettings(
           return true;
         }
 
-
         return qualityConfig.enabled.has(
           quality
         );
-
       }
     );
-
 
   /*
    * Stable sort:
@@ -2727,13 +2239,11 @@ function applyQualitySettings(
 
   filtered.sort(
     (a, b) => {
-
       const qa =
         getStreamQuality(a);
 
       const qb =
         getStreamQuality(b);
-
 
       const ia =
         qa
@@ -2742,7 +2252,6 @@ function applyQualitySettings(
             )
           : Infinity;
 
-
       const ib =
         qb
           ? qualityConfig.priority.indexOf(
@@ -2750,17 +2259,13 @@ function applyQualitySettings(
             )
           : Infinity;
 
-
       return ia - ib;
-
     }
   );
-
 
   console.log(
     "[ShowBox] Quality settings:",
     {
-
       enabled:
         Array.from(
           qualityConfig.enabled
@@ -2774,14 +2279,11 @@ function applyQualitySettings(
 
       after:
         filtered.length
-
     }
   );
 
-
   return filtered;
 }
-
 
 // =========================================================
 // STREAM FILTER CONFIGURATION
@@ -2791,7 +2293,6 @@ const DEFAULT_STREAM_FILTERS = {
   cam: false
 };
 
-
 // ---------------------------------------------------------
 // Normalize stream filter configuration
 // ---------------------------------------------------------
@@ -2799,10 +2300,8 @@ const DEFAULT_STREAM_FILTERS = {
 function normalizeStreamFilterConfig(
   config
 ) {
-
   const filters =
     config?.filters;
-
 
   /*
    * Old addon configurations don't have
@@ -2815,29 +2314,28 @@ function normalizeStreamFilterConfig(
     !filters ||
     typeof filters !== "object"
   ) {
-
     return {
       ...DEFAULT_STREAM_FILTERS
     };
-
   }
 
-
   return {
-
     cam:
       filters.cam === true
-
   };
 }
-
 
 // ---------------------------------------------------------
 // Detect CAM / Telecine
 // ---------------------------------------------------------
 
-function isCamOrTelecine(fileName) {
-  const text = String(fileName || "").toUpperCase();
+function isCamOrTelecine(
+  fileName
+) {
+  const text =
+    String(
+      fileName || ""
+    ).toUpperCase();
 
   return (
     /\bTELECINE\b/.test(text) ||
@@ -2849,7 +2347,6 @@ function isCamOrTelecine(fileName) {
   );
 }
 
-
 // ---------------------------------------------------------
 // Apply stream filters
 // ---------------------------------------------------------
@@ -2858,12 +2355,10 @@ function applyStreamFilters(
   qualityResults,
   config
 ) {
-
   const filters =
     normalizeStreamFilterConfig(
       config
     );
-
 
   /*
    * Filter the original FebBox file
@@ -2879,12 +2374,10 @@ function applyStreamFilters(
   const filtered =
     qualityResults.filter(
       item => {
-
         const fileName =
           item.fileName ||
           item.sourceFile?.file_name ||
           "";
-
 
         if (
           !filters.cam &&
@@ -2892,22 +2385,16 @@ function applyStreamFilters(
             fileName
           )
         ) {
-
           return false;
-
         }
 
-
         return true;
-
       }
     );
-
 
   console.log(
     "[ShowBox] Stream filters:",
     {
-
       cam:
         filters.cam,
 
@@ -2916,19 +2403,15 @@ function applyStreamFilters(
 
       after:
         filtered.length
-
     }
   );
-
 
   return filtered;
 }
 
-
 // =========================================================
 // FILE SIZE CONFIGURATION
 // =========================================================
-
 
 // ---------------------------------------------------------
 // Parse file size into GB
@@ -2937,16 +2420,12 @@ function applyStreamFilters(
 function parseSizeGb(
   value
 ) {
-
   if (
     value === null ||
     value === undefined
   ) {
-
     return null;
-
   }
-
 
   const text =
     String(
@@ -2959,94 +2438,69 @@ function parseSizeGb(
       )
       .toUpperCase();
 
-
   if (!text) {
     return null;
   }
-
 
   const match =
     text.match(
       /([\d.]+)\s*(TB|GB|MB|KB|B)\b/
     );
 
-
   if (!match) {
     return null;
   }
-
 
   const number =
     Number(
       match[1]
     );
 
-
   if (
     !Number.isFinite(
       number
     )
   ) {
-
     return null;
-
   }
-
 
   const unit =
     match[2];
 
-
   if (
     unit === "TB"
   ) {
-
     return number * 1024;
-
   }
-
 
   if (
     unit === "GB"
   ) {
-
     return number;
-
   }
-
 
   if (
     unit === "MB"
   ) {
-
     return number / 1024;
-
   }
-
 
   if (
     unit === "KB"
   ) {
-
     return number /
       (1024 * 1024);
-
   }
-
 
   if (
     unit === "B"
   ) {
-
     return number /
       (1024 * 1024 * 1024);
-
   }
-
 
   return null;
 }
-
 
 // ---------------------------------------------------------
 // Apply file-size settings
@@ -3056,10 +2510,8 @@ function applyFileSizeSettings(
   streams,
   config
 ) {
-
   const fileSize =
     config?.fileSize;
-
 
   /*
    * No file-size configuration means
@@ -3073,11 +2525,8 @@ function applyFileSizeSettings(
       fileSize.maxGb === null
     )
   ) {
-
     return streams;
-
   }
-
 
   const minGb =
     Number.isFinite(
@@ -3090,7 +2539,6 @@ function applyFileSizeSettings(
         )
       : null;
 
-
   const maxGb =
     Number.isFinite(
       Number(
@@ -3102,26 +2550,20 @@ function applyFileSizeSettings(
         )
       : null;
 
-
   if (
     minGb === null &&
     maxGb === null
   ) {
-
     return streams;
-
   }
-
 
   const filtered =
     streams.filter(
       stream => {
-
         const sizeGb =
           parseSizeGb(
             stream.size
           );
-
 
         /*
          * If the size is unavailable or
@@ -3131,42 +2573,30 @@ function applyFileSizeSettings(
         if (
           sizeGb === null
         ) {
-
           return true;
-
         }
-
 
         if (
           minGb !== null &&
           sizeGb < minGb
         ) {
-
           return false;
-
         }
-
 
         if (
           maxGb !== null &&
           sizeGb > maxGb
         ) {
-
           return false;
-
         }
 
-
         return true;
-
       }
     );
-
 
   console.log(
     "[ShowBox] File-size settings:",
     {
-
       minGb,
 
       maxGb,
@@ -3176,14 +2606,11 @@ function applyFileSizeSettings(
 
       after:
         filtered.length
-
     }
   );
 
-
   return filtered;
 }
-
 
 // =========================================================
 // Main handler
@@ -3193,29 +2620,23 @@ export default async (
   req,
   context
 ) => {
-
   const requestId =
     Math.random()
       .toString(36)
       .slice(2, 8);
 
-
   console.log(
     `[ShowBox][${requestId}] ===== START =====`
   );
 
-
   try {
-
     const url =
       new URL(
         req.url
       );
 
-
     const pathname =
       url.pathname;
-
 
     // -----------------------------------------------------
     // Extract config + request
@@ -3226,29 +2647,22 @@ export default async (
         /^\/([^/]+)\/stream\/([^/]+)\/(.+)$/
       );
 
-
     if (!match) {
-
       throw new Error(
         "Invalid stream request path"
       );
-
     }
-
 
     const rawConfig =
       match[1];
 
-
     const type =
       match[2];
-
 
     let rawId =
       decodeURIComponent(
         match[3]
       );
-
 
     console.log(
       `[ShowBox][${requestId}] Request:`,
@@ -3257,7 +2671,6 @@ export default async (
         rawId
       }
     );
-
 
     // -----------------------------------------------------
     // Remove .json
@@ -3269,7 +2682,6 @@ export default async (
         ""
       );
 
-
     // -----------------------------------------------------
     // Parse configuration
     // -----------------------------------------------------
@@ -3277,21 +2689,25 @@ export default async (
     const config =
       await loadConfig(
         rawConfig
-      ); 
-    console.log(
-  `[ShowBox][${requestId}] Loaded config settings:`,
-  {
-    qualities: config?.qualities,
-    filters: config?.filters,
-    fileSize: config?.fileSize
-  }
-);
+      );
 
+    console.log(
+      `[ShowBox][${requestId}] Loaded config settings:`,
+      {
+        qualities:
+          config?.qualities,
+
+        filters:
+          config?.filters,
+
+        fileSize:
+          config?.fileSize
+      }
+    );
 
     const token =
       config.uiToken ||
       "";
-
 
     console.log(
       `[ShowBox][${requestId}] Token loaded:`,
@@ -3301,50 +2717,38 @@ export default async (
       }
     );
 
-
     if (!token) {
-
       throw new Error(
         "No ShowBox UI token configured"
       );
-
     }
-
 
     // -----------------------------------------------------
     // Parse IMDb / season / episode
     // -----------------------------------------------------
 
     let imdbId;
-
     let season;
-
     let episode;
-
 
     if (
       type === "series"
     ) {
-
       const parts =
         rawId.split(":");
 
-
       imdbId =
         parts[0];
-
 
       season =
         Number(
           parts[1]
         );
 
-
       episode =
         Number(
           parts[2]
         );
-
 
       if (
         !imdbId ||
@@ -3355,13 +2759,10 @@ export default async (
           episode
         )
       ) {
-
         throw new Error(
           `Invalid series ID: ${rawId}`
         );
-
       }
-
 
       console.log(
         `[ShowBox][${requestId}] Parsed:`,
@@ -3371,12 +2772,9 @@ export default async (
           episode
         }
       );
-
     } else {
-
       imdbId =
         rawId;
-
 
       console.log(
         `[ShowBox][${requestId}] Parsed:`,
@@ -3384,9 +2782,7 @@ export default async (
           imdbId
         }
       );
-
     }
-
 
     // -----------------------------------------------------
     // IMDb -> TMDB
@@ -3397,12 +2793,10 @@ export default async (
         imdbId
       );
 
-
     console.log(
       `[ShowBox][${requestId}] TMDB:`,
       tmdbId
     );
-
 
     // -----------------------------------------------------
     // Get title metadata
@@ -3413,7 +2807,6 @@ export default async (
         tmdbId,
         type
       );
-
 
     console.log(
       `[ShowBox][${requestId}] TMDB details:`,
@@ -3428,7 +2821,6 @@ export default async (
       }
     );
 
-
     // -----------------------------------------------------
     // Parse ShowBox token
     // -----------------------------------------------------
@@ -3438,7 +2830,6 @@ export default async (
         token
       );
 
-
     console.log(
       `[ShowBox][${requestId}] Token ready:`,
       {
@@ -3446,7 +2837,6 @@ export default async (
           parsedToken !== token
       }
     );
-
 
     // -----------------------------------------------------
     // ShowBox
@@ -3457,21 +2847,16 @@ export default async (
         imdbId
       );
 
-
     console.log(
       `[ShowBox][${requestId}] ShowBox ID:`,
       showboxId
     );
 
-
     if (!showboxId) {
-
       throw new Error(
         "ShowBox ID missing"
       );
-
     }
-
 
     // -----------------------------------------------------
     // FebBox share
@@ -3482,7 +2867,6 @@ export default async (
         showboxId,
         type
       );
-
 
     // -----------------------------------------------------
     // Find ALL matching FebBox files
@@ -3496,7 +2880,6 @@ export default async (
         episode
       );
 
-
     // -----------------------------------------------------
     // Get qualities from ALL matching files
     // -----------------------------------------------------
@@ -3504,13 +2887,10 @@ export default async (
     const allQualityResults =
       [];
 
-
     for (
       const file of files
     ) {
-
       try {
-
         const results =
           await febboxQualityList(
             file,
@@ -3518,19 +2898,14 @@ export default async (
             parsedToken
           );
 
-
         for (
           const result of results
         ) {
-
           allQualityResults.push(
             result
           );
-
         }
-
       } catch (error) {
-
         console.log(
           "[ShowBox] FebBox file failed:",
           {
@@ -3544,11 +2919,8 @@ export default async (
               error.message
           }
         );
-
       }
-
     }
-
 
     // -----------------------------------------------------
     // Apply CAM / Telecine filter
@@ -3560,7 +2932,6 @@ export default async (
         allQualityResults,
         config
       );
-
 
     // -----------------------------------------------------
     // FebBox streams
@@ -3575,7 +2946,6 @@ export default async (
         episode
       );
 
-
     // -----------------------------------------------------
     // Combine both sources
     // -----------------------------------------------------
@@ -3584,7 +2954,6 @@ export default async (
       dedupeStreams([
         ...febboxStreams
       ]);
-
 
     // -----------------------------------------------------
     // Apply quality settings
@@ -3596,7 +2965,6 @@ export default async (
         config
       );
 
-
     // -----------------------------------------------------
     // Apply file-size settings
     // -----------------------------------------------------
@@ -3607,17 +2975,13 @@ export default async (
         config
       );
 
-
     if (
       !configuredStreams.length
     ) {
-
       throw new Error(
         "No streams remain after filtering"
       );
-
     }
-
 
     // -----------------------------------------------------
     // Final diagnostics
@@ -3626,7 +2990,6 @@ export default async (
     console.log(
       `[ShowBox][${requestId}] Stream breakdown:`,
       {
-
         febbox:
           febboxStreams.length,
 
@@ -3635,15 +2998,12 @@ export default async (
 
         final:
           configuredStreams.length
-
       }
     );
-
 
     console.log(
       `[ShowBox][${requestId}] ===== END =====`
     );
-
 
     return new Response(
       JSON.stringify({
@@ -3655,35 +3015,27 @@ export default async (
           200,
 
         headers: {
-
           "Content-Type":
             "application/json",
 
           "Access-Control-Allow-Origin":
             "*"
-
         }
       }
     );
-
-
   } catch (error) {
-
     console.error(
       `[ShowBox][${requestId}] ===== ERROR =====`
     );
-
 
     console.error(
       `[ShowBox][${requestId}]`,
       error.message
     );
 
-
     console.error(
       `[ShowBox][${requestId}] ===== END ERROR =====`
     );
-
 
     return new Response(
       JSON.stringify({
@@ -3694,29 +3046,22 @@ export default async (
           200,
 
         headers: {
-
           "Content-Type":
             "application/json",
 
           "Access-Control-Allow-Origin":
             "*"
-
         }
       }
     );
-
   }
-
 };
-
 
 // ---------------------------------------------------------
 // Netlify route
 // ---------------------------------------------------------
 
 export const config = {
-
   path:
     "/:config/stream/:type/:id.json"
-
 };
