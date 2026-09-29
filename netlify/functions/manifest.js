@@ -1557,7 +1557,7 @@ body{
 .container{
   width:
     min(
-      clamp(560px,72vw,760px),
+      clamp(500px,68vw,760px),
       calc(100% - 28px)
     );
 
@@ -1723,7 +1723,7 @@ h1{
   color:var(--text);
 
   font-size:
-    clamp(27px,4vw,34px);
+    clamp(40px, 1.75rem + 4vw, 72px);
 
   line-height:1.15;
 
@@ -2206,14 +2206,14 @@ h1{
 
   .container{
     width:
-      calc(100% - 24px);
+      calc(100% - 20px);
 
     padding:
       38px 0 60px;
   }
 
   h1{
-    font-size:38px;
+    font-size:40px;
   }
 
   .settings-title,
