@@ -6,6 +6,7 @@ import {
   getHomepageSession,
   setHomepageSessionToken
 } from "./config-store.js";
+
 const DEFAULT_QUALITIES=[
   "ORG",
   "4K",
@@ -15,18 +16,27 @@ const DEFAULT_QUALITIES=[
   "480p",
   "360p"
 ];
+
 const MAX_CONFIG_BODY_BYTES=
   16*1024;
+
 const MAX_TOKEN_LENGTH=4096;
+
 const MAX_QUALITY_ITEMS=
   DEFAULT_QUALITIES.length;
+
 const MAX_FILE_SIZE_GB=200;
+
 const CREATE_CONFIG_RATE_LIMIT=10;
+
 const CREATE_CONFIG_RATE_WINDOW_MS=
   60*1000;
+
 const MAX_RATE_LIMIT_ENTRIES=5000;
+
 const createConfigRateLimits=
   new Map();
+
 function qualityRows(){
   return DEFAULT_QUALITIES.map(
     (quality,index)=>`
@@ -63,6 +73,7 @@ function qualityRows(){
     `
   ).join("");
 }
+
 function filterRows(){
   return `
     <div class="filter-setting-row">
@@ -80,6 +91,7 @@ function filterRows(){
     </div>
   `;
 }
+
 function jsonResponse(
   body,
   status=200,
@@ -103,6 +115,7 @@ function jsonResponse(
     }
   );
 }
+
 function validateFileSize(
   fileSize
 ){
@@ -119,6 +132,7 @@ function validateFileSize(
   ){
     return "Minimum file size must be between 0 and 200 GB.";
   }
+
   if(
     fileSize.maxGb!==null&&
     (
@@ -132,6 +146,7 @@ function validateFileSize(
   ){
     return "Maximum file size must be between 0 and 200 GB.";
   }
+
   if(
     fileSize.minGb!==null&&
     fileSize.maxGb!==null&&
@@ -140,20 +155,26 @@ function validateFileSize(
   ){
     return "Minimum size cannot be greater than maximum size.";
   }
+
   return null;
 }
+
 function normalizeQualities(
   input
 ){
   if(!Array.isArray(input)){
     return [];
   }
+
   const allowed=
     new Set(
       DEFAULT_QUALITIES
     );
+
   const seen=new Set();
+
   const result=[];
+
   for(
     const item of input
   ){
@@ -164,31 +185,39 @@ function normalizeQualities(
     ){
       continue;
     }
+
     const name=
       item.name.trim();
+
     if(
       !allowed.has(name)||
       seen.has(name)
     ){
       continue;
     }
+
     seen.add(name);
+
     result.push({
       name,
       enabled:
         item.enabled!==false
     });
+
     if(
       result.length>=
-      DEFAULT_QUALITIES.length
+      MAX_QUALITY_ITEMS
     ){
       break;
     }
   }
+
   return result;
 }
+
 function isRateLimited(ip){
   const now=Date.now();
+
   for(
     const [
       key,
@@ -204,6 +233,7 @@ function isRateLimited(ip){
       );
     }
   }
+
   if(
     createConfigRateLimits.size>=
       MAX_RATE_LIMIT_ENTRIES&&
@@ -213,10 +243,12 @@ function isRateLimited(ip){
   ){
     return true;
   }
+
   let entry=
     createConfigRateLimits.get(
       ip
     );
+
   if(
     !entry||
     now-entry.windowStart>=
@@ -226,93 +258,127 @@ function isRateLimited(ip){
       windowStart:now,
       count:0
     };
+
     createConfigRateLimits.set(
       ip,
       entry
     );
   }
+
   entry.count++;
+
   return (
     entry.count>
     CREATE_CONFIG_RATE_LIMIT
   );
 }
+
 function homepageScript(
   session
 ){
   return `
 (function(){
 "use strict";
+
 const tokenInput=
   document.getElementById(
     "tokenInput"
   );
+
 const generateButton=
   document.getElementById(
     "generateButton"
   );
+
 const checkStatus=
   document.getElementById(
     "checkStatus"
   );
+
 const tokenPage=
   document.getElementById(
     "tokenPage"
   );
+
 const configuration=
   document.getElementById(
     "configuration"
   );
+
 const qualityList=
   document.getElementById(
     "qualityList"
   );
+
 const filterList=
   document.getElementById(
     "filterList"
   );
+
 const minSizeInput=
   document.getElementById(
     "minSize"
   );
+
 const maxSizeInput=
   document.getElementById(
     "maxSize"
   );
+
 const fileSizeStatus=
   document.getElementById(
     "fileSizeStatus"
   );
+
 const saveConfiguration=
   document.getElementById(
     "saveConfiguration"
   );
+
 const result=
   document.getElementById(
     "result"
   );
+
 const manifestUrl=
   document.getElementById(
     "manifestUrl"
   );
+
 const copyButton=
   document.getElementById(
     "copyButton"
   );
+
 const installButton=
   document.getElementById(
     "installButton"
   );
+
 const sessionId=
   ${JSON.stringify(session.id)};
+
 const expiresAt=
   ${session.expiresAt};
+
 let currentToken="";
 let hasGenerated=false;
 let configId="";
+let expired=false;
+
 function expire(){
+  if(expired){
+    return;
+  }
+
+  expired=true;
+
+  generateButton.disabled=true;
+  saveConfiguration.disabled=true;
+
   location.reload();
 }
+
 setTimeout(
   expire,
   Math.max(
@@ -320,6 +386,7 @@ setTimeout(
     expiresAt-Date.now()
   )
 );
+
 function getRows(){
   return Array.from(
     qualityList.querySelectorAll(
@@ -327,6 +394,7 @@ function getRows(){
     )
   );
 }
+
 function getQualityConfig(){
   return getRows().map(
     row=>{
@@ -334,43 +402,58 @@ function getQualityConfig(){
         row.querySelector(
           ".quality-checkbox"
         );
+
       return {
         name:
           checkbox.dataset.quality,
+
         enabled:
           checkbox.checked
       };
     }
   );
 }
+
 function getFilterConfig(){
+  const checkbox=
+    document.getElementById(
+      "camFilter"
+    );
+
   return {
     cam:
-      document.getElementById(
-        "camFilter"
-      ).checked
+      checkbox?
+        checkbox.checked:
+        true
   };
 }
+
 function getFileSizeConfig(){
   const minValue=
     minSizeInput.value.trim();
+
   const maxValue=
     maxSizeInput.value.trim();
+
   return {
     minGb:
       minValue===""
         ?null
         :Number(minValue),
+
     maxGb:
       maxValue===""
         ?null
         :Number(maxValue)
   };
 }
+
 function validateFileSizeInputs(){
   const fileSize=
     getFileSizeConfig();
+
   let error="";
+
   if(
     fileSize.minGb!==null&&
     (
@@ -384,6 +467,7 @@ function validateFileSizeInputs(){
     error=
       "Minimum file size must be between 0 and 200 GB.";
   }
+
   else if(
     fileSize.maxGb!==null&&
     (
@@ -397,6 +481,7 @@ function validateFileSizeInputs(){
     error=
       "Maximum file size must be between 0 and 200 GB.";
   }
+
   else if(
     fileSize.minGb!==null&&
     fileSize.maxGb!==null&&
@@ -406,100 +491,149 @@ function validateFileSizeInputs(){
     error=
       "Minimum size cannot be greater than maximum size.";
   }
+
   fileSizeStatus.textContent=
     error;
+
   fileSizeStatus.className=
     error
       ?"filter-error"
       :"";
+
   return !error;
 }
+
 function clearManifest(){
   manifestUrl.value="";
+
   installButton.classList.add(
     "disabled"
   );
+
   installButton.href="#";
+
   result.style.display=
     "none";
 }
+
 function showConfigurationPage(){
   tokenPage.style.display=
     "none";
+
   configuration.style.display=
     "block";
+
   window.scrollTo(
     0,
     0
   );
 }
+
 function showTokenPage(){
   configuration.style.display=
     "none";
+
   tokenPage.style.display=
     "block";
+
   checkStatus.textContent="";
   checkStatus.className="";
+
   window.scrollTo(
     0,
     0
   );
 }
+
 function settingsChanged(){
   if(!hasGenerated){
     return;
   }
+
   clearManifest();
+
   checkStatus.textContent=
     "Settings changed. Save the configuration to update the addon.";
+
   checkStatus.className="";
 }
+
 async function generate(){
+  if(expired){
+    return;
+  }
+
   const token=
     tokenInput.value.trim();
+
   if(!token){
     checkStatus.textContent=
       "Enter your ShowBox UI token first.";
+
     checkStatus.className=
       "error";
+
     return;
   }
+
   if(
     token.length<=100||
     token.length>4096
   ){
     checkStatus.textContent=
       "Invalid Cookie";
+
     checkStatus.className=
       "error";
+
     return;
   }
+
   generateButton.disabled=true;
+
   generateButton.textContent=
     "Generating...";
+
   try{
     const response=
       await fetch(
         "/create-config",
         {
           method:"POST",
+
           headers:{
             "Content-Type":
               "application/json"
           },
+
           body:
             JSON.stringify({
               action:
                 "prepare",
+
               sessionId,
+
               uiToken:
                 token
             }),
+
           cache:"no-store"
         }
       );
-    const data=
-      await response.json();
+
+    let data;
+
+    try{
+      data=
+        await response.json();
+    }
+
+    catch{
+      throw new Error(
+        "The server returned an invalid response."
+      );
+    }
+
     if(
       response.status===410||
       response.status===403
@@ -507,44 +641,81 @@ async function generate(){
       expire();
       return;
     }
+
     if(!response.ok){
       throw new Error(
         data.error||
-        "Failed to start configuration"
+        "Failed to start configuration."
       );
     }
-    currentToken=token;
-    hasGenerated=true;
+
+    currentToken=
+      token;
+
+    hasGenerated=
+      true;
+
     saveConfiguration.style.display=
       "flex";
+
     clearManifest();
+
     checkStatus.textContent="";
     checkStatus.className="";
+
     showConfigurationPage();
   }
+
   catch(error){
-    checkStatus.textContent=
-      error.message||
-      "Failed to start configuration.";
-    checkStatus.className=
-      "error";
+    if(!expired){
+      checkStatus.textContent=
+        error?.message||
+        "Failed to start configuration.";
+
+      checkStatus.className=
+        "error";
+    }
   }
+
   finally{
-    generateButton.disabled=
-      false;
-    generateButton.textContent=
-      "Generate";
+    if(!expired){
+      generateButton.disabled=
+        false;
+
+      generateButton.textContent=
+        "Generate";
+    }
   }
 }
+
 async function save(){
+  if(expired){
+    return;
+  }
+
   if(
     !hasGenerated||
     !currentToken
   ){
+    checkStatus.textContent=
+      "Generate the configuration first.";
+
+    checkStatus.className=
+      "error";
+
     return;
   }
+
+  if(
+    Date.now()>=expiresAt
+  ){
+    expire();
+    return;
+  }
+
   const qualities=
     getQualityConfig();
+
   if(
     !qualities.some(
       item=>item.enabled
@@ -552,46 +723,62 @@ async function save(){
   ){
     checkStatus.textContent=
       "Enable at least one quality.";
+
     checkStatus.className=
       "error";
+
     return;
   }
+
   if(
     !validateFileSizeInputs()
   ){
     return;
   }
+
   saveConfiguration.disabled=
     true;
+
   saveConfiguration.textContent=
     "Saving...";
+
+  checkStatus.textContent="";
+  checkStatus.className="";
+
   try{
     const response=
       await fetch(
         "/create-config",
         {
           method:"POST",
+
           headers:{
             "Content-Type":
               "application/json"
           },
+
           body:
             JSON.stringify({
               action:
                 "save",
+
               sessionId,
+
               configId,
+
               fileSize:
                 getFileSizeConfig(),
+
               qualities,
+
               filters:
                 getFilterConfig()
             }),
+
           cache:"no-store"
         }
       );
-    const data=
-      await response.json();
+
     if(
       response.status===410||
       response.status===403
@@ -599,64 +786,100 @@ async function save(){
       expire();
       return;
     }
+
+    let data;
+
+    try{
+      data=
+        await response.json();
+    }
+
+    catch{
+      throw new Error(
+        "The server returned an invalid response."
+      );
+    }
+
+    if(!response.ok){
+      throw new Error(
+        data.error||
+        "Failed to save configuration."
+      );
+    }
+
     if(
-      !response.ok||
       !data.manifestUrl
     ){
       throw new Error(
-        data.error||
-        "Failed to save configuration"
+        "The server did not return a manifest URL."
       );
     }
+
     configId=
       data.configId||
       configId;
+
     manifestUrl.value=
       data.manifestUrl;
+
     installButton.href=
-      data.stremioUrl;
+      data.stremioUrl||
+      "#";
+
     installButton.classList.remove(
       "disabled"
     );
+
     result.style.display=
       "block";
+
     checkStatus.textContent=
       "Configuration saved.";
+
     checkStatus.className=
       "success";
+
     window.scrollTo({
       top:
         document.body.scrollHeight,
+
       behavior:
         "smooth"
     });
   }
+
   catch(error){
-    checkStatus.textContent=
-      error.message||
-      "Failed to save configuration.";
-    checkStatus.className=
-      "error";
+    if(!expired){
+      checkStatus.textContent=
+        error?.message||
+        "Failed to save configuration.";
+
+      checkStatus.className=
+        "error";
+    }
   }
+
   finally{
-    if(
-      document.visibilityState!=="hidden"
-    ){
+    if(!expired){
       saveConfiguration.disabled=
         false;
+
       saveConfiguration.textContent=
         "Save Configuration";
     }
   }
 }
+
 qualityList.addEventListener(
   "change",
   settingsChanged
 );
+
 filterList.addEventListener(
   "change",
   settingsChanged
 );
+
 qualityList.addEventListener(
   "click",
   event=>{
@@ -664,17 +887,22 @@ qualityList.addEventListener(
       event.target.closest(
         ".move-button"
       );
+
     if(!button){
       return;
     }
+
     const row=
       button.closest(
         ".quality-row"
       );
+
     const rows=
       getRows();
+
     const index=
       rows.indexOf(row);
+
     if(
       button.dataset.action===
         "up"&&
@@ -685,6 +913,7 @@ qualityList.addEventListener(
         rows[index-1]
       );
     }
+
     if(
       button.dataset.action===
         "down"&&
@@ -696,9 +925,11 @@ qualityList.addEventListener(
         row
       );
     }
+
     settingsChanged();
   }
 );
+
 minSizeInput.addEventListener(
   "input",
   ()=>{
@@ -706,6 +937,7 @@ minSizeInput.addEventListener(
     settingsChanged();
   }
 );
+
 maxSizeInput.addEventListener(
   "input",
   ()=>{
@@ -713,51 +945,65 @@ maxSizeInput.addEventListener(
     settingsChanged();
   }
 );
+
 tokenInput.addEventListener(
   "input",
   ()=>{
     currentToken="";
     hasGenerated=false;
     configId="";
+
     configuration.style.display=
       "none";
+
     tokenPage.style.display=
       "block";
+
     clearManifest();
+
     saveConfiguration.style.display=
       "none";
+
     checkStatus.textContent="";
     checkStatus.className="";
   }
 );
+
 generateButton.addEventListener(
   "click",
   generate
 );
+
 saveConfiguration.addEventListener(
   "click",
   save
 );
+
 copyButton.addEventListener(
   "click",
   async()=>{
     if(!manifestUrl.value){
       return;
     }
+
     try{
       await navigator.clipboard.writeText(
         manifestUrl.value
       );
     }
+
     catch{
       manifestUrl.focus();
       manifestUrl.select();
+
       document.execCommand(
         "copy"
       );
     }
+
     copyButton.textContent=
       "Copied";
+
     setTimeout(
       ()=>{
         copyButton.textContent=
@@ -767,17 +1013,33 @@ copyButton.addEventListener(
     );
   }
 );
+
+installButton.addEventListener(
+  "click",
+  event=>{
+    if(
+      !manifestUrl.value||
+      expired
+    ){
+      event.preventDefault();
+    }
+  }
+);
+
 })();
 `;
 }
+
 export default async function handler(
   request,
   context
 ){
   const url=
     new URL(request.url);
+
   const pathname=
     url.pathname;
+
   if(
     pathname==="/create-config"
   ){
@@ -795,9 +1057,11 @@ export default async function handler(
         }
       );
     }
+
     const clientIp=
       context?.ip||
       "unknown";
+
     if(
       isRateLimited(
         clientIp
@@ -815,11 +1079,13 @@ export default async function handler(
         }
       );
     }
+
     try{
       const contentLength=
         request.headers.get(
           "content-length"
         );
+
       if(
         contentLength&&
         Number.isFinite(
@@ -836,8 +1102,10 @@ export default async function handler(
           413
         );
       }
+
       const requestBody=
         await request.text();
+
       if(
         new TextEncoder()
           .encode(
@@ -854,13 +1122,16 @@ export default async function handler(
           413
         );
       }
+
       let body;
+
       try{
         body=
           JSON.parse(
             requestBody
           );
       }
+
       catch{
         return jsonResponse(
           {
@@ -870,6 +1141,7 @@ export default async function handler(
           400
         );
       }
+
       if(
         !body||
         typeof body!=="object"||
@@ -883,15 +1155,18 @@ export default async function handler(
           400
         );
       }
+
       const sessionId=
         typeof body.sessionId===
           "string"
           ?body.sessionId
           :"";
+
       const session=
         await getHomepageSession(
           sessionId
         );
+
       if(!session){
         return jsonResponse(
           {
@@ -901,6 +1176,7 @@ export default async function handler(
           410
         );
       }
+
       if(
         body.action==="prepare"
       ){
@@ -909,6 +1185,7 @@ export default async function handler(
             "string"
             ?body.uiToken.trim()
             :"";
+
         if(!token){
           return jsonResponse(
             {
@@ -918,6 +1195,7 @@ export default async function handler(
             400
           );
         }
+
         if(
           token.length>
           MAX_TOKEN_LENGTH
@@ -930,14 +1208,17 @@ export default async function handler(
             400
           );
         }
+
         await setHomepageSessionToken(
           sessionId,
           token
         );
+
         return jsonResponse({
           ok:true
         });
       }
+
       if(
         body.action!=="save"
       ){
@@ -949,10 +1230,12 @@ export default async function handler(
           400
         );
       }
+
       const currentSession=
         await getHomepageSession(
           sessionId
         );
+
       if(
         !currentSession||
         typeof currentSession.uiToken!==
@@ -967,8 +1250,10 @@ export default async function handler(
           410
         );
       }
+
       let minGb=null;
       let maxGb=null;
+
       if(
         body.fileSize&&
         typeof body.fileSize==="object"&&
@@ -986,6 +1271,7 @@ export default async function handler(
               body.fileSize.minGb
             );
         }
+
         if(
           body.fileSize.maxGb!==null&&
           body.fileSize.maxGb!==undefined&&
@@ -997,14 +1283,17 @@ export default async function handler(
             );
         }
       }
+
       const fileSize={
         minGb,
         maxGb
       };
+
       const fileSizeError=
         validateFileSize(
           fileSize
         );
+
       if(fileSizeError){
         return jsonResponse(
           {
@@ -1014,6 +1303,7 @@ export default async function handler(
           400
         );
       }
+
       if(
         Array.isArray(
           body.qualities
@@ -1029,10 +1319,12 @@ export default async function handler(
           400
         );
       }
+
       const qualities=
         normalizeQualities(
           body.qualities
         );
+
       if(
         !qualities.some(
           item=>item.enabled
@@ -1046,12 +1338,11 @@ export default async function handler(
           400
         );
       }
+
       const filters=
         body.filters&&
         typeof body.filters==="object"&&
-        !Array.isArray(
-          body.filters
-        )
+        !Array.isArray(body.filters)
           ?{
               cam:
                 body.filters.cam!==false
@@ -1059,30 +1350,38 @@ export default async function handler(
           :{
               cam:true
             };
+
       const config={
         uiToken:
           currentSession.uiToken,
+
         fileSize,
+
         qualities,
+
         filters
       };
+
       let finalConfigId=
         /^[a-f0-9]{32}$/i.test(
           body.configId||""
         )
           ?body.configId
           :null;
+
       if(finalConfigId){
         const existing=
           await getConfig(
             finalConfigId
           );
+
         if(existing){
           await saveConfig(
             finalConfigId,
             config
           );
         }
+
         else{
           finalConfigId=
             await createConfig(
@@ -1090,35 +1389,45 @@ export default async function handler(
             );
         }
       }
+
       else{
         finalConfigId=
           await createConfig(
             config
           );
       }
+
       return jsonResponse({
+        ok:true,
+
         configId:
           finalConfigId,
+
         manifestUrl:
           `${url.origin}/${finalConfigId}/manifest.json`,
+
         stremioUrl:
           `stremio://${url.host}/${finalConfigId}/manifest.json`
       });
     }
+
     catch(error){
       console.error(
         "[ShowBox] Config creation failed:",
         error?.message
       );
+
       return jsonResponse(
         {
           error:
+            error?.message||
             "Failed to create configuration"
         },
         500
       );
     }
   }
+
   if(
     pathname==="/manifest.json"||
     /^\/[^/]+\/manifest\.json$/.test(
@@ -1138,6 +1447,8 @@ export default async function handler(
               "text/plain; charset=utf-8",
             "Cache-Control":
               "no-store",
+            "Access-Control-Allow-Origin":
+              "*",
             "X-Content-Type-Options":
               "nosniff",
             "Referrer-Policy":
@@ -1146,25 +1457,34 @@ export default async function handler(
         }
       );
     }
+
     return new Response(
       JSON.stringify({
         id:
           "com.showbox.stremio",
+
         version:
           "1.0.0",
+
         name:
           "ShowBox",
+
         description:
           "ShowBox Stremio addon",
+
         resources:
           ["stream"],
+
         types:
           ["movie","series"],
+
         catalogs:[],
+
         behaviorHints:{
           configurable:true,
           configurationRequired:false
         },
+
         config:[
           {
             key:"uiToken",
@@ -1179,18 +1499,23 @@ export default async function handler(
         headers:{
           "Content-Type":
             "application/json; charset=utf-8",
+
           "Cache-Control":
             "no-store",
+
           "Access-Control-Allow-Origin":
             "*",
+
           "X-Content-Type-Options":
             "nosniff",
+
           "Referrer-Policy":
             "no-referrer"
         }
       }
     );
   }
+
   if(
     request.method!=="GET"
   ){
@@ -1212,8 +1537,10 @@ export default async function handler(
       }
     );
   }
+
   const session=
     await createHomepageSession();
+
   const html=`
 <!DOCTYPE html>
 <html lang="en">
@@ -1284,7 +1611,6 @@ body{
     0
     clamp(50px,6vw,80px);
 }
-/* TOKEN PAGE */
 #tokenPage h1{
   margin:
     25px 0 0;
@@ -1361,7 +1687,6 @@ body{
 .error{
   color:var(--error)!important;
 }
-/* CONFIGURATION */
 #configuration{
   display:none;
 }
@@ -1399,7 +1724,6 @@ body{
     clamp(12px,1.4vw,14px);
   line-height:1.5;
 }
-/* FILE SIZE */
 .file-size-section{
   margin-top:0;
 }
@@ -1504,7 +1828,6 @@ body{
   margin-top:8px;
   padding-bottom:4px;
 }
-/* QUALITY */
 .quality-section,
 .filter-section{
   margin-top:
@@ -1582,7 +1905,6 @@ body{
 .move-button:disabled{
   opacity:.3;
 }
-/* SAVE */
 #saveConfiguration{
   display:none;
   align-items:center;
@@ -1607,7 +1929,6 @@ body{
 #saveConfiguration:disabled{
   opacity:.55;
 }
-/* RESULT */
 #result{
   display:none;
   margin-top:
@@ -1694,7 +2015,6 @@ body{
     clamp(9px,1vw,11px);
   line-height:1.5;
 }
-/* MOBILE */
 @media(max-width:600px){
   .container{
     width:100%;
@@ -1860,7 +2180,6 @@ body{
     font-size:10px;
   }
 }
-/* VERY SMALL PHONES */
 @media(max-width:380px){
   .container{
     padding-left:0;
@@ -1925,12 +2244,14 @@ Generate
 </button>
 <div id="checkStatus"></div>
 </div>
+
 <div id="configuration">
 <div class="settings-header">
 <h1 class="settings-title">
 Settings
 </h1>
 </div>
+
 <section class="file-size-section">
 <div class="section-title">
 File size
@@ -1997,6 +2318,7 @@ Max (GB)
 </div>
 </div>
 </section>
+
 <section class="quality-section">
 <div class="configuration-title">
 Quality settings
@@ -2011,6 +2333,7 @@ Enable the qualities you want. Move them up or down to set their priority.
 ${qualityRows()}
 </div>
 </section>
+
 <section class="filter-section">
 <div class="configuration-title">
 Stream filters
@@ -2025,12 +2348,14 @@ Enable the stream types you want to keep. These settings do not change quality p
 ${filterRows()}
 </div>
 </section>
+
 <button
   id="saveConfiguration"
   type="button"
 >
 Save Configuration
 </button>
+
 <div id="result">
 <span class="result-label">
 Manifest URL
@@ -2062,12 +2387,14 @@ use Copy and paste the manifest URL into Stremio's Add Addon field.
 </div>
 </div>
 </div>
+
 <script>
 ${homepageScript(session)}
 </script>
 </body>
 </html>
 `;
+
   return new Response(
     html,
     {
@@ -2084,6 +2411,7 @@ ${homepageScript(session)}
     }
   );
 }
+
 export const config={
   path:[
     "/",
