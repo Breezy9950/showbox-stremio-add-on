@@ -21,10 +21,14 @@ const MAX_CONFIG_BODY_BYTES=
   16*1024;
 
 const MAX_TOKEN_LENGTH=4096;
-const MAX_QUALITY_ITEMS=DEFAULT_QUALITIES.length;
+
+const MAX_QUALITY_ITEMS=
+  DEFAULT_QUALITIES.length;
+
 const MAX_FILE_SIZE_GB=200;
 
 const CREATE_CONFIG_RATE_LIMIT=10;
+
 const CREATE_CONFIG_RATE_WINDOW_MS=
   60*1000;
 
@@ -100,12 +104,16 @@ function jsonResponse(
       headers:{
         "Content-Type":
           "application/json; charset=utf-8",
+
         "Cache-Control":
           "no-store",
+
         "X-Content-Type-Options":
           "nosniff",
+
         "Referrer-Policy":
           "no-referrer",
+
         ...extraHeaders
       }
     }
@@ -489,10 +497,13 @@ function validateFileSizeInputs(){
 
 function clearManifest(){
   manifestUrl.value="";
+
   installButton.classList.add(
     "disabled"
   );
+
   installButton.href="#";
+
   result.style.display=
     "none";
 }
@@ -1272,8 +1283,11 @@ export default async function handler(
       const config={
         uiToken:
           currentSession.uiToken,
+
         fileSize,
+
         qualities,
+
         filters
       };
 
@@ -1372,27 +1386,38 @@ export default async function handler(
       JSON.stringify({
         id:
           "com.showbox.stremio",
+
         version:
           "1.0.0",
+
         name:
           "ShowBox",
+
         description:
           "ShowBox Stremio addon",
+
         resources:
           ["stream"],
+
         types:
           ["movie","series"],
+
         catalogs:[],
+
         behaviorHints:{
           configurable:true,
           configurationRequired:false
         },
+
         config:[
           {
             key:"uiToken",
+
             type:"password",
+
             title:
               "ShowBox UI Token",
+
             required:true
           }
         ]
@@ -1401,12 +1426,16 @@ export default async function handler(
         headers:{
           "Content-Type":
             "application/json; charset=utf-8",
+
           "Cache-Control":
             "no-store",
+
           "Access-Control-Allow-Origin":
             "*",
+
           "X-Content-Type-Options":
             "nosniff",
+
           "Referrer-Policy":
             "no-referrer"
         }
@@ -1423,12 +1452,16 @@ export default async function handler(
         status:405,
         headers:{
           Allow:"GET",
+
           "Content-Type":
             "text/plain; charset=utf-8",
+
           "Cache-Control":
             "no-store",
+
           "X-Content-Type-Options":
             "nosniff",
+
           "Referrer-Policy":
             "no-referrer"
         }
