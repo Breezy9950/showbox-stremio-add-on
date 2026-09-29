@@ -1721,7 +1721,7 @@ h1{
   color:var(--text);
 
   font-size:
-    clamp(40px, 1.75rem + 4vw, 72px);
+    clamp(40px, 1.5rem + 3.5vw, 64px);
 
   line-height:1.15;
 
