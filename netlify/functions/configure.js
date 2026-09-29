@@ -11,7 +11,6 @@ const DEFAULT_QUALITIES = [
   { name: "4K", enabled: true },
   { name: "1440p", enabled: true },
   { name: "1080p", enabled: true },
-  { name: "720p", enabled: true },
   { name: "480p", enabled: true },
   { name: "360p", enabled: true }
 ];
@@ -57,7 +56,8 @@ function decodeConfig(value) {
     }
 
     return JSON.parse(jsonStr);
-  } catch {
+  } catch (error) {
+    console.error("[Configure] Legacy config decode failed:", error);
     return {};
   }
 }
@@ -186,18 +186,27 @@ function getConfigIdFromRequest(request) {
 async function getConfigFromRequest(request) {
   const configValue = getConfigIdFromRequest(request);
 
+  console.log("[Configure] Config value from URL:", configValue);
+
   if (!configValue) {
+    console.log("[Configure] No config value found in URL");
     return null;
   }
+
+  console.log("[Configure] Looking up stored config");
 
   const stored = await getConfig(configValue);
 
   if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+    console.log("[Configure] Stored config found");
+
     return {
       id: configValue,
       config: stored
     };
   }
+
+  console.log("[Configure] Stored config not found; trying legacy config");
 
   const legacy = decodeConfig(configValue);
 
@@ -207,8 +216,11 @@ async function getConfigFromRequest(request) {
     Array.isArray(legacy) ||
     !Object.keys(legacy).length
   ) {
+    console.log("[Configure] Legacy config also not found");
     return null;
   }
+
+  console.log("[Configure] Legacy config decoded successfully");
 
   return {
     id: null,
@@ -217,6 +229,8 @@ async function getConfigFromRequest(request) {
 }
 
 function expiredResponse() {
+  console.log("[Configure] Returning 404 expired response");
+
   return new Response("Not Found", {
     status: 404,
     headers: {
@@ -229,6 +243,8 @@ function expiredResponse() {
 }
 
 function invalidConfigResponse() {
+  console.log("[Configure] Returning invalid configuration page");
+
   return new Response(
     `
 <!doctype html>
@@ -281,15 +297,28 @@ export const config = {
 export default async function handler(request) {
   const url = new URL(request.url);
 
+  console.log("========================================");
+  console.log("[Configure] REQUEST RECEIVED");
+  console.log("[Configure] Method:", request.method);
+  console.log("[Configure] URL:", request.url);
+  console.log("[Configure] Path:", url.pathname);
+  console.log("========================================");
+
   if (request.method === "POST") {
+    console.log("[Configure] POST save request started");
+
     try {
       const contentLength = request.headers.get("content-length");
+
+      console.log("[Configure] Content-Length:", contentLength);
 
       if (
         contentLength &&
         Number.isFinite(Number(contentLength)) &&
         Number(contentLength) > MAX_CONFIG_BODY_BYTES
       ) {
+        console.log("[Configure] REJECTED: Content-Length too large");
+
         return jsonResponse(
           { error: "Configuration request is too large" },
           413
@@ -298,9 +327,14 @@ export default async function handler(request) {
 
       const requestBody = await request.text();
 
-      if (
-        new TextEncoder().encode(requestBody).byteLength > MAX_CONFIG_BODY_BYTES
-      ) {
+      const bodySize = new TextEncoder().encode(requestBody).byteLength;
+
+      console.log("[Configure] Request body received");
+      console.log("[Configure] Body bytes:", bodySize);
+
+      if (bodySize > MAX_CONFIG_BODY_BYTES) {
+        console.log("[Configure] REJECTED: Request body too large");
+
         return jsonResponse(
           { error: "Configuration request is too large" },
           413
@@ -311,34 +345,94 @@ export default async function handler(request) {
 
       try {
         body = JSON.parse(requestBody);
-      } catch {
+
+        console.log("[Configure] JSON parsed successfully");
+        console.log("[Configure] Action:", body?.action);
+        console.log(
+          "[Configure] Session ID present:",
+          typeof body?.sessionId === "string" &&
+            body.sessionId.length > 0
+        );
+      } catch (error) {
+        console.error("[Configure] JSON parse failed:", error);
+
         return jsonResponse({ error: "Invalid JSON" }, 400);
       }
 
       if (!body || typeof body !== "object" || Array.isArray(body)) {
+        console.log("[Configure] REJECTED: Invalid body");
+
         return jsonResponse({ error: "Invalid configuration" }, 400);
       }
 
       if (body.action !== "save") {
-        return jsonResponse({ error: "Invalid configuration action" }, 400);
+        console.log(
+          "[Configure] REJECTED: Invalid action:",
+          body.action
+        );
+
+        return jsonResponse(
+          { error: "Invalid configuration action" },
+          400
+        );
       }
 
       const sessionId =
         typeof body.sessionId === "string" ? body.sessionId : "";
 
       if (!sessionId) {
-        return jsonResponse({ error: "Configure session is invalid" }, 403);
+        console.log("[Configure] REJECTED: Missing session ID");
+
+        return jsonResponse(
+          { error: "Configure session is invalid" },
+          403
+        );
       }
+
+      console.log("[Configure] Checking Configure session");
 
       const activeSession = await getConfigureSession(sessionId);
 
+      console.log(
+        "[Configure] Session lookup:",
+        activeSession ? "ACTIVE" : "MISSING OR EXPIRED"
+      );
+
       if (!activeSession) {
+        console.log("[Configure] REJECTED: Session expired or missing");
+
         return expiredResponse();
       }
 
+      console.log(
+        "[Configure] Session createdAt:",
+        activeSession.createdAt
+      );
+
+      console.log(
+        "[Configure] Session expiresAt:",
+        activeSession.expiresAt
+      );
+
+      console.log(
+        "[Configure] Session remaining ms:",
+        Number(activeSession.expiresAt) - Date.now()
+      );
+
+      console.log("[Configure] Looking up addon configuration");
+
       const configData = await getConfigFromRequest(request);
 
+      console.log(
+        "[Configure] Configuration lookup:",
+        configData ? "FOUND" : "NOT FOUND"
+      );
+
       if (!configData) {
+        console.log(
+          "[Configure] REJECTED: Invalid addon configuration context"
+        );
+
         return jsonResponse(
           { error: "Invalid addon configuration context" },
           400
@@ -348,21 +442,49 @@ export default async function handler(request) {
       const configId = configData.id;
       const existingConfig = configData.config;
 
+      console.log("[Configure] Config ID:", configId);
+
+      console.log(
+        "[Configure] Existing config has uiToken:",
+        typeof existingConfig.uiToken === "string" &&
+          existingConfig.uiToken.length > 0
+      );
+
       if (
         Array.isArray(body.qualities) &&
         body.qualities.length > MAX_QUALITY_ITEMS
       ) {
+        console.log("[Configure] REJECTED: Too many quality entries");
+
         throw new Error("Too many quality entries");
       }
 
+      console.log(
+        "[Configure] Incoming quality count:",
+        Array.isArray(body.qualities)
+          ? body.qualities.length
+          : "not an array"
+      );
+
       const qualities = normalizeQualities(body.qualities);
 
+      console.log("[Configure] Normalized qualities:", qualities);
+
       if (!qualities.some((item) => item.enabled)) {
+        console.log("[Configure] REJECTED: No qualities enabled");
+
         throw new Error("Enable at least one quality.");
       }
 
+      console.log("[Configure] Validating file size");
+
       const fileSize = validateFileSize(body.fileSize);
+
+      console.log("[Configure] File size:", fileSize);
+
       const filters = normalizeFilters(body.filters);
+
+      console.log("[Configure] Filters:", filters);
 
       const uiToken =
         typeof existingConfig.uiToken === "string"
@@ -370,6 +492,8 @@ export default async function handler(request) {
           : "";
 
       if (!uiToken) {
+        console.log("[Configure] REJECTED: Missing uiToken");
+
         throw new Error(
           "The existing configuration does not contain a ShowBox UI token."
         );
@@ -383,22 +507,51 @@ export default async function handler(request) {
         filters
       };
 
+      console.log("[Configure] New configuration prepared");
+
       let finalConfigId = configId;
 
       if (!finalConfigId) {
+        console.log("[Configure] Creating new persistent config");
+
         finalConfigId = await createConfig(newConfig);
+
+        console.log(
+          "[Configure] New persistent config created:",
+          finalConfigId
+        );
       } else {
+        console.log(
+          "[Configure] Saving existing persistent config:",
+          finalConfigId
+        );
+
         await saveConfig(finalConfigId, newConfig);
+
+        console.log("[Configure] Existing persistent config saved");
       }
 
-      return jsonResponse({
+      const responseData = {
         ok: true,
         configId: finalConfigId,
         manifestUrl: `${url.origin}/${finalConfigId}/manifest.json`,
         stremioUrl: `stremio://${url.host}/${finalConfigId}/manifest.json`
-      });
+      };
+
+      console.log("[Configure] SAVE SUCCESS");
+      console.log("[Configure] Final config ID:", finalConfigId);
+      console.log("[Configure] Manifest URL:", responseData.manifestUrl);
+      console.log("[Configure] Stremio URL:", responseData.stremioUrl);
+      console.log("========================================");
+
+      return jsonResponse(responseData);
     } catch (error) {
-      console.error("[Configure] Save error:", error?.message);
+      console.error("========================================");
+      console.error("[Configure] SAVE ERROR");
+      console.error("[Configure] Error message:", error?.message);
+      console.error("[Configure] Error stack:", error?.stack);
+      console.error("[Configure] Error object:", error);
+      console.error("========================================");
 
       return jsonResponse(
         {
@@ -409,28 +562,69 @@ export default async function handler(request) {
     }
   }
 
-  const configData = await getConfigFromRequest(request);
+  console.log("[Configure] GET request started");
 
-  if (!configData) {
-    return invalidConfigResponse();
-  }
+  try {
+    const configData = await getConfigFromRequest(request);
 
-  const existingConfig = configData.config;
+    console.log(
+      "[Configure] GET config lookup:",
+      configData ? "FOUND" : "NOT FOUND"
+    );
 
-  const session = await createConfigureSession();
-  const sessionId = session.id;
+    if (!configData) {
+      console.log("[Configure] GET rejected: invalid configuration");
 
-  const qualities = normalizeQualities(existingConfig.qualities);
-  const fileSize = normalizeFileSize(existingConfig.fileSize);
-  const filters = normalizeFilters(existingConfig.filters);
+      return invalidConfigResponse();
+    }
 
-  const qualitiesJson = safeJsonStringify(qualities);
-  const fileSizeJson = safeJsonStringify(fileSize);
-  const filtersJson = safeJsonStringify(filters);
-  const sessionJson = safeJsonStringify(sessionId);
-  const expiresAt = Number(session.expiresAt);
+    const existingConfig = configData.config;
 
-  const html = `
+    console.log("[Configure] GET config ID:", configData.id);
+
+    console.log(
+      "[Configure] Existing config has uiToken:",
+      typeof existingConfig.uiToken === "string" &&
+        existingConfig.uiToken.length > 0
+    );
+
+    console.log("[Configure] Creating Configure session");
+
+    const session = await createConfigureSession();
+
+    console.log("[Configure] Configure session created");
+    console.log("[Configure] Session ID:", session.id);
+    console.log("[Configure] Session createdAt:", session.createdAt);
+    console.log("[Configure] Session expiresAt:", session.expiresAt);
+    console.log(
+      "[Configure] Session TTL:",
+      Number(session.expiresAt) - Number(session.createdAt),
+      "ms"
+    );
+
+    const sessionId = session.id;
+
+    const qualities = normalizeQualities(existingConfig.qualities);
+    const fileSize = normalizeFileSize(existingConfig.fileSize);
+    const filters = normalizeFilters(existingConfig.filters);
+
+    console.log("[Configure] GET settings prepared");
+    console.log("[Configure] Qualities:", qualities);
+    console.log("[Configure] File size:", fileSize);
+    console.log("[Configure] Filters:", filters);
+
+    const qualitiesJson = safeJsonStringify(qualities);
+    const fileSizeJson = safeJsonStringify(fileSize);
+    const filtersJson = safeJsonStringify(filters);
+    const sessionJson = safeJsonStringify(sessionId);
+    const expiresAt = Number(session.expiresAt);
+
+    console.log(
+      "[Configure] HTML session expiry:",
+      expiresAt
+    );
+
+    const html = `
 <!doctype html>
 <html lang="en">
 <head>
@@ -490,63 +684,6 @@ body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -15%,rgb
 .install{background:var(--white);color:var(--black);}
 .note{margin-top:clamp(16px,2vw,22px);color:var(--muted-2);font-size:clamp(9px,1vw,11px);line-height:1.5;}
 
-.debug{
-  margin-top:40px;
-  padding:16px;
-  border:1px solid #343740;
-  border-radius:16px;
-  background:#101115;
-}
-
-.debug-title{
-  margin:0 0 8px;
-  color:#f1f1f3;
-  font-size:16px;
-  font-weight:700;
-}
-
-.debug-description{
-  margin:0 0 12px;
-  color:#777b85;
-  font-size:11px;
-  line-height:1.5;
-}
-
-#debugLogs{
-  width:100%;
-  min-height:300px;
-  max-height:600px;
-  overflow:auto;
-  padding:14px;
-  border:1px solid #292c34;
-  border-radius:12px;
-  background:#090a0d;
-  color:#bfc2ca;
-  font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
-  font-size:11px;
-  line-height:1.6;
-  white-space:pre-wrap;
-  word-break:break-word;
-}
-
-.debug-buttons{
-  display:flex;
-  gap:8px;
-  margin-top:10px;
-}
-
-.debug-buttons button{
-  flex:1;
-  min-height:40px;
-  border:1px solid #343740;
-  border-radius:10px;
-  background:#1d1f25;
-  color:#dddfe5;
-  font-size:12px;
-  font-weight:600;
-  cursor:pointer;
-}
-
 @media(max-width:600px){
   .container{width:100%;padding:22px 0 48px;}
   .header{margin-bottom:28px;}
@@ -573,18 +710,6 @@ body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -15%,rgb
   .result-card{padding:12px;border-radius:14px;}
   .result-buttons button{height:42px;font-size:11px;}
   .note{font-size:10px;}
-
-  .debug{
-    margin-top:30px;
-    padding:12px;
-    border-radius:13px;
-  }
-
-  #debugLogs{
-    min-height:280px;
-    max-height:500px;
-    font-size:10px;
-  }
 }
 
 @media(max-width:380px){
@@ -600,6 +725,7 @@ body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -15%,rgb
 </head>
 
 <body>
+
 <div class="container">
 
 <header class="header">
@@ -611,6 +737,7 @@ body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -15%,rgb
 <p class="section-description">Keep streams between the selected minimum and maximum size.</p>
 
 <div class="file-size-card">
+
 <div class="file-size-heading">
 <span>FILE SIZE</span>
 
@@ -620,82 +747,116 @@ body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -15%,rgb
 </div>
 
 <div class="file-size-inner">
-<div class="file-size-inner-header">Keep streams between</div>
+
+<div class="file-size-inner-header">
+Keep streams between
+</div>
 
 <div class="size-row">
+
 <div class="size-field">
 <label for="minSize">Min (GB)</label>
-<input id="minSize" type="number" min="0" max="200" step="0.1" placeholder="No minimum">
+<input
+id="minSize"
+type="number"
+min="0"
+max="200"
+step="0.1"
+placeholder="No minimum"
+>
 </div>
 
 <div class="size-field">
 <label for="maxSize">Max (GB)</label>
-<input id="maxSize" type="number" min="0" max="200" step="0.1" placeholder="No maximum">
+<input
+id="maxSize"
+type="number"
+min="0"
+max="200"
+step="0.1"
+placeholder="No maximum"
+>
 </div>
+
 </div>
 
 <div id="fileSizeError" class="file-size-error"></div>
+
 </div>
 </div>
 </section>
 
 <section class="section">
+
 <h2 class="section-title">Quality settings</h2>
-<p class="section-description">Enable the qualities you want. Move them up or down to set their priority.</p>
+
+<p class="section-description">
+Enable the qualities you want. Move them up or down to set their priority.
+</p>
 
 <div class="quality-card">
 <div id="qualityList" class="quality-list"></div>
 </div>
+
 </section>
 
 <section class="section">
+
 <h2 class="section-title">Stream filters</h2>
-<p class="section-description">Enable the stream types you want to keep. These settings do not change quality priority.</p>
+
+<p class="section-description">
+Enable the stream types you want to keep. These settings do not change quality priority.
+</p>
 
 <div class="filter-card">
+
 <div class="filter-row">
+
 <label class="filter-label">
 <input id="camFilter" type="checkbox">
 <span>CAM</span>
 </label>
+
 </div>
+
 </div>
 </section>
 
-<button id="save" type="button">Save Configuration</button>
+<button id="save" type="button">
+Save Configuration
+</button>
 
 <div id="status"></div>
 
 <div id="result">
+
 <div class="result-card">
-<div class="result-title">Manifest URL</div>
+
+<div class="result-title">
+Manifest URL
+</div>
+
 <div id="manifestUrl"></div>
 
 <div class="result-buttons">
-<button id="copy" class="copy" type="button">Copy</button>
-<button id="install" class="install" type="button">Install in Stremio</button>
+
+<button id="copy" class="copy" type="button">
+Copy
+</button>
+
+<button id="install" class="install" type="button">
+Install in Stremio
+</button>
+
 </div>
+
 </div>
+
 </div>
 
 <div class="note">
 On iOS/iPadOS, if Stremio does not open automatically, copy the manifest URL and add it manually through Stremio's Add-ons page.
 </div>
-
-<section class="debug">
-<h2 class="debug-title">Debug Logs</h2>
-
-<p class="debug-description">
-Client-side logs are shown here so you can see exactly what happens when the page initializes and when Save Configuration is pressed.
-</p>
-
-<div id="debugLogs"></div>
-
-<div class="debug-buttons">
-<button id="clearLogs" type="button">Clear Logs</button>
-<button id="testSave" type="button">Test Save Button</button>
-</div>
-</section>
 
 </div>
 
@@ -719,76 +880,11 @@ const result=document.getElementById("result");
 const manifestUrl=document.getElementById("manifestUrl");
 const copyButton=document.getElementById("copy");
 const installButton=document.getElementById("install");
-const debugLogs=document.getElementById("debugLogs");
-const clearLogsButton=document.getElementById("clearLogs");
-const testSaveButton=document.getElementById("testSave");
 
 let expired=false;
 
-function debugLog(message,data){
-  const time=new Date().toLocaleTimeString();
-
-  let line="[" + time + "] " + message;
-
-  if(data!==undefined){
-    try{
-      if(typeof data==="string"){
-        line+="\n  " + data;
-      }else{
-        line+="\n  " + JSON.stringify(data,null,2);
-      }
-    }catch{
-      line+="\n  " + String(data);
-    }
-  }
-
-  console.log("[ShowBox Configure]",message,data);
-
-  if(debugLogs){
-    debugLogs.textContent+=line+"\n\n";
-    debugLogs.scrollTop=debugLogs.scrollHeight;
-  }
-}
-
-function debugError(message,error){
-  const details=error?.stack || error?.message || String(error);
-
-  debugLog("ERROR: " + message,details);
-}
-
-debugLog("Configure script started.");
-
-debugLog("DOM lookup complete.",{
-  qualityList:!!qualityList,
-  minSizeInput:!!minSizeInput,
-  maxSizeInput:!!maxSizeInput,
-  fileSizeError:!!fileSizeError,
-  camFilter:!!camFilter,
-  saveButton:!!saveButton,
-  status:!!status,
-  result:!!result,
-  manifestUrl:!!manifestUrl,
-  copyButton:!!copyButton,
-  installButton:!!installButton,
-  debugLogs:!!debugLogs
-});
-
-debugLog("Session information loaded.",{
-  sessionId,
-  expiresAt,
-  expiresInMs:expiresAt-Date.now(),
-  expiresInSeconds:Math.round((expiresAt-Date.now())/1000)
-});
-
-function setStatus(message,type=""){
-  status.textContent=message;
-  status.className=type;
-}
-
 function expire(){
   if(expired) return;
-
-  debugLog("Configure session expired.");
 
   expired=true;
   saveButton.disabled=true;
@@ -796,21 +892,21 @@ function expire(){
   window.location.replace("/__showbox_configure_expired__");
 }
 
-const expirationDelay=Math.max(0,expiresAt-Date.now());
+setTimeout(
+  expire,
+  Math.max(0,expiresAt-Date.now())
+);
 
-debugLog("Starting expiration timer.",{
-  expirationDelay,
-  expiresAt
-});
-
-setTimeout(expire,expirationDelay);
+function setStatus(message,type=""){
+  status.textContent=message;
+  status.className=type;
+}
 
 function renderQualities(){
-  debugLog("Rendering quality settings.");
-
   qualityList.innerHTML="";
 
   qualities.forEach((quality,index)=>{
+
     const row=document.createElement("div");
     row.className="quality-row";
 
@@ -821,12 +917,6 @@ function renderQualities(){
 
     checkbox.addEventListener("change",()=>{
       quality.enabled=checkbox.checked;
-
-      debugLog("Quality changed.",{
-        name:quality.name,
-        enabled:quality.enabled
-      });
-
       invalidateResult();
     });
 
@@ -843,9 +933,8 @@ function renderQualities(){
     up.disabled=index===0;
 
     up.addEventListener("click",()=>{
-      if(index<=0) return;
 
-      debugLog("Moving quality up.",quality.name);
+      if(index<=0) return;
 
       [qualities[index-1],qualities[index]]=[
         qualities[index],
@@ -862,9 +951,8 @@ function renderQualities(){
     down.disabled=index===qualities.length-1;
 
     down.addEventListener("click",()=>{
-      if(index>=qualities.length-1) return;
 
-      debugLog("Moving quality down.",quality.name);
+      if(index>=qualities.length-1) return;
 
       [qualities[index+1],qualities[index]]=[
         qualities[index],
@@ -879,10 +967,6 @@ function renderQualities(){
     row.append(checkbox,name,controls);
     qualityList.appendChild(row);
   });
-
-  debugLog("Quality settings rendered.",{
-    count:qualities.length
-  });
 }
 
 function getFileSize(){
@@ -896,6 +980,7 @@ function getFileSize(){
 }
 
 function validateFileSize(){
+
   const value=getFileSize();
   let error="";
 
@@ -908,7 +993,9 @@ function validateFileSize(){
     )
   ){
     error="Minimum size must be between 0 and 200 GB.";
-  }else if(
+  }
+
+  else if(
     value.maxGb!==null &&
     (
       !Number.isFinite(value.maxGb) ||
@@ -917,7 +1004,9 @@ function validateFileSize(){
     )
   ){
     error="Maximum size must be between 0 and 200 GB.";
-  }else if(
+  }
+
+  else if(
     value.minGb!==null &&
     value.maxGb!==null &&
     value.minGb>value.maxGb
@@ -937,113 +1026,83 @@ function invalidateResult(){
 }
 
 async function saveConfiguration(){
-  debugLog("SAVE BUTTON HANDLER STARTED.");
 
   if(expired){
-    debugLog("Save aborted: session is already expired.");
     return;
   }
 
-  const remaining=expiresAt-Date.now();
-
-  debugLog("Checking session expiration.",{
-    remainingMs:remaining,
-    remainingSeconds:Math.round(remaining/1000)
-  });
-
   if(Date.now()>=expiresAt){
-    debugLog("Save aborted: session reached expiration.");
     expire();
     return;
   }
 
-  debugLog("Validating file size.");
-
   if(!validateFileSize()){
-    debugLog("Save aborted: invalid file size.",{
-      fileSize:getFileSize()
-    });
-
     return;
   }
 
   if(!qualities.some(quality=>quality.enabled)){
-    debugLog("Save aborted: no qualities enabled.");
+    setStatus(
+      "Enable at least one quality.",
+      "error"
+    );
 
-    setStatus("Enable at least one quality.","error");
     return;
   }
-
-  const payload={
-    action:"save",
-    sessionId,
-    qualities:qualities.map(quality=>({
-      name:quality.name,
-      enabled:quality.enabled
-    })),
-    fileSize:getFileSize(),
-    filters:{
-      cam:camFilter.checked
-    }
-  };
-
-  debugLog("Save validation passed.",payload);
 
   saveButton.disabled=true;
   saveButton.textContent="Saving...";
   setStatus("");
 
-  const requestUrl=window.location.pathname;
-
-  debugLog("Sending POST request.",{
-    url:requestUrl,
-    method:"POST"
-  });
-
   try{
-    const response=await fetch(requestUrl,{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json"
-      },
-      body:JSON.stringify(payload),
-      cache:"no-store"
-    });
 
-    debugLog("POST response received.",{
-      status:response.status,
-      statusText:response.statusText,
-      ok:response.ok,
-      url:response.url
-    });
+    const response=await fetch(
+      window.location.pathname,
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          action:"save",
+          sessionId,
+          qualities:qualities.map(quality=>({
+            name:quality.name,
+            enabled:quality.enabled
+          })),
+          fileSize:getFileSize(),
+          filters:{
+            cam:camFilter.checked
+          }
+        }),
+        cache:"no-store"
+      }
+    );
 
-    if(response.status===404 || response.status===410){
-      debugLog("Server reported expired Configure session.");
+    if(
+      response.status===404 ||
+      response.status===410
+    ){
       expire();
       return;
     }
 
     const text=await response.text();
 
-    debugLog("Raw server response received.",text);
-
     let data;
 
     try{
       data=JSON.parse(text);
-    }catch(error){
-      debugError("Could not parse server response as JSON.",error);
-
+    }catch{
       throw new Error(
-        text || "The server returned an invalid response."
+        text ||
+        "The server returned an invalid response."
       );
     }
 
-    debugLog("Parsed server response.",data);
-
     if(!response.ok){
       throw new Error(
-        data.error || "Failed to save configuration."
+        data.error ||
+        "Failed to save configuration."
       );
     }
 
@@ -1053,23 +1112,20 @@ async function saveConfiguration(){
       );
     }
 
-    debugLog("SAVE SUCCESSFUL.",{
-      configId:data.configId,
-      manifestUrl:data.manifestUrl,
-      stremioUrl:data.stremioUrl
-    });
-
     manifestUrl.textContent=data.manifestUrl;
     result.style.display="block";
 
-    setStatus("Configuration saved.","success");
+    setStatus(
+      "Configuration saved.",
+      "success"
+    );
 
     window.scrollTo({
       top:document.body.scrollHeight,
       behavior:"smooth"
     });
+
   }catch(error){
-    debugError("Save request failed.",error);
 
     if(!expired){
       setStatus(
@@ -1078,11 +1134,8 @@ async function saveConfiguration(){
         "error"
       );
     }
+
   }finally{
-    debugLog("Save handler finished.",{
-      expired,
-      buttonDisabled:saveButton.disabled
-    });
 
     if(!expired){
       saveButton.disabled=false;
@@ -1092,169 +1145,121 @@ async function saveConfiguration(){
 }
 
 /*
- * IMPORTANT:
- * Attach the Save listener BEFORE the rest of the initialization.
- * If something below throws an exception, the Save button still has
- * its event handler.
+ * Attach the Save handler before the rest of the initialization.
+ * This prevents a later initialization error from leaving the
+ * Save button completely unwired.
  */
-debugLog("Attaching Save button listener.");
-
-saveButton.addEventListener("click",saveConfiguration);
-
-debugLog("Save button listener attached successfully.");
+saveButton.addEventListener(
+  "click",
+  saveConfiguration
+);
 
 minSizeInput.addEventListener("input",()=>{
-  debugLog("Minimum file size changed.",minSizeInput.value);
-
   validateFileSize();
   invalidateResult();
 });
 
 maxSizeInput.addEventListener("input",()=>{
-  debugLog("Maximum file size changed.",maxSizeInput.value);
-
   validateFileSize();
   invalidateResult();
 });
 
-camFilter.addEventListener("change",()=>{
-  debugLog("CAM filter changed.",camFilter.checked);
+camFilter.addEventListener(
+  "change",
+  invalidateResult
+);
 
-  invalidateResult();
-});
+copyButton.addEventListener(
+  "click",
+  async()=>{
+    const value=manifestUrl.textContent;
 
-copyButton.addEventListener("click",async()=>{
-  debugLog("Copy button clicked.");
+    if(!value){
+      return;
+    }
 
-  const value=manifestUrl.textContent;
+    try{
 
-  if(!value){
-    debugLog("Copy aborted: no manifest URL.");
-    return;
+      await navigator.clipboard.writeText(value);
+
+      copyButton.textContent="Copied";
+
+      setTimeout(()=>{
+        if(!expired){
+          copyButton.textContent="Copy";
+        }
+      },1500);
+
+    }catch{
+
+      setStatus(
+        "Copy failed. Select the manifest URL manually.",
+        "error"
+      );
+    }
   }
+);
 
-  try{
-    await navigator.clipboard.writeText(value);
+installButton.addEventListener(
+  "click",
+  ()=>{
+    const value=manifestUrl.textContent;
 
-    debugLog("Manifest URL copied.");
+    if(!value || expired){
+      return;
+    }
 
-    copyButton.textContent="Copied";
-
-    setTimeout(()=>{
-      if(!expired){
-        copyButton.textContent="Copy";
-      }
-    },1500);
-  }catch(error){
-    debugError("Copy failed.",error);
-
-    setStatus(
-      "Copy failed. Select the manifest URL manually.",
-      "error"
-    );
+    window.location.href=
+      "stremio://" +
+      value.replace(/^https?:\/\//,"");
   }
-});
+);
 
-installButton.addEventListener("click",()=>{
-  debugLog("Install button clicked.");
-
-  const value=manifestUrl.textContent;
-
-  if(!value || expired){
-    debugLog("Install aborted.",{
-      hasManifest:!!value,
-      expired
-    });
-
-    return;
-  }
-
-  const stremioUrl=
-    "stremio://" +
-    value.replace(/^https?:\/\//,"");
-
-  debugLog("Opening Stremio URL.",stremioUrl);
-
-  window.location.href=stremioUrl;
-});
-
-clearLogsButton.addEventListener("click",()=>{
-  debugLogs.textContent="";
-  debugLog("Logs cleared.");
-});
-
-testSaveButton.addEventListener("click",()=>{
-  debugLog("TEST SAVE BUTTON PRESSED.");
-
-  setStatus(
-    "Debug test button works. Now press Save Configuration.",
-    "success"
-  );
-});
-
-window.addEventListener("error",(event)=>{
-  debugError(
-    "Unhandled JavaScript error.",
-    event.error || event.message
-  );
-});
-
-window.addEventListener("unhandledrejection",(event)=>{
-  debugError(
-    "Unhandled Promise rejection.",
-    event.reason
-  );
-});
-
-try{
-  debugLog("Applying saved file size values.");
-
-  if(fileSize.minGb!==null){
-    minSizeInput.value=fileSize.minGb;
-  }
-
-  if(fileSize.maxGb!==null){
-    maxSizeInput.value=fileSize.maxGb;
-  }
-
-  debugLog("Applying CAM filter.",filters.cam!==false);
-
-  camFilter.checked=filters.cam!==false;
-
-  debugLog("Starting quality rendering.");
-
-  renderQualities();
-
-  debugLog("Running initial file size validation.");
-
-  validateFileSize();
-
-  debugLog("Configure UI initialization completed successfully.");
-}catch(error){
-  debugError(
-    "Configure UI initialization failed.",
-    error
-  );
-
-  setStatus(
-    error?.message ||
-    "Configure page failed to initialize.",
-    "error"
-  );
+if(fileSize.minGb!==null){
+  minSizeInput.value=fileSize.minGb;
 }
 
-debugLog("Configure script finished.");
+if(fileSize.maxGb!==null){
+  maxSizeInput.value=fileSize.maxGb;
+}
+
+camFilter.checked=filters.cam!==false;
+
+renderQualities();
+validateFileSize();
 </script>
+
 </body>
 </html>
 `;
 
-  return new Response(html, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-      "Referrer-Policy": "no-referrer"
-    }
-  });
+    console.log("[Configure] HTML generated successfully");
+    console.log("[Configure] Returning Configure page");
+    console.log("========================================");
+
+    return new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer"
+      }
+    });
+
+  } catch (error) {
+    console.error("========================================");
+    console.error("[Configure] GET ERROR");
+    console.error("[Configure] Error message:", error?.message);
+    console.error("[Configure] Error stack:", error?.stack);
+    console.error("[Configure] Error object:", error);
+    console.error("========================================");
+
+    return new Response("Internal Server Error", {
+      status: 500,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    });
+  }
 }
