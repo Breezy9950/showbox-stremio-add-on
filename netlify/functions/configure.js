@@ -52,21 +52,19 @@ function decodeConfig(value) {
         .toString("utf8");
     } else if (typeof atob !== "undefined") {
       const binary = atob(base64);
+
       const bytes = Uint8Array.from(
         binary,
         c => c.charCodeAt(0)
       );
+
       jsonStr = new TextDecoder().decode(bytes);
     } else {
       return {};
     }
 
     return JSON.parse(jsonStr);
-  } catch (error) {
-    console.error(
-      "[Configure] Legacy config decode failed:",
-      error
-    );
+  } catch {
     return {};
   }
 }
@@ -238,11 +236,6 @@ async function getConfigFromRequest(request) {
   const configValue =
     getConfigIdFromRequest(request);
 
-  console.log(
-    "[Configure] Config value:",
-    configValue
-  );
-
   if (!configValue) {
     return null;
   }
@@ -280,10 +273,6 @@ async function getConfigFromRequest(request) {
 }
 
 function expiredResponse() {
-  console.log(
-    "[Configure] Returning expired response"
-  );
-
   return new Response("Not Found", {
     status: 404,
     headers: {
@@ -308,16 +297,16 @@ function invalidConfigResponse() {
 *{box-sizing:border-box}
 body{
   margin:0;
-  padding:32px 16px;
+  padding:35px 18px;
   background:#0d0e11;
   color:#f1f1f3;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif
 }
 .card{
-  width:min(560px,100%);
+  width:min(616px,100%);
   margin:auto;
-  padding:28px;
-  border-radius:18px;
+  padding:31px;
+  border-radius:20px;
   background:#17181d
 }
 p{
@@ -355,11 +344,7 @@ function clientScript() {
 const dataElement =
   document.getElementById("showbox-config-data");
 
-if (!dataElement) {
-  console.error(
-    "[Configure] Configuration data not found"
-  );
-} else {
+if (dataElement) {
   const config =
     JSON.parse(dataElement.textContent);
 
@@ -902,10 +887,6 @@ if (!dataElement) {
 
   renderQualities();
   validateFileSize();
-
-  console.log(
-    "[Configure] Client loaded"
-  );
 }
 `;
 }
@@ -925,16 +906,6 @@ export default async function handler(
   const url =
     new URL(request.url);
 
-  console.log(
-    "[Configure]",
-    request.method,
-    url.pathname
-  );
-
-  /*
-   * The browser-side JavaScript is served
-   * by this same Netlify Function.
-   */
   if (
     request.method === "GET" &&
     url.pathname ===
@@ -958,10 +929,6 @@ export default async function handler(
   }
 
   if (request.method === "POST") {
-    console.log(
-      "[Configure] POST save request started"
-    );
-
     try {
       const contentLength =
         request.headers.get(
@@ -1011,12 +978,7 @@ export default async function handler(
       try {
         body =
           JSON.parse(requestBody);
-      } catch (error) {
-        console.error(
-          "[Configure] JSON parse failed:",
-          error
-        );
-
+      } catch {
         return jsonResponse(
           {
             error:
@@ -1068,21 +1030,12 @@ export default async function handler(
         );
       }
 
-      console.log(
-        "[Configure] Checking session:",
-        sessionId
-      );
-
       const activeSession =
         await getConfigureSession(
           sessionId
         );
 
       if (!activeSession) {
-        console.log(
-          "[Configure] Session expired or missing"
-        );
-
         return expiredResponse();
       }
 
@@ -1189,21 +1142,11 @@ export default async function handler(
           `stremio://${url.host}/${finalConfigId}/manifest.json`
       };
 
-      console.log(
-        "[Configure] SAVE SUCCESS:",
-        finalConfigId
-      );
-
       return jsonResponse(
         responseData
       );
 
     } catch (error) {
-      console.error(
-        "[Configure] SAVE ERROR:",
-        error?.stack || error
-      );
-
       return jsonResponse(
         {
           error:
@@ -1214,10 +1157,6 @@ export default async function handler(
       );
     }
   }
-
-  console.log(
-    "[Configure] GET request started"
-  );
 
   try {
     const configData =
@@ -1235,11 +1174,6 @@ export default async function handler(
     const session =
       await createConfigureSession();
 
-    console.log(
-      "[Configure] Configure session created:",
-      session.id
-    );
-
     const qualities =
       normalizeQualities(
         existingConfig.qualities
@@ -1255,13 +1189,6 @@ export default async function handler(
         existingConfig.filters
       );
 
-    /*
-     * The configuration is placed inside
-     * an inert JSON script element.
-     *
-     * This is NOT executable JavaScript.
-     * configure-client.js reads it later.
-     */
     const clientData =
       JSON.stringify({
         qualities,
@@ -1337,24 +1264,24 @@ body{
     calc(100% - 28px)
   );
   margin:auto;
-  padding:20px 0 clamp(50px,6vw,80px)
+  padding:22px 0 clamp(55px,6.5vw,88px)
 }
 
 .header{
-  margin-bottom:clamp(28px,4vw,40px)
+  margin-bottom:clamp(31px,4.4vw,44px)
 }
 
 .header h1{
   margin:0;
   color:var(--text);
-  font-size:clamp(40px,5.5vw,58px);
+  font-size:clamp(44px,6vw,64px);
   line-height:.98;
   font-weight:700;
-  letter-spacing:-2.5px
+  letter-spacing:-2.7px
 }
 
 .section{
-  margin-top:clamp(26px,3.5vw,38px)
+  margin-top:clamp(29px,3.8vw,42px)
 }
 
 .section:first-of-type{
@@ -1362,83 +1289,83 @@ body{
 }
 
 .section-title{
-  margin:0 0 6px;
+  margin:0 0 7px;
   color:var(--text);
-  font-size:clamp(25px,3vw,34px);
+  font-size:clamp(28px,3.3vw,37px);
   line-height:1.1;
   font-weight:700;
-  letter-spacing:-1px
+  letter-spacing:-1.1px
 }
 
 .section-description{
-  margin:0 0 clamp(12px,1.5vw,18px);
+  margin:0 0 clamp(13px,1.65vw,20px);
   color:var(--muted);
-  font-size:clamp(12px,1.4vw,14px);
+  font-size:clamp(13px,1.55vw,15px);
   line-height:1.5
 }
 
 .file-size-card,
 .quality-card,
 .filter-card{
-  padding:clamp(10px,1.2vw,13px);
+  padding:clamp(11px,1.3vw,14px);
   border:1px solid var(--border);
-  border-radius:clamp(15px,1.8vw,20px);
+  border-radius:clamp(17px,2vw,22px);
   background:var(--surface)
 }
 
 .file-size-heading{
   display:flex;
   align-items:center;
-  gap:12px;
-  padding:4px 7px clamp(9px,1vw,12px);
+  gap:13px;
+  padding:4px 8px clamp(10px,1.1vw,13px);
   color:var(--muted-2);
-  font-size:clamp(9px,1vw,11px);
+  font-size:clamp(10px,1.1vw,12px);
   font-weight:700;
   letter-spacing:.12em;
   text-transform:uppercase
 }
 
 .file-size-heading svg{
-  width:clamp(17px,1.8vw,22px);
-  height:clamp(17px,1.8vw,22px)
+  width:clamp(19px,2vw,24px);
+  height:clamp(19px,2vw,24px)
 }
 
 .file-size-inner{
-  padding:clamp(15px,1.8vw,20px);
-  padding-bottom:4px;
+  padding:clamp(17px,2vw,22px);
+  padding-bottom:5px;
   border:1px solid var(--border-light);
-  border-radius:clamp(11px,1.4vw,15px);
+  border-radius:clamp(12px,1.5vw,17px);
   background:var(--surface-2)
 }
 
 .file-size-inner-header{
-  margin-bottom:clamp(13px,1.6vw,17px);
+  margin-bottom:clamp(14px,1.75vw,19px);
   color:var(--text);
-  font-size:clamp(16px,1.8vw,20px);
+  font-size:clamp(18px,2vw,22px);
   font-weight:700
 }
 
 .size-row{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:clamp(9px,1.2vw,12px)
+  gap:clamp(10px,1.3vw,13px)
 }
 
 .size-field label{
   display:block;
-  margin-bottom:clamp(5px,1vw,7px);
+  margin-bottom:clamp(6px,1.1vw,8px);
   color:var(--muted-2);
-  font-size:clamp(10px,1.1vw,12px)
+  font-size:clamp(11px,1.2vw,13px)
 }
 
 .size-field input{
   width:100%;
-  padding:9px clamp(10px,1.3vw,14px);
+  padding:10px clamp(11px,1.4vw,15px);
   border:1px solid #343740;
-  border-radius:clamp(10px,1.3vw,13px);
+  border-radius:clamp(11px,1.4vw,14px);
   background:var(--input);
   color:#fff;
-  font-size:clamp(12px,1.3vw,14px);
+  font-size:clamp(13px,1.4vw,15px);
   outline:0
 }
 
@@ -1454,7 +1381,7 @@ body{
   min-height:0;
   margin-top:0;
   color:var(--error);
-  font-size:11px
+  font-size:12px
 }
 
 .file-size-error:empty{
@@ -1462,53 +1389,53 @@ body{
 }
 
 .file-size-error:not(:empty){
-  margin-top:8px;
-  padding-bottom:4px
+  margin-top:9px;
+  padding-bottom:5px
 }
 
 .quality-list{
   display:flex;
   flex-direction:column;
-  gap:clamp(6px,.9vw,9px)
+  gap:clamp(7px,1vw,10px)
 }
 
 .quality-row{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  min-height:clamp(52px,5vw,62px);
-  padding:clamp(9px,1.1vw,12px) clamp(11px,1.3vw,15px);
-  border-radius:clamp(11px,1.3vw,14px);
+  min-height:clamp(57px,5.5vw,68px);
+  padding:clamp(10px,1.2vw,13px) clamp(12px,1.4vw,17px);
+  border-radius:clamp(12px,1.4vw,15px);
   background:var(--surface-2)
 }
 
 .quality-check{
-  width:clamp(18px,1.8vw,21px);
-  height:clamp(18px,1.8vw,21px);
-  margin:0 clamp(9px,1.2vw,13px) 0 0
+  width:clamp(20px,2vw,23px);
+  height:clamp(20px,2vw,23px);
+  margin:0 clamp(10px,1.3vw,14px) 0 0
 }
 
 .quality-name{
   flex:1;
   color:#ededf0;
-  font-size:clamp(14px,1.5vw,17px);
+  font-size:clamp(15px,1.65vw,19px);
   font-weight:600
 }
 
 .quality-controls{
   display:flex;
-  gap:clamp(5px,.7vw,7px)
+  gap:clamp(6px,.8vw,8px)
 }
 
 .quality-controls button{
-  width:clamp(32px,3.3vw,40px);
-  height:clamp(32px,3.3vw,40px);
+  width:clamp(35px,3.6vw,44px);
+  height:clamp(35px,3.6vw,44px);
   padding:0;
   border:1px solid #343740;
-  border-radius:clamp(9px,1.1vw,11px);
+  border-radius:clamp(10px,1.2vw,12px);
   background:var(--input);
   color:#c9cad0;
-  font-size:clamp(13px,1.5vw,16px);
+  font-size:clamp(14px,1.65vw,18px);
   cursor:pointer
 }
 
@@ -1520,25 +1447,25 @@ body{
 .filter-row{
   display:flex;
   align-items:center;
-  min-height:clamp(52px,5vw,62px);
-  padding:clamp(9px,1.1vw,12px) clamp(11px,1.3vw,15px);
-  border-radius:clamp(11px,1.3vw,14px);
+  min-height:clamp(57px,5.5vw,68px);
+  padding:clamp(10px,1.2vw,13px) clamp(12px,1.4vw,17px);
+  border-radius:clamp(12px,1.4vw,15px);
   background:var(--surface-2)
 }
 
 .filter-label{
   display:flex;
   align-items:center;
-  gap:clamp(9px,1.2vw,13px);
+  gap:clamp(10px,1.3vw,14px);
   color:#ededf0;
-  font-size:clamp(14px,1.5vw,17px);
+  font-size:clamp(15px,1.65vw,19px);
   font-weight:600;
   cursor:pointer
 }
 
 .filter-label input{
-  width:clamp(18px,1.8vw,21px);
-  height:clamp(18px,1.8vw,21px);
+  width:clamp(20px,2vw,23px);
+  height:clamp(20px,2vw,23px);
   margin:0
 }
 
@@ -1547,14 +1474,14 @@ body{
   align-items:center;
   justify-content:center;
   width:100%;
-  height:clamp(46px,4.5vw,54px);
-  margin-top:clamp(20px,2.5vw,28px);
-  padding:0 20px;
+  height:clamp(51px,5vw,59px);
+  margin-top:clamp(22px,2.75vw,31px);
+  padding:0 22px;
   border:0;
-  border-radius:clamp(12px,1.5vw,15px);
+  border-radius:clamp(13px,1.65vw,17px);
   background:var(--white);
   color:var(--black);
-  font-size:clamp(13px,1.4vw,15px);
+  font-size:clamp(14px,1.55vw,17px);
   font-weight:700;
   cursor:pointer
 }
@@ -1565,10 +1492,10 @@ body{
 }
 
 #status{
-  min-height:18px;
-  margin-top:9px;
+  min-height:20px;
+  margin-top:10px;
   color:var(--muted);
-  font-size:11px
+  font-size:12px
 }
 
 #status.success{
@@ -1581,47 +1508,47 @@ body{
 
 #result{
   display:none;
-  margin-top:clamp(24px,3vw,32px)
+  margin-top:clamp(26px,3.3vw,35px)
 }
 
 .result-card{
-  padding:clamp(14px,1.6vw,18px);
+  padding:clamp(15px,1.75vw,20px);
   border:1px solid var(--border);
-  border-radius:clamp(15px,1.8vw,20px);
+  border-radius:clamp(17px,2vw,22px);
   background:var(--surface)
 }
 
 .result-title{
-  margin-bottom:10px;
+  margin-bottom:11px;
   color:var(--text);
-  font-size:clamp(16px,1.7vw,19px);
+  font-size:clamp(18px,1.9vw,21px);
   font-weight:700
 }
 
 #manifestUrl{
   overflow:auto;
-  padding:clamp(11px,1.2vw,14px);
+  padding:clamp(12px,1.3vw,15px);
   border:1px solid #343740;
-  border-radius:clamp(10px,1.3vw,13px);
+  border-radius:clamp(11px,1.4vw,14px);
   background:var(--surface-2);
   color:#c9cad0;
-  font-size:clamp(11px,1.1vw,13px);
+  font-size:clamp(12px,1.2vw,14px);
   line-height:1.45;
   word-break:break-all
 }
 
 .result-buttons{
   display:flex;
-  gap:9px;
-  margin-top:10px
+  gap:10px;
+  margin-top:11px
 }
 
 .result-buttons button{
   flex:1;
-  height:clamp(42px,4vw,48px);
+  height:clamp(46px,4.4vw,53px);
   border:0;
-  border-radius:clamp(10px,1.2vw,13px);
-  font-size:clamp(11px,1.2vw,13px);
+  border-radius:clamp(11px,1.3vw,14px);
+  font-size:clamp(12px,1.3vw,14px);
   font-weight:700;
   cursor:pointer
 }
@@ -1637,141 +1564,141 @@ body{
 }
 
 .note{
-  margin-top:clamp(16px,2vw,22px);
+  margin-top:clamp(18px,2.2vw,24px);
   color:var(--muted-2);
-  font-size:clamp(9px,1vw,11px);
+  font-size:clamp(10px,1.1vw,12px);
   line-height:1.5
 }
 
 @media(max-width:600px){
   .container{
     width:100%;
-    padding:22px 0 48px
+    padding:24px 0 53px
   }
 
   .header{
-    margin-bottom:28px
+    margin-bottom:31px
   }
 
   .header h1{
-    font-size:30px;
-    letter-spacing:-1.2px
+    font-size:33px;
+    letter-spacing:-1.3px
   }
 
   .section{
-    margin-top:25px
+    margin-top:28px
   }
 
   .section-title{
-    margin-bottom:5px;
-    font-size:23px;
-    letter-spacing:-.7px
+    margin-bottom:6px;
+    font-size:25px;
+    letter-spacing:-.8px
   }
 
   .section-description{
-    margin-bottom:11px;
-    font-size:11px
+    margin-bottom:12px;
+    font-size:12px
   }
 
   .file-size-card,
   .quality-card,
   .filter-card{
-    padding:9px;
-    border-radius:14px
+    padding:10px;
+    border-radius:15px
   }
 
   .file-size-heading{
-    padding:3px 6px 8px;
-    font-size:10px
+    padding:3px 7px 9px;
+    font-size:11px
   }
 
   .file-size-heading svg{
-    width:18px;
-    height:18px
+    width:20px;
+    height:20px
   }
 
   .file-size-inner{
-    padding:12px;
-    padding-bottom:4px;
-    border-radius:11px
+    padding:13px;
+    padding-bottom:5px;
+    border-radius:12px
   }
 
   .file-size-inner-header{
-    margin-bottom:12px;
-    font-size:16px
+    margin-bottom:13px;
+    font-size:18px
   }
 
   .size-row{
-    gap:8px
+    gap:9px
   }
 
   .size-field label{
-    margin-bottom:5px;
-    font-size:10px
+    margin-bottom:6px;
+    font-size:11px
   }
 
   .size-field input{
-    padding:8px 10px;
-    border-radius:9px;
-    font-size:12px
+    padding:9px 11px;
+    border-radius:10px;
+    font-size:13px
   }
 
   .quality-list{
-    gap:6px
+    gap:7px
   }
 
   .quality-row,
   .filter-row{
-    min-height:47px;
-    padding:8px 10px;
-    border-radius:11px
+    min-height:52px;
+    padding:9px 11px;
+    border-radius:12px
   }
 
   .quality-check,
   .filter-label input{
-    width:18px;
-    height:18px
+    width:20px;
+    height:20px
   }
 
   .quality-name,
   .filter-label{
-    font-size:13px
+    font-size:14px
   }
 
   .quality-controls{
-    gap:5px
+    gap:6px
   }
 
   .quality-controls button{
-    width:30px;
-    height:30px;
-    border-radius:9px;
-    font-size:13px
+    width:33px;
+    height:33px;
+    border-radius:10px;
+    font-size:14px
   }
 
   #save{
-    height:44px;
-    margin-top:18px;
-    border-radius:12px;
-    font-size:13px
+    height:48px;
+    margin-top:20px;
+    border-radius:13px;
+    font-size:14px
   }
 
   #result{
-    margin-top:22px
+    margin-top:24px
   }
 
   .result-card{
-    padding:12px;
-    border-radius:14px
+    padding:13px;
+    border-radius:15px
   }
 
   .result-buttons button{
-    height:42px;
-    font-size:11px
+    height:46px;
+    font-size:12px
   }
 
   .note{
-    font-size:10px
+    font-size:11px
   }
 }
 
@@ -1782,33 +1709,33 @@ body{
   }
 
   .header h1{
-    font-size:28px
+    font-size:31px
   }
 
   .section-title{
-    font-size:22px
+    font-size:24px
   }
 
   .file-size-card,
   .quality-card,
   .filter-card{
-    padding:8px
+    padding:9px
   }
 
   .file-size-inner{
-    padding:12px;
-    padding-bottom:4px
+    padding:13px;
+    padding-bottom:5px
   }
 
   .quality-row,
   .filter-row{
-    padding-left:9px;
-    padding-right:9px
+    padding-left:10px;
+    padding-right:10px
   }
 
   .quality-controls button{
-    width:28px;
-    height:28px
+    width:31px;
+    height:31px
   }
 }
 </style>
@@ -1838,8 +1765,8 @@ Keep streams between the selected minimum and maximum size.
 <span>FILE SIZE</span>
 
 <svg
-width="22"
-height="22"
+width="24"
+height="24"
 viewBox="0 0 24 24"
 fill="none"
 stroke="currentColor"
@@ -2034,12 +1961,7 @@ id="showbox-config-data"
       }
     );
 
-  } catch (error) {
-    console.error(
-      "[Configure] GET ERROR:",
-      error?.stack || error
-    );
-
+  } catch {
     return new Response(
       "Internal Server Error",
       {
