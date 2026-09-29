@@ -3,7 +3,7 @@ import {
   getConfig,
   saveConfig,
   createConfigureSession,
-  checkConfigureSession
+  getConfigureSession
 } from "./config-store.js";
 
 const DEFAULT_QUALITIES=[
@@ -37,11 +37,18 @@ const DEFAULT_QUALITIES=[
   }
 ];
 
-const MAX_CONFIG_BODY_BYTES=16*1024;
-const MAX_QUALITY_ITEMS=DEFAULT_QUALITIES.length;
+const MAX_CONFIG_BODY_BYTES=
+  16*1024;
+
+const MAX_QUALITY_ITEMS=
+  DEFAULT_QUALITIES.length;
+
 const MAX_FILE_SIZE_GB=200;
 
-function jsonResponse(body,status=200){
+function jsonResponse(
+  body,
+  status=200
+){
   return new Response(
     JSON.stringify(body),
     {
@@ -49,10 +56,13 @@ function jsonResponse(body,status=200){
       headers:{
         "Content-Type":
           "application/json; charset=utf-8",
+
         "Cache-Control":
           "no-store",
+
         "X-Content-Type-Options":
           "nosniff",
+
         "Referrer-Policy":
           "no-referrer"
       }
@@ -60,23 +70,31 @@ function jsonResponse(body,status=200){
   );
 }
 
-function decodeConfig(value){
+function decodeConfig(
+  value
+){
   try{
     if(!value){
       return {};
     }
 
-    let base64=value
-      .replace(/-/g,"+")
-      .replace(/_/g,"/");
+    let base64=
+      value
+        .replace(/-/g,"+")
+        .replace(/_/g,"/");
 
-    while(base64.length%4){
+    while(
+      base64.length%4
+    ){
       base64+="=";
     }
 
     return JSON.parse(
       Buffer
-        .from(base64,"base64")
+        .from(
+          base64,
+          "base64"
+        )
         .toString("utf8")
     );
   }
@@ -86,29 +104,35 @@ function decodeConfig(value){
   }
 }
 
-function normalizeQualities(qualities){
+function normalizeQualities(
+  qualities
+){
   if(!Array.isArray(qualities)){
     return DEFAULT_QUALITIES.map(
       item=>({...item})
     );
   }
 
-  const allowed=new Map(
-    DEFAULT_QUALITIES.map(
-      item=>[
-        item.name,
-        item
-      ]
-    )
-  );
+  const allowed=
+    new Map(
+      DEFAULT_QUALITIES.map(
+        item=>[
+          item.name,
+          item
+        ]
+      )
+    );
 
   const result=[];
   const used=new Set();
 
-  for(const item of qualities){
+  for(
+    const item of qualities
+  ){
     if(
       !item||
       typeof item!=="object"||
+      typeof item.name!=="string"||
       !allowed.has(item.name)||
       used.has(item.name)
     ){
@@ -117,13 +141,22 @@ function normalizeQualities(qualities){
 
     result.push({
       name:item.name,
-      enabled:item.enabled===true
+      enabled:item.enabled!==false
     });
 
     used.add(item.name);
+
+    if(
+      result.length>=
+      MAX_QUALITY_ITEMS
+    ){
+      break;
+    }
   }
 
-  for(const item of DEFAULT_QUALITIES){
+  for(
+    const item of DEFAULT_QUALITIES
+  ){
     if(!used.has(item.name)){
       result.push({
         ...item
@@ -134,10 +167,13 @@ function normalizeQualities(qualities){
   return result;
 }
 
-function normalizeFilters(filters){
+function normalizeFilters(
+  filters
+){
   if(
     !filters||
-    typeof filters!=="object"
+    typeof filters!=="object"||
+    Array.isArray(filters)
   ){
     return {
       cam:true
@@ -145,14 +181,18 @@ function normalizeFilters(filters){
   }
 
   return {
-    cam:filters.cam!==false
+    cam:
+      filters.cam!==false
   };
 }
 
-function normalizeFileSize(fileSize){
+function normalizeFileSize(
+  fileSize
+){
   if(
     !fileSize||
-    typeof fileSize!=="object"
+    typeof fileSize!=="object"||
+    Array.isArray(fileSize)
   ){
     return {
       minGb:null,
@@ -187,15 +227,20 @@ function normalizeFileSize(fileSize){
   };
 }
 
-function validateFileSize(fileSize){
+function validateFileSize(
+  fileSize
+){
   const normalized=
-    normalizeFileSize(fileSize);
+    normalizeFileSize(
+      fileSize
+    );
 
   if(
     normalized.minGb!==null&&
     (
       normalized.minGb<0||
-      normalized.minGb>MAX_FILE_SIZE_GB
+      normalized.minGb>
+        MAX_FILE_SIZE_GB
     )
   ){
     throw new Error(
@@ -207,7 +252,8 @@ function validateFileSize(fileSize){
     normalized.maxGb!==null&&
     (
       normalized.maxGb<0||
-      normalized.maxGb>MAX_FILE_SIZE_GB
+      normalized.maxGb>
+        MAX_FILE_SIZE_GB
     )
   ){
     throw new Error(
@@ -218,7 +264,8 @@ function validateFileSize(fileSize){
   if(
     normalized.minGb!==null&&
     normalized.maxGb!==null&&
-    normalized.minGb>normalized.maxGb
+    normalized.minGb>
+      normalized.maxGb
   ){
     throw new Error(
       "Minimum size cannot be greater than maximum size."
@@ -228,13 +275,17 @@ function validateFileSize(fileSize){
   return normalized;
 }
 
-async function getConfigFromRequest(request){
-  const url=new URL(request.url);
+async function getConfigFromRequest(
+  request
+){
+  const url=
+    new URL(request.url);
 
-  const pathname=url.pathname.replace(
-    /\/+$/,
-    ""
-  );
+  const pathname=
+    url.pathname.replace(
+      /\/+$/,
+      ""
+    );
 
   const match=
     pathname.match(
@@ -248,11 +299,13 @@ async function getConfigFromRequest(request){
     return null;
   }
 
-  const configValue=match[1];
+  const configValue=
+    match[1];
 
-  const stored=await getConfig(
-    configValue
-  );
+  const stored=
+    await getConfig(
+      configValue
+    );
 
   if(
     stored&&
@@ -265,9 +318,10 @@ async function getConfigFromRequest(request){
     };
   }
 
-  const legacy=decodeConfig(
-    configValue
-  );
+  const legacy=
+    decodeConfig(
+      configValue
+    );
 
   if(
     !legacy||
@@ -292,10 +346,13 @@ function expiredResponse(){
       headers:{
         "Content-Type":
           "text/plain; charset=utf-8",
+
         "Cache-Control":
           "no-store",
+
         "X-Content-Type-Options":
           "nosniff",
+
         "Referrer-Policy":
           "no-referrer"
       }
@@ -310,20 +367,27 @@ export const config={
   ]
 };
 
-export default async function handler(request){
-  const url=new URL(request.url);
+export default async function handler(
+  request
+){
+  const url=
+    new URL(request.url);
 
   const configData=
-    await getConfigFromRequest(request);
+    await getConfigFromRequest(
+      request
+    );
 
   if(!configData){
     return new Response(
       `
 <!doctype html>
 
-<html>
+<html lang="en">
 
 <head>
+
+<meta charset="UTF-8">
 
 <meta
   name="viewport"
@@ -348,7 +412,6 @@ body{
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  text-align:center;
 }
 
 .card{
@@ -389,13 +452,17 @@ an existing addon configuration.
 `,
       {
         status:400,
+
         headers:{
           "Content-Type":
             "text/html; charset=utf-8",
+
           "Cache-Control":
             "no-store",
+
           "X-Content-Type-Options":
             "nosniff",
+
           "Referrer-Policy":
             "no-referrer"
         }
@@ -403,42 +470,80 @@ an existing addon configuration.
     );
   }
 
-  const configId=configData.id;
-  const existingConfig=configData.config;
+  const configId=
+    configData.id;
+
+  const existingConfig=
+    configData.config;
 
   let sessionId=
-    url.searchParams.get("session");
+    url.searchParams.get(
+      "session"
+    );
 
   let session;
 
-  if(request.method==="GET"&&!sessionId){
-    session=await createConfigureSession();
+  if(
+    request.method==="GET"&&
+    !sessionId
+  ){
+    /*
+     * Create the temporary session and
+     * render immediately.
+     *
+     * No redirect and no second session
+     * lookup are needed.
+     */
+    session=
+      await createConfigureSession();
 
-    sessionId=session.id;
+    sessionId=
+      session.id;
   }
 
   else{
-    const checked=
-      await checkConfigureSession(
+    session=
+      await getConfigureSession(
         sessionId
       );
 
-    if(!checked.ok){
+    if(!session){
       return expiredResponse();
     }
-
-    session={
-      expiresAt:checked.expiresAt
-    };
   }
 
   if(request.method==="POST"){
     try{
-      const requestBody=await request.text();
+      const contentLength=
+        request.headers.get(
+          "content-length"
+        );
+
+      if(
+        contentLength&&
+        Number.isFinite(
+          Number(contentLength)
+        )&&
+        Number(contentLength)>
+          MAX_CONFIG_BODY_BYTES
+      ){
+        return jsonResponse(
+          {
+            error:
+              "Configuration request is too large"
+          },
+          413
+        );
+      }
+
+      const requestBody=
+        await request.text();
 
       if(
         new TextEncoder()
-          .encode(requestBody)
+          .encode(
+            requestBody
+          )
           .byteLength>
         MAX_CONFIG_BODY_BYTES
       ){
@@ -454,13 +559,17 @@ an existing addon configuration.
       let body;
 
       try{
-        body=JSON.parse(requestBody);
+        body=
+          JSON.parse(
+            requestBody
+          );
       }
 
       catch{
         return jsonResponse(
           {
-            error:"Invalid JSON"
+            error:
+              "Invalid JSON"
           },
           400
         );
@@ -480,7 +589,9 @@ an existing addon configuration.
         );
       }
 
-      if(body.sessionId!==sessionId){
+      if(
+        body.sessionId!==sessionId
+      ){
         return jsonResponse(
           {
             error:
@@ -490,14 +601,26 @@ an existing addon configuration.
         );
       }
 
-      if(body.action==="check-session"){
-        return jsonResponse({
-          ok:true,
-          expiresAt:session.expiresAt
-        });
+      /*
+       * Re-read the session immediately
+       * before saving.
+       *
+       * This makes expiration server
+       * authoritative even if the browser
+       * timer has not fired yet.
+       */
+      const activeSession=
+        await getConfigureSession(
+          sessionId
+        );
+
+      if(!activeSession){
+        return expiredResponse();
       }
 
-      if(body.action!=="save"){
+      if(
+        body.action!=="save"
+      ){
         return jsonResponse(
           {
             error:
@@ -508,9 +631,11 @@ an existing addon configuration.
       }
 
       if(
-        Array.isArray(body.qualities)&&
+        Array.isArray(
+          body.qualities
+        )&&
         body.qualities.length>
-        MAX_QUALITY_ITEMS
+          MAX_QUALITY_ITEMS
       ){
         throw new Error(
           "Too many quality entries"
@@ -521,6 +646,16 @@ an existing addon configuration.
         normalizeQualities(
           body.qualities
         );
+
+      if(
+        !qualities.some(
+          item=>item.enabled
+        )
+      ){
+        throw new Error(
+          "Enable at least one quality."
+        );
+      }
 
       const fileSize=
         validateFileSize(
@@ -533,7 +668,8 @@ an existing addon configuration.
         );
 
       const uiToken=
-        typeof existingConfig.uiToken==="string"
+        typeof existingConfig.uiToken===
+          "string"
           ?existingConfig.uiToken
           :"";
 
@@ -545,18 +681,18 @@ an existing addon configuration.
 
       const newConfig={
         ...existingConfig,
+
         uiToken,
+
         fileSize,
-        qualities:qualities.map(
-          item=>({
-            name:item.name,
-            enabled:item.enabled
-          })
-        ),
+
+        qualities,
+
         filters
       };
 
-      let finalConfigId=configId;
+      let finalConfigId=
+        configId;
 
       if(!finalConfigId){
         finalConfigId=
@@ -573,7 +709,10 @@ an existing addon configuration.
       }
 
       return jsonResponse({
-        configId:finalConfigId,
+        ok:true,
+
+        configId:
+          finalConfigId,
 
         manifestUrl:
           `${url.origin}/${finalConfigId}/manifest.json`,
@@ -591,7 +730,7 @@ an existing addon configuration.
 
       const message=
         error?.message||
-        "Invalid configuration";
+        "Failed to save configuration.";
 
       return jsonResponse(
         {
@@ -621,16 +760,41 @@ an existing addon configuration.
     );
 
   const qualitiesJson=
-    JSON.stringify(qualities)
-      .replace(/</g,"\\u003c")
-      .replace(/>/g,"\\u003e")
-      .replace(/&/g,"\\u0026");
+    JSON.stringify(
+      qualities
+    )
+      .replace(
+        /</g,
+        "\\u003c"
+      )
+      .replace(
+        />/g,
+        "\\u003e"
+      )
+      .replace(
+        /&/g,
+        "\\u0026"
+      );
 
   const fileSizeJson=
-    JSON.stringify(fileSize);
+    JSON.stringify(
+      fileSize
+    );
 
   const filtersJson=
-    JSON.stringify(filters);
+    JSON.stringify(
+      filters
+    );
+
+  const sessionJson=
+    JSON.stringify(
+      sessionId
+    );
+
+  const expiresAt=
+    Number(
+      session.expiresAt
+    );
 
   const html=`
 <!doctype html>
@@ -646,62 +810,103 @@ an existing addon configuration.
   content="width=device-width,initial-scale=1,viewport-fit=cover"
 >
 
+<meta
+  name="theme-color"
+  content="#0d0e11"
+>
+
 <title>ShowBox</title>
 
 <style>
+
+:root{
+  color-scheme:dark;
+
+  --bg:#0d0e11;
+  --surface:#15161b;
+  --surface-2:#1d1f25;
+  --input:#252831;
+
+  --border:#292c34;
+  --border-light:#343740;
+
+  --text:#f1f1f3;
+  --muted:#858892;
+  --muted-2:#696c75;
+
+  --white:#f4f4f5;
+  --black:#101115;
+
+  --success:#a7e3b1;
+  --error:#ff9b9b;
+}
 
 *{
   box-sizing:border-box;
 }
 
-:root{
-  --bg:#0d0e11;
-  --surface:#15161b;
-  --surface-2:#1d1f25;
-  --input:#252831;
-  --border:#292c34;
-  --border-light:#30333b;
-  --text:#f1f1f3;
-  --muted:#858892;
-  --muted-2:#696c75;
+html{
+  background:var(--bg);
 }
 
 body{
   margin:0;
-  padding:
-    clamp(28px,4vw,52px)
-    16px
-    60px;
-  background:var(--bg);
+  min-height:100vh;
+
+  background:
+    radial-gradient(
+      circle at 50% -15%,
+      rgba(255,255,255,.055),
+      transparent 38%
+    ),
+    var(--bg);
+
   color:var(--text);
+
   font-family:
     -apple-system,
     BlinkMacSystemFont,
+    "SF Pro Display",
+    "SF Pro Text",
     "Segoe UI",
     sans-serif;
+
+  -webkit-font-smoothing:antialiased;
 }
 
 .container{
   width:
     min(
       clamp(700px,74vw,960px),
-      100%
+      calc(100% - 28px)
     );
+
   margin:auto;
+
+  padding:
+    20px
+    0
+    clamp(50px,6vw,80px);
 }
 
 .header{
   margin-bottom:
-    clamp(30px,4vw,44px);
+    clamp(28px,4vw,40px);
 }
 
-h1{
+.header h1{
   margin:0;
+
+  color:var(--text);
+
   font-size:
     clamp(40px,5.5vw,58px);
+
   line-height:.98;
-  letter-spacing:-2.5px;
+
   font-weight:700;
+
+  letter-spacing:-2.5px;
 }
 
 .section{
@@ -709,14 +914,23 @@ h1{
     clamp(26px,3.5vw,38px);
 }
 
+.section:first-of-type{
+  margin-top:0;
+}
+
 .section-title{
   margin:0 0 6px;
+
   color:var(--text);
+
   font-size:
     clamp(25px,3vw,34px);
+
   line-height:1.1;
-  letter-spacing:-1px;
+
   font-weight:700;
+
+  letter-spacing:-1px;
 }
 
 .section-description{
@@ -724,9 +938,12 @@ h1{
     0
     0
     clamp(12px,1.5vw,18px);
+
   color:var(--muted);
+
   font-size:
     clamp(12px,1.4vw,14px);
+
   line-height:1.5;
 }
 
@@ -736,89 +953,123 @@ h1{
 .file-size-card{
   padding:
     clamp(11px,1.2vw,14px);
+
   border:
     1px solid var(--border);
+
   border-radius:
     clamp(15px,1.8vw,20px);
+
   background:var(--surface);
 }
 
 .file-size-heading{
   display:flex;
+
   align-items:center;
+
   gap:12px;
+
   padding:
     4px
     7px
     clamp(9px,1vw,12px);
+
   color:var(--muted-2);
+
   font-size:
     clamp(9px,1vw,11px);
+
   font-weight:700;
+
   letter-spacing:.12em;
+
   text-transform:uppercase;
 }
 
 .file-size-heading svg{
   width:
     clamp(17px,1.8vw,22px);
+
   height:
     clamp(17px,1.8vw,22px);
+
   flex-shrink:0;
 }
 
 .file-size-inner{
   padding:
     clamp(15px,1.8vw,20px);
+
   padding-bottom:4px;
+
   border:
     1px solid var(--border-light);
+
   border-radius:
     clamp(11px,1.4vw,15px);
+
   background:var(--surface-2);
 }
 
 .file-size-inner-header{
   margin-bottom:
     clamp(13px,1.6vw,17px);
+
   color:var(--text);
+
   font-size:
     clamp(16px,1.8vw,20px);
+
   line-height:1.2;
+
   font-weight:700;
 }
 
 .size-row{
   display:grid;
+
   grid-template-columns:
     1fr 1fr;
+
   gap:
     clamp(9px,1.2vw,12px);
 }
 
 .size-field label{
   display:block;
+
   margin-bottom:
     clamp(5px,1vw,7px);
+
   color:var(--muted-2);
+
   font-size:
     clamp(10px,1.1vw,12px);
 }
 
 .size-field input{
   width:100%;
+
   padding:
     9px
     clamp(10px,1.3vw,14px);
+
   border:
     1px solid #343740;
+
   border-radius:
     clamp(10px,1.3vw,13px);
+
   background:var(--input);
+
   color:#fff;
+
   font-size:
     clamp(12px,1.3vw,14px);
+
   line-height:1.25;
+
   outline:0;
 }
 
@@ -826,11 +1077,19 @@ h1{
   border-color:#4b4f59;
 }
 
+.size-field input::placeholder{
+  color:var(--muted-2);
+}
+
 .file-size-error{
   min-height:0;
+
   margin-top:0;
-  color:#ff9b9b;
+
+  color:var(--error);
+
   line-height:1.4;
+
   font-size:11px;
 }
 
@@ -840,66 +1099,88 @@ h1{
 
 .file-size-error:not(:empty){
   margin-top:8px;
+
   padding-bottom:4px;
 }
 
 
 /* QUALITY */
 
-.quality-card{
+.quality-card,
+.filter-card{
   padding:
     clamp(10px,1.2vw,13px);
+
   border:
     1px solid var(--border);
+
   border-radius:
     clamp(15px,1.8vw,20px);
+
   background:var(--surface);
 }
 
 .quality-list{
   display:flex;
+
   flex-direction:column;
+
   gap:
     clamp(6px,.9vw,9px);
 }
 
 .quality-row{
   display:flex;
+
   align-items:center;
+
   justify-content:space-between;
+
   min-height:
     clamp(52px,5vw,62px);
+
   padding:
     clamp(9px,1.1vw,12px)
     clamp(11px,1.3vw,15px);
+
   border-radius:
     clamp(11px,1.3vw,14px);
+
   background:var(--surface-2);
 }
 
-.quality-row>input{
+.quality-check{
   width:
     clamp(18px,1.8vw,21px);
+
   height:
     clamp(18px,1.8vw,21px);
+
   margin:
     0
-    clamp(10px,1.3vw,14px)
+    clamp(9px,1.2vw,13px)
     0
     0;
+
   flex-shrink:0;
 }
 
 .quality-name{
   flex:1;
+
+  min-width:0;
+
   color:#ededf0;
+
   font-size:
     clamp(14px,1.5vw,17px);
+
   font-weight:600;
 }
 
 .quality-controls{
   display:flex;
+
   gap:
     clamp(5px,.7vw,7px);
 }
@@ -907,105 +1188,153 @@ h1{
 .quality-controls button{
   width:
     clamp(32px,3.3vw,40px);
+
   height:
     clamp(32px,3.3vw,40px);
+
   padding:0;
+
   border:
     1px solid #343740;
+
   border-radius:
     clamp(9px,1.1vw,11px);
+
   background:var(--input);
+
   color:#c9cad0;
+
   font-size:
     clamp(13px,1.5vw,16px);
+
+  cursor:pointer;
 }
 
 .quality-controls button:disabled{
   opacity:.3;
+
+  cursor:default;
 }
 
 
-/* FILTERS */
-
-.filter-card{
-  padding:
-    clamp(10px,1.2vw,13px);
-  border:
-    1px solid var(--border);
-  border-radius:
-    clamp(15px,1.8vw,20px);
-  background:var(--surface);
-}
+/* FILTER */
 
 .filter-row{
+  display:flex;
+
+  align-items:center;
+
+  min-height:
+    clamp(52px,5vw,62px);
+
   padding:
-    clamp(13px,1.5vw,17px);
+    clamp(9px,1.1vw,12px)
+    clamp(11px,1.3vw,15px);
+
   border-radius:
     clamp(11px,1.3vw,14px);
+
   background:var(--surface-2);
 }
 
 .filter-label{
   display:flex;
+
   align-items:center;
+
   gap:
     clamp(9px,1.2vw,13px);
+
   color:#ededf0;
+
   font-size:
     clamp(14px,1.5vw,17px);
+
   font-weight:600;
+
+  cursor:pointer;
 }
 
 .filter-label input{
   width:
     clamp(18px,1.8vw,21px);
+
   height:
     clamp(18px,1.8vw,21px);
+
+  margin:0;
+
+  flex-shrink:0;
 }
 
 
 /* SAVE */
 
-.main{
+#save{
   display:flex;
+
   align-items:center;
+
   justify-content:center;
+
   width:100%;
+
   height:
     clamp(46px,4.5vw,54px);
+
   margin-top:
     clamp(20px,2.5vw,28px);
+
   padding:
-    0
-    20px;
+    0 20px;
+
   border:0;
+
   border-radius:
     clamp(12px,1.5vw,15px);
-  background:#f4f4f5;
-  color:#101115;
+
+  background:var(--white);
+
+  color:var(--black);
+
   font-size:
     clamp(13px,1.4vw,15px);
+
   font-weight:700;
-  line-height:1;
+
+  cursor:pointer;
 }
 
-.main:disabled{
+#save:disabled{
   opacity:.55;
+
+  cursor:default;
 }
 
-.status{
+#status{
   min-height:18px;
+
   margin-top:9px;
+
   color:var(--muted);
+
   font-size:11px;
-  text-align:center;
+}
+
+#status.success{
+  color:var(--success);
+}
+
+#status.error{
+  color:var(--error);
 }
 
 
 /* RESULT */
 
-.result{
+#result{
   display:none;
+
   margin-top:
     clamp(24px,3vw,32px);
 }
@@ -1013,70 +1342,99 @@ h1{
 .result-card{
   padding:
     clamp(14px,1.6vw,18px);
+
   border:
     1px solid var(--border);
+
   border-radius:
     clamp(15px,1.8vw,20px);
+
   background:var(--surface);
 }
 
 .result-title{
   margin-bottom:10px;
+
+  color:var(--text);
+
   font-size:
     clamp(16px,1.7vw,19px);
+
   font-weight:700;
 }
 
-.manifest-url{
+#manifestUrl{
   overflow:auto;
+
   padding:
     clamp(11px,1.2vw,14px);
+
   border:
     1px solid #343740;
+
   border-radius:
     clamp(10px,1.3vw,13px);
+
   background:var(--surface-2);
+
   color:#c9cad0;
+
   font-size:
     clamp(11px,1.1vw,13px);
+
   line-height:1.45;
+
   word-break:break-all;
 }
 
 .result-buttons{
   display:flex;
+
   gap:9px;
+
   margin-top:10px;
 }
 
 .result-buttons button{
   flex:1;
+
   height:
     clamp(42px,4vw,48px);
+
   border:0;
+
   border-radius:
     clamp(10px,1.2vw,13px);
+
   font-size:
     clamp(11px,1.2vw,13px);
+
   font-weight:700;
+
+  cursor:pointer;
 }
 
 .copy{
   background:var(--input);
+
   color:#fff;
 }
 
 .install{
-  background:#f4f4f5;
-  color:#101115;
+  background:var(--white);
+
+  color:var(--black);
 }
 
 .note{
   margin-top:
     clamp(16px,2vw,22px);
+
   color:var(--muted-2);
+
   font-size:
     clamp(9px,1vw,11px);
+
   line-height:1.5;
 }
 
@@ -1085,23 +1443,22 @@ h1{
 
 @media(max-width:600px){
 
-  body{
-    padding:
-      22px
-      14px
-      48px;
-  }
-
   .container{
     width:100%;
+
+    padding:
+      22px
+      0
+      48px;
   }
 
   .header{
     margin-bottom:28px;
   }
 
-  h1{
+  .header h1{
     font-size:30px;
+
     letter-spacing:-1.2px;
   }
 
@@ -1111,17 +1468,23 @@ h1{
 
   .section-title{
     margin-bottom:5px;
+
     font-size:23px;
+
     letter-spacing:-.7px;
   }
 
   .section-description{
     margin-bottom:11px;
+
     font-size:11px;
   }
 
-  .file-size-card{
+  .file-size-card,
+  .quality-card,
+  .filter-card{
     padding:9px;
+
     border-radius:14px;
   }
 
@@ -1130,22 +1493,27 @@ h1{
       3px
       6px
       8px;
+
     font-size:10px;
   }
 
   .file-size-heading svg{
     width:18px;
+
     height:18px;
   }
 
   .file-size-inner{
     padding:12px;
+
     padding-bottom:4px;
+
     border-radius:11px;
   }
 
   .file-size-inner-header{
     margin-bottom:12px;
+
     font-size:16px;
   }
 
@@ -1155,6 +1523,7 @@ h1{
 
   .size-field label{
     margin-bottom:5px;
+
     font-size:10px;
   }
 
@@ -1162,35 +1531,36 @@ h1{
     padding:
       8px
       10px;
-    border-radius:9px;
-    font-size:12px;
-  }
 
-  .quality-card,
-  .filter-card{
-    padding:9px;
-    border-radius:14px;
+    border-radius:9px;
+
+    font-size:12px;
   }
 
   .quality-list{
     gap:6px;
   }
 
-  .quality-row{
+  .quality-row,
+  .filter-row{
     min-height:47px;
+
     padding:
       8px
       10px;
+
     border-radius:11px;
   }
 
-  .quality-row>input{
+  .quality-check,
+  .filter-label input{
     width:18px;
+
     height:18px;
-    margin-right:9px;
   }
 
-  .quality-name{
+  .quality-name,
+  .filter-label{
     font-size:13px;
   }
 
@@ -1200,44 +1570,37 @@ h1{
 
   .quality-controls button{
     width:30px;
+
     height:30px;
+
     border-radius:9px;
+
     font-size:13px;
   }
 
-  .filter-row{
-    padding:12px;
-    border-radius:11px;
-  }
-
-  .filter-label{
-    gap:9px;
-    font-size:13px;
-  }
-
-  .filter-label input{
-    width:18px;
-    height:18px;
-  }
-
-  .main{
+  #save{
     height:44px;
+
     margin-top:18px;
+
     border-radius:12px;
+
     font-size:13px;
   }
 
-  .result{
+  #result{
     margin-top:22px;
   }
 
   .result-card{
     padding:12px;
+
     border-radius:14px;
   }
 
   .result-buttons button{
     height:42px;
+
     font-size:11px;
   }
 
@@ -1251,12 +1614,13 @@ h1{
 
 @media(max-width:380px){
 
-  body{
-    padding-left:12px;
-    padding-right:12px;
+  .container{
+    padding-left:0;
+
+    padding-right:0;
   }
 
-  h1{
+  .header h1{
     font-size:28px;
   }
 
@@ -1272,19 +1636,22 @@ h1{
 
   .file-size-inner{
     padding:12px;
+
     padding-bottom:4px;
   }
 
-  .quality-row{
+  .quality-row,
+  .filter-row{
     padding-left:9px;
+
     padding-right:9px;
   }
 
   .quality-controls button{
     width:28px;
+
     height:28px;
   }
-
 }
 
 </style>
@@ -1318,7 +1685,9 @@ Keep streams between the selected minimum and maximum size.
 
 <div class="file-size-heading">
 
-<span>FILE SIZE</span>
+<span>
+FILE SIZE
+</span>
 
 <svg
   width="22"
@@ -1449,22 +1818,15 @@ CAM
 
 <button
   id="save"
-  class="main"
   type="button"
 >
 Save Configuration
 </button>
 
-<div
-  id="status"
-  class="status"
-></div>
+<div id="status"></div>
 
 
-<div
-  id="result"
-  class="result"
->
+<div id="result">
 
 <div class="result-card">
 
@@ -1474,7 +1836,6 @@ Manifest URL
 
 <div
   id="manifestUrl"
-  class="manifest-url"
 ></div>
 
 <div class="result-buttons">
@@ -1512,48 +1873,81 @@ copy the manifest URL and add it manually through Stremio's Add-ons page.
 
 <script>
 
-const qualities=${qualitiesJson};
-const fileSize=${fileSizeJson};
-const filters=${filtersJson};
-const sessionId=${JSON.stringify(sessionId)};
-const expiresAt=${session.expiresAt};
+"use strict";
+
+const qualities=
+  ${qualitiesJson};
+
+const fileSize=
+  ${fileSizeJson};
+
+const filters=
+  ${filtersJson};
+
+const sessionId=
+  ${sessionJson};
+
+const expiresAt=
+  ${expiresAt};
 
 const qualityList=
-  document.getElementById("qualityList");
+  document.getElementById(
+    "qualityList"
+  );
 
 const minSizeInput=
-  document.getElementById("minSize");
+  document.getElementById(
+    "minSize"
+  );
 
 const maxSizeInput=
-  document.getElementById("maxSize");
+  document.getElementById(
+    "maxSize"
+  );
 
 const fileSizeError=
-  document.getElementById("fileSizeError");
+  document.getElementById(
+    "fileSizeError"
+  );
 
 const camFilter=
-  document.getElementById("camFilter");
+  document.getElementById(
+    "camFilter"
+  );
 
 const saveButton=
-  document.getElementById("save");
+  document.getElementById(
+    "save"
+  );
 
 const status=
-  document.getElementById("status");
+  document.getElementById(
+    "status"
+  );
 
 const result=
-  document.getElementById("result");
+  document.getElementById(
+    "result"
+  );
 
 const manifestUrl=
-  document.getElementById("manifestUrl");
+  document.getElementById(
+    "manifestUrl"
+  );
 
 const copyButton=
-  document.getElementById("copy");
+  document.getElementById(
+    "copy"
+  );
 
 const installButton=
-  document.getElementById("install");
+  document.getElementById(
+    "install"
+  );
 
 let expired=false;
 
-function permanentlyExpire(){
+function expire(){
   if(expired){
     return;
   }
@@ -1562,24 +1956,32 @@ function permanentlyExpire(){
 
   saveButton.disabled=true;
 
-  history.replaceState(
-    null,
-    "",
-    "/__showbox_configure_expired__"
-  );
-
-  location.replace(
+  window.location.replace(
     "/__showbox_configure_expired__"
   );
 }
 
-setTimeout(
-  permanentlyExpire,
+const remaining=
   Math.max(
     0,
     expiresAt-Date.now()
-  )
+  );
+
+setTimeout(
+  expire,
+  remaining
 );
+
+function setStatus(
+  message,
+  type=""
+){
+  status.textContent=
+    message;
+
+  status.className=
+    type;
+}
 
 function renderQualities(){
   qualityList.innerHTML="";
@@ -1587,15 +1989,26 @@ function renderQualities(){
   qualities.forEach(
     (quality,index)=>{
       const row=
-        document.createElement("div");
+        document.createElement(
+          "div"
+        );
 
-      row.className="quality-row";
+      row.className=
+        "quality-row";
 
       const checkbox=
-        document.createElement("input");
+        document.createElement(
+          "input"
+        );
 
-      checkbox.type="checkbox";
-      checkbox.checked=quality.enabled;
+      checkbox.type=
+        "checkbox";
+
+      checkbox.className=
+        "quality-check";
+
+      checkbox.checked=
+        quality.enabled;
 
       checkbox.addEventListener(
         "change",
@@ -1608,73 +2021,96 @@ function renderQualities(){
       );
 
       const name=
-        document.createElement("div");
+        document.createElement(
+          "div"
+        );
 
-      name.className="quality-name";
-      name.textContent=quality.name;
+      name.className=
+        "quality-name";
+
+      name.textContent=
+        quality.name;
 
       const controls=
-        document.createElement("div");
+        document.createElement(
+          "div"
+        );
 
       controls.className=
         "quality-controls";
 
       const up=
-        document.createElement("button");
+        document.createElement(
+          "button"
+        );
 
-      up.type="button";
-      up.textContent="↑";
-      up.disabled=index===0;
+      up.type=
+        "button";
+
+      up.textContent=
+        "↑";
+
+      up.disabled=
+        index===0;
 
       up.addEventListener(
         "click",
         ()=>{
-          if(index===0){
+          if(index<=0){
             return;
           }
 
-          const temp=
+          const previous=
             qualities[index-1];
 
           qualities[index-1]=
             qualities[index];
 
           qualities[index]=
-            temp;
+            previous;
 
           invalidateResult();
+
           renderQualities();
         }
       );
 
       const down=
-        document.createElement("button");
+        document.createElement(
+          "button"
+        );
 
-      down.type="button";
-      down.textContent="↓";
+      down.type=
+        "button";
+
+      down.textContent=
+        "↓";
+
       down.disabled=
-        index===qualities.length-1;
+        index===
+        qualities.length-1;
 
       down.addEventListener(
         "click",
         ()=>{
           if(
-            index===
+            index>=
             qualities.length-1
           ){
             return;
           }
 
-          const temp=
+          const next=
             qualities[index+1];
 
           qualities[index+1]=
             qualities[index];
 
           qualities[index]=
-            temp;
+            next;
 
           invalidateResult();
+
           renderQualities();
         }
       );
@@ -1690,34 +2126,45 @@ function renderQualities(){
         controls
       );
 
-      qualityList.appendChild(row);
+      qualityList.appendChild(
+        row
+      );
     }
   );
 }
 
 function getFileSize(){
+  const min=
+    minSizeInput.value.trim();
+
+  const max=
+    maxSizeInput.value.trim();
+
   return {
     minGb:
-      minSizeInput.value.trim()===""
+      min===""
         ?null
-        :Number(minSizeInput.value),
+        :Number(min),
 
     maxGb:
-      maxSizeInput.value.trim()===""
+      max===""
         ?null
-        :Number(maxSizeInput.value)
+        :Number(max)
   };
 }
 
-function validate(){
-  const value=getFileSize();
+function validateFileSize(){
+  const value=
+    getFileSize();
 
   let error="";
 
   if(
-    minSizeInput.value.trim()!==""&&
+    value.minGb!==null&&
     (
-      !Number.isFinite(value.minGb)||
+      !Number.isFinite(
+        value.minGb
+      )||
       value.minGb<0||
       value.minGb>200
     )
@@ -1727,9 +2174,11 @@ function validate(){
   }
 
   else if(
-    maxSizeInput.value.trim()!==""&&
+    value.maxGb!==null&&
     (
-      !Number.isFinite(value.maxGb)||
+      !Number.isFinite(
+        value.maxGb
+      )||
       value.maxGb<0||
       value.maxGb>200
     )
@@ -1741,20 +2190,26 @@ function validate(){
   else if(
     value.minGb!==null&&
     value.maxGb!==null&&
-    value.minGb>value.maxGb
+    value.minGb>
+      value.maxGb
   ){
     error=
       "Minimum size cannot be greater than maximum size.";
   }
 
-  fileSizeError.textContent=error;
+  fileSizeError.textContent=
+    error;
 
   return !error;
 }
 
 function invalidateResult(){
+  result.style.display=
+    "none";
+
   manifestUrl.textContent="";
-  result.style.display="none";
+
+  setStatus("");
 }
 
 async function saveConfiguration(){
@@ -1762,12 +2217,14 @@ async function saveConfiguration(){
     return;
   }
 
-  if(Date.now()>=expiresAt){
-    permanentlyExpire();
+  if(
+    Date.now()>=expiresAt
+  ){
+    expire();
     return;
   }
 
-  if(!validate()){
+  if(!validateFileSize()){
     return;
   }
 
@@ -1776,37 +2233,59 @@ async function saveConfiguration(){
       quality=>quality.enabled
     )
   ){
-    status.textContent=
-      "Enable at least one quality.";
+    setStatus(
+      "Enable at least one quality.",
+      "error"
+    );
 
     return;
   }
 
   saveButton.disabled=true;
-  saveButton.textContent="Saving...";
-  status.textContent="";
+
+  saveButton.textContent=
+    "Saving...";
+
+  setStatus("");
 
   try{
     const response=
       await fetch(
-        window.location.pathname+
-        window.location.search,
+        window.location.href,
         {
           method:"POST",
+
           headers:{
             "Content-Type":
               "application/json"
           },
+
           body:
             JSON.stringify({
               action:"save",
+
               sessionId,
-              qualities,
-              fileSize:getFileSize(),
+
+              qualities:
+                qualities.map(
+                  quality=>({
+                    name:
+                      quality.name,
+
+                    enabled:
+                      quality.enabled
+                  })
+                ),
+
+              fileSize:
+                getFileSize(),
+
               filters:{
-                cam:camFilter.checked
+                cam:
+                  camFilter.checked
               }
             }),
+
           cache:"no-store"
         }
       );
@@ -1815,45 +2294,73 @@ async function saveConfiguration(){
       response.status===404||
       response.status===410
     ){
-      permanentlyExpire();
+      expire();
       return;
     }
 
-    const data=
-      await response.json();
+    let data;
+
+    try{
+      data=
+        await response.json();
+    }
+
+    catch{
+      throw new Error(
+        "The server returned an invalid response."
+      );
+    }
 
     if(!response.ok){
       throw new Error(
         data.error||
-        "Failed to save configuration"
+        "Failed to save configuration."
+      );
+    }
+
+    if(
+      !data.manifestUrl
+    ){
+      throw new Error(
+        "The server did not return a manifest URL."
       );
     }
 
     manifestUrl.textContent=
       data.manifestUrl;
 
-    result.style.display="block";
+    result.style.display=
+      "block";
 
-    status.textContent=
-      "Configuration saved.";
+    setStatus(
+      "Configuration saved.",
+      "success"
+    );
 
     window.scrollTo({
-      top:document.body.scrollHeight,
-      behavior:"smooth"
+      top:
+        document.body.scrollHeight,
+
+      behavior:
+        "smooth"
     });
   }
 
   catch(error){
     if(!expired){
-      status.textContent=
-        error.message||
-        "Something went wrong.";
+      setStatus(
+        error?.message||
+        "Failed to save configuration.",
+        "error"
+      );
     }
   }
 
   finally{
     if(!expired){
-      saveButton.disabled=false;
+      saveButton.disabled=
+        false;
+
       saveButton.textContent=
         "Save Configuration";
     }
@@ -1863,16 +2370,18 @@ async function saveConfiguration(){
 minSizeInput.addEventListener(
   "input",
   ()=>{
+    validateFileSize();
+
     invalidateResult();
-    validate();
   }
 );
 
 maxSizeInput.addEventListener(
   "input",
   ()=>{
+    validateFileSize();
+
     invalidateResult();
-    validate();
   }
 );
 
@@ -1884,24 +2393,26 @@ camFilter.addEventListener(
 copyButton.addEventListener(
   "click",
   async()=>{
-    if(
-      !manifestUrl.textContent||
-      expired
-    ){
+    const value=
+      manifestUrl.textContent;
+
+    if(!value){
       return;
     }
 
     try{
       await navigator.clipboard.writeText(
-        manifestUrl.textContent
+        value
       );
 
-      copyButton.textContent="Copied";
+      copyButton.textContent=
+        "Copied";
 
       setTimeout(
         ()=>{
           if(!expired){
-            copyButton.textContent="Copy";
+            copyButton.textContent=
+              "Copy";
           }
         },
         1500
@@ -1909,8 +2420,10 @@ copyButton.addEventListener(
     }
 
     catch{
-      status.textContent=
-        "Copy failed. Select the URL manually.";
+      setStatus(
+        "Copy failed. Select the manifest URL manually.",
+        "error"
+      );
     }
   }
 );
@@ -1918,35 +2431,45 @@ copyButton.addEventListener(
 installButton.addEventListener(
   "click",
   ()=>{
-    if(
-      !manifestUrl.textContent||
-      expired
-    ){
+    const value=
+      manifestUrl.textContent;
+
+    if(!value||expired){
       return;
     }
 
-    location.href=
+    const stremioUrl=
       "stremio://"+
-      manifestUrl.textContent.replace(
+      value.replace(
         /^https?:\/\//,
         ""
       );
+
+    window.location.href=
+      stremioUrl;
   }
 );
 
-if(fileSize.minGb!==null){
-  minSizeInput.value=fileSize.minGb;
+if(
+  fileSize.minGb!==null
+){
+  minSizeInput.value=
+    fileSize.minGb;
 }
 
-if(fileSize.maxGb!==null){
-  maxSizeInput.value=fileSize.maxGb;
+if(
+  fileSize.maxGb!==null
+){
+  maxSizeInput.value=
+    fileSize.maxGb;
 }
 
 camFilter.checked=
   filters.cam!==false;
 
 renderQualities();
-validate();
+
+validateFileSize();
 
 saveButton.addEventListener(
   "click",
@@ -1966,10 +2489,13 @@ saveButton.addEventListener(
       headers:{
         "Content-Type":
           "text/html; charset=utf-8",
+
         "Cache-Control":
           "no-store",
+
         "X-Content-Type-Options":
           "nosniff",
+
         "Referrer-Policy":
           "no-referrer"
       }
