@@ -39,7 +39,7 @@ const DEFAULT_QUALITIES=[
 
 const MAX_CONFIG_BODY_BYTES=
   16*1024;
-const CONFIGURE_SESSION_MS=5*60*1000;
+
 const MAX_QUALITY_ITEMS=
   DEFAULT_QUALITIES.length;
 
@@ -451,18 +451,6 @@ export default async function handler(
   const existingConfig=
     configData.config;
 
-  /*
-   * GET:
-   *
-   * Create one temporary session and
-   * render the page immediately.
-   *
-   * POST:
-   *
-   * Read sessionId from the JSON body.
-   * The session is therefore NOT required
-   * to be present in the URL.
-   */
   if(
     request.method==="POST"
   ){
@@ -554,12 +542,6 @@ export default async function handler(
         );
       }
 
-      /*
-       * IMPORTANT:
-       *
-       * The session ID comes from the
-       * POST body, not from ?session=.
-       */
       const sessionId=
         typeof body.sessionId==="string"
           ?body.sessionId
@@ -575,11 +557,6 @@ export default async function handler(
         );
       }
 
-      /*
-       * This is the authoritative expiration
-       * check. getConfigureSession() returns
-       * null once expiresAt has passed.
-       */
       const activeSession=
         await getConfigureSession(
           sessionId
@@ -683,31 +660,19 @@ export default async function handler(
         error?.message
       );
 
-      const message=
-        error?.message||
-        "Failed to save configuration.";
-
       return jsonResponse(
         {
-          error:message
+          error:
+            error?.message||
+            "Failed to save configuration."
         },
-        message===
-          "Configuration request is too large"
-            ?413
-            :400
+        400
       );
     }
   }
 
-  /*
-   * Only GET reaches this point.
-   *
-   * Create exactly one 5-minute session.
-   */
- const session=
-  await createConfigureSession(
-    CONFIGURE_SESSION_MS
-  );
+  const session=
+    await createConfigureSession();
 
   const sessionId=
     session.id;
@@ -766,61 +731,44 @@ export default async function handler(
 
   const html=`
 <!doctype html>
-
 <html lang="en">
-
 <head>
-
 <meta charset="UTF-8">
-
 <meta
   name="viewport"
   content="width=device-width,initial-scale=1,viewport-fit=cover"
 >
-
 <meta
   name="theme-color"
   content="#0d0e11"
 >
-
 <title>ShowBox</title>
-
 <style>
-
 :root{
   color-scheme:dark;
-
   --bg:#0d0e11;
   --surface:#15161b;
   --surface-2:#1d1f25;
   --input:#252831;
-
   --border:#292c34;
   --border-light:#343740;
-
   --text:#f1f1f3;
   --muted:#858892;
   --muted-2:#696c75;
-
   --white:#f4f4f5;
   --black:#101115;
-
   --success:#a7e3b1;
   --error:#ff9b9b;
 }
-
 *{
   box-sizing:border-box;
 }
-
 html{
   background:var(--bg);
 }
-
 body{
   margin:0;
   min-height:100vh;
-
   background:
     radial-gradient(
       circle at 50% -15%,
@@ -828,9 +776,7 @@ body{
       transparent 38%
     ),
     var(--bg);
-
   color:var(--text);
-
   font-family:
     -apple-system,
     BlinkMacSystemFont,
@@ -838,825 +784,540 @@ body{
     "SF Pro Text",
     "Segoe UI",
     sans-serif;
-
   -webkit-font-smoothing:antialiased;
 }
-
 .container{
   width:
     min(
       clamp(700px,74vw,960px),
       calc(100% - 28px)
     );
-
   margin:auto;
-
   padding:
     20px
     0
     clamp(50px,6vw,80px);
 }
-
 .header{
   margin-bottom:
     clamp(28px,4vw,40px);
 }
-
 .header h1{
   margin:0;
-
   color:var(--text);
-
   font-size:
     clamp(40px,5.5vw,58px);
-
   line-height:.98;
-
   font-weight:700;
-
   letter-spacing:-2.5px;
 }
-
 .section{
   margin-top:
     clamp(26px,3.5vw,38px);
 }
-
 .section:first-of-type{
   margin-top:0;
 }
-
 .section-title{
   margin:0 0 6px;
-
   color:var(--text);
-
   font-size:
     clamp(25px,3vw,34px);
-
   line-height:1.1;
-
   font-weight:700;
-
   letter-spacing:-1px;
 }
-
 .section-description{
   margin:
     0
     0
     clamp(12px,1.5vw,18px);
-
   color:var(--muted);
-
   font-size:
     clamp(12px,1.4vw,14px);
-
   line-height:1.5;
 }
-
-
-/* FILE SIZE */
-
 .file-size-card{
   padding:
     clamp(11px,1.2vw,14px);
-
   border:
     1px solid var(--border);
-
   border-radius:
     clamp(15px,1.8vw,20px);
-
   background:var(--surface);
 }
-
 .file-size-heading{
   display:flex;
-
   align-items:center;
-
   gap:12px;
-
   padding:
     4px
     7px
     clamp(9px,1vw,12px);
-
   color:var(--muted-2);
-
   font-size:
     clamp(9px,1vw,11px);
-
   font-weight:700;
-
   letter-spacing:.12em;
-
   text-transform:uppercase;
 }
-
 .file-size-heading svg{
   width:
     clamp(17px,1.8vw,22px);
-
   height:
     clamp(17px,1.8vw,22px);
-
   flex-shrink:0;
 }
-
 .file-size-inner{
   padding:
     clamp(15px,1.8vw,20px);
-
   padding-bottom:4px;
-
   border:
     1px solid var(--border-light);
-
   border-radius:
     clamp(11px,1.4vw,15px);
-
   background:var(--surface-2);
 }
-
 .file-size-inner-header{
   margin-bottom:
     clamp(13px,1.6vw,17px);
-
   color:var(--text);
-
   font-size:
     clamp(16px,1.8vw,20px);
-
   line-height:1.2;
-
   font-weight:700;
 }
-
 .size-row{
   display:grid;
-
   grid-template-columns:
     1fr 1fr;
-
   gap:
     clamp(9px,1.2vw,12px);
 }
-
 .size-field label{
   display:block;
-
   margin-bottom:
     clamp(5px,1vw,7px);
-
   color:var(--muted-2);
-
   font-size:
     clamp(10px,1.1vw,12px);
 }
-
 .size-field input{
   width:100%;
-
   padding:
     9px
     clamp(10px,1.3vw,14px);
-
   border:
     1px solid #343740;
-
   border-radius:
     clamp(10px,1.3vw,13px);
-
   background:var(--input);
-
   color:#fff;
-
   font-size:
     clamp(12px,1.3vw,14px);
-
   line-height:1.25;
-
   outline:0;
 }
-
 .size-field input:focus{
   border-color:#4b4f59;
 }
-
 .size-field input::placeholder{
   color:var(--muted-2);
 }
-
 .file-size-error{
   min-height:0;
-
   margin-top:0;
-
   color:var(--error);
-
   line-height:1.4;
-
   font-size:11px;
 }
-
 .file-size-error:empty{
   display:none;
 }
-
 .file-size-error:not(:empty){
   margin-top:8px;
-
   padding-bottom:4px;
 }
-
-
-/* QUALITY */
-
 .quality-card,
 .filter-card{
   padding:
     clamp(10px,1.2vw,13px);
-
   border:
     1px solid var(--border);
-
   border-radius:
     clamp(15px,1.8vw,20px);
-
   background:var(--surface);
 }
-
 .quality-list{
   display:flex;
-
   flex-direction:column;
-
   gap:
     clamp(6px,.9vw,9px);
 }
-
 .quality-row{
   display:flex;
-
   align-items:center;
-
   justify-content:space-between;
-
   min-height:
     clamp(52px,5vw,62px);
-
   padding:
     clamp(9px,1.1vw,12px)
     clamp(11px,1.3vw,15px);
-
   border-radius:
     clamp(11px,1.3vw,14px);
-
   background:var(--surface-2);
 }
-
 .quality-check{
   width:
     clamp(18px,1.8vw,21px);
-
   height:
     clamp(18px,1.8vw,21px);
-
   margin:
     0
     clamp(9px,1.2vw,13px)
     0
     0;
-
   flex-shrink:0;
 }
-
 .quality-name{
   flex:1;
-
   min-width:0;
-
   color:#ededf0;
-
   font-size:
     clamp(14px,1.5vw,17px);
-
   font-weight:600;
 }
-
 .quality-controls{
   display:flex;
-
   gap:
     clamp(5px,.7vw,7px);
 }
-
 .quality-controls button{
   width:
     clamp(32px,3.3vw,40px);
-
   height:
     clamp(32px,3.3vw,40px);
-
   padding:0;
-
   border:
     1px solid #343740;
-
   border-radius:
     clamp(9px,1.1vw,11px);
-
   background:var(--input);
-
   color:#c9cad0;
-
   font-size:
     clamp(13px,1.5vw,16px);
-
   cursor:pointer;
 }
-
 .quality-controls button:disabled{
   opacity:.3;
-
   cursor:default;
 }
-
-
-/* FILTER */
-
 .filter-row{
   display:flex;
-
   align-items:center;
-
   min-height:
     clamp(52px,5vw,62px);
-
   padding:
     clamp(9px,1.1vw,12px)
     clamp(11px,1.3vw,15px);
-
   border-radius:
     clamp(11px,1.3vw,14px);
-
   background:var(--surface-2);
 }
-
 .filter-label{
   display:flex;
-
   align-items:center;
-
   gap:
     clamp(9px,1.2vw,13px);
-
   color:#ededf0;
-
   font-size:
     clamp(14px,1.5vw,17px);
-
   font-weight:600;
-
   cursor:pointer;
 }
-
 .filter-label input{
   width:
     clamp(18px,1.8vw,21px);
-
   height:
     clamp(18px,1.8vw,21px);
-
   margin:0;
-
   flex-shrink:0;
 }
-
-
-/* SAVE */
-
 #save{
   display:flex;
-
   align-items:center;
-
   justify-content:center;
-
   width:100%;
-
   height:
     clamp(46px,4.5vw,54px);
-
   margin-top:
     clamp(20px,2.5vw,28px);
-
   padding:
     0 20px;
-
   border:0;
-
   border-radius:
     clamp(12px,1.5vw,15px);
-
   background:var(--white);
-
   color:var(--black);
-
   font-size:
     clamp(13px,1.4vw,15px);
-
   font-weight:700;
-
   cursor:pointer;
 }
-
 #save:disabled{
   opacity:.55;
-
   cursor:default;
 }
-
 #status{
   min-height:18px;
-
   margin-top:9px;
-
   color:var(--muted);
-
   font-size:11px;
 }
-
 #status.success{
   color:var(--success);
 }
-
 #status.error{
   color:var(--error);
 }
-
-
-/* RESULT */
-
 #result{
   display:none;
-
   margin-top:
     clamp(24px,3vw,32px);
 }
-
 .result-card{
   padding:
     clamp(14px,1.6vw,18px);
-
   border:
     1px solid var(--border);
-
   border-radius:
     clamp(15px,1.8vw,20px);
-
   background:var(--surface);
 }
-
 .result-title{
   margin-bottom:10px;
-
   color:var(--text);
-
   font-size:
     clamp(16px,1.7vw,19px);
-
   font-weight:700;
 }
-
 #manifestUrl{
   overflow:auto;
-
   padding:
     clamp(11px,1.2vw,14px);
-
   border:
     1px solid #343740;
-
   border-radius:
     clamp(10px,1.3vw,13px);
-
   background:var(--surface-2);
-
   color:#c9cad0;
-
   font-size:
     clamp(11px,1.1vw,13px);
-
   line-height:1.45;
-
   word-break:break-all;
 }
-
 .result-buttons{
   display:flex;
-
   gap:9px;
-
   margin-top:10px;
 }
-
 .result-buttons button{
   flex:1;
-
   height:
     clamp(42px,4vw,48px);
-
   border:0;
-
   border-radius:
     clamp(10px,1.2vw,13px);
-
   font-size:
     clamp(11px,1.2vw,13px);
-
   font-weight:700;
-
   cursor:pointer;
 }
-
 .copy{
   background:var(--input);
-
   color:#fff;
 }
-
 .install{
   background:var(--white);
-
   color:var(--black);
 }
-
 .note{
   margin-top:
     clamp(16px,2vw,22px);
-
   color:var(--muted-2);
-
   font-size:
     clamp(9px,1vw,11px);
-
   line-height:1.5;
 }
-
-
-/* MOBILE */
-
 @media(max-width:600px){
-
   .container{
     width:100%;
-
     padding:
       22px
       0
       48px;
   }
-
   .header{
     margin-bottom:28px;
   }
-
   .header h1{
     font-size:30px;
-
     letter-spacing:-1.2px;
   }
-
   .section{
     margin-top:25px;
   }
-
   .section-title{
     margin-bottom:5px;
-
     font-size:23px;
-
     letter-spacing:-.7px;
   }
-
   .section-description{
     margin-bottom:11px;
-
     font-size:11px;
   }
-
   .file-size-card,
   .quality-card,
   .filter-card{
     padding:9px;
-
     border-radius:14px;
   }
-
   .file-size-heading{
     padding:
       3px
       6px
       8px;
-
     font-size:10px;
   }
-
   .file-size-heading svg{
     width:18px;
-
     height:18px;
   }
-
   .file-size-inner{
     padding:12px;
-
     padding-bottom:4px;
-
     border-radius:11px;
   }
-
   .file-size-inner-header{
     margin-bottom:12px;
-
     font-size:16px;
   }
-
   .size-row{
     gap:8px;
   }
-
   .size-field label{
     margin-bottom:5px;
-
     font-size:10px;
   }
-
   .size-field input{
     padding:
       8px
       10px;
-
     border-radius:9px;
-
     font-size:12px;
   }
-
   .quality-list{
     gap:6px;
   }
-
   .quality-row,
   .filter-row{
     min-height:47px;
-
     padding:
       8px
       10px;
-
     border-radius:11px;
   }
-
   .quality-check,
   .filter-label input{
     width:18px;
-
     height:18px;
   }
-
   .quality-name,
   .filter-label{
     font-size:13px;
   }
-
   .quality-controls{
     gap:5px;
   }
-
   .quality-controls button{
     width:30px;
-
     height:30px;
-
     border-radius:9px;
-
     font-size:13px;
   }
-
   #save{
     height:44px;
-
     margin-top:18px;
-
     border-radius:12px;
-
     font-size:13px;
   }
-
   #result{
     margin-top:22px;
   }
-
   .result-card{
     padding:12px;
-
     border-radius:14px;
   }
-
   .result-buttons button{
     height:42px;
-
     font-size:11px;
   }
-
   .note{
     font-size:10px;
   }
 }
-
-
-/* VERY SMALL PHONES */
-
 @media(max-width:380px){
-
   .container{
     padding-left:0;
-
     padding-right:0;
   }
-
   .header h1{
     font-size:28px;
   }
-
   .section-title{
     font-size:22px;
   }
-
   .file-size-card,
   .quality-card,
   .filter-card{
     padding:8px;
   }
-
   .file-size-inner{
     padding:12px;
-
     padding-bottom:4px;
   }
-
   .quality-row,
   .filter-row{
     padding-left:9px;
-
     padding-right:9px;
   }
-
   .quality-controls button{
     width:28px;
-
     height:28px;
   }
 }
-
 </style>
-
 </head>
-
 <body>
-
 <div class="container">
-
 <header class="header">
-
 <h1>
 Settings
 </h1>
-
 </header>
 
-
 <section class="section">
-
 <h2 class="section-title">
 File size
 </h2>
-
 <p class="section-description">
 Keep streams between the selected minimum and maximum size.
 </p>
-
 <div class="file-size-card">
-
 <div class="file-size-heading">
-
 <span>
 FILE SIZE
 </span>
-
 <svg
   width="22"
   height="22"
@@ -1669,23 +1330,16 @@ FILE SIZE
 >
   <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"/>
 </svg>
-
 </div>
-
 <div class="file-size-inner">
-
 <div class="file-size-inner-header">
 Keep streams between
 </div>
-
 <div class="size-row">
-
 <div class="size-field">
-
 <label for="minSize">
 Min (GB)
 </label>
-
 <input
   id="minSize"
   type="number"
@@ -1694,15 +1348,11 @@ Min (GB)
   step="0.1"
   placeholder="No minimum"
 >
-
 </div>
-
 <div class="size-field">
-
 <label for="maxSize">
 Max (GB)
 </label>
-
 <input
   id="maxSize"
   type="number"
@@ -1711,78 +1361,52 @@ Max (GB)
   step="0.1"
   placeholder="No maximum"
 >
-
 </div>
-
 </div>
-
 <div
   id="fileSizeError"
   class="file-size-error"
 ></div>
-
 </div>
-
 </div>
-
 </section>
 
-
 <section class="section">
-
 <h2 class="section-title">
 Quality settings
 </h2>
-
 <p class="section-description">
 Enable the qualities you want. Move them up or down to set their priority.
 </p>
-
 <div class="quality-card">
-
 <div
   id="qualityList"
   class="quality-list"
 ></div>
-
 </div>
-
 </section>
 
-
 <section class="section">
-
 <h2 class="section-title">
 Stream filters
 </h2>
-
 <p class="section-description">
 Enable the stream types you want to keep. These settings do not change quality priority.
 </p>
-
 <div class="filter-card">
-
 <div class="filter-row">
-
 <label class="filter-label">
-
 <input
   id="camFilter"
   type="checkbox"
 >
-
 <span>
 CAM
 </span>
-
 </label>
-
 </div>
-
 </div>
-
 </section>
-
 
 <button
   id="save"
@@ -1793,21 +1417,13 @@ Save Configuration
 
 <div id="status"></div>
 
-
 <div id="result">
-
 <div class="result-card">
-
 <div class="result-title">
 Manifest URL
 </div>
-
-<div
-  id="manifestUrl"
-></div>
-
+<div id="manifestUrl"></div>
 <div class="result-buttons">
-
 <button
   id="copy"
   class="copy"
@@ -1815,7 +1431,6 @@ Manifest URL
 >
 Copy
 </button>
-
 <button
   id="install"
   class="install"
@@ -1823,24 +1438,17 @@ Copy
 >
 Install in Stremio
 </button>
-
 </div>
-
 </div>
-
 </div>
-
 
 <div class="note">
 On iOS/iPadOS, if Stremio does not open automatically,
 copy the manifest URL and add it manually through Stremio's Add-ons page.
 </div>
-
 </div>
 
-
 <script>
-
 "use strict";
 
 const qualities=
@@ -2217,50 +1825,35 @@ async function saveConfiguration(){
   setStatus("");
 
   try{
-    /*
-     * Use the current pathname rather
-     * than relying on a ?session= query.
-     *
-     * The session ID is explicitly sent
-     * in the JSON body.
-     */
     const response=
       await fetch(
         window.location.pathname,
         {
           method:"POST",
-
           headers:{
             "Content-Type":
               "application/json"
           },
-
           body:
             JSON.stringify({
               action:"save",
-
               sessionId,
-
               qualities:
                 qualities.map(
                   quality=>({
                     name:
                       quality.name,
-
                     enabled:
                       quality.enabled
                   })
                 ),
-
               fileSize:
                 getFileSize(),
-
               filters:{
                 cam:
                   camFilter.checked
               }
             }),
-
           cache:"no-store"
         }
       );
@@ -2315,7 +1908,6 @@ async function saveConfiguration(){
     window.scrollTo({
       top:
         document.body.scrollHeight,
-
       behavior:
         "smooth"
     });
@@ -2346,7 +1938,6 @@ minSizeInput.addEventListener(
   "input",
   ()=>{
     validateFileSize();
-
     invalidateResult();
   }
 );
@@ -2355,7 +1946,6 @@ maxSizeInput.addEventListener(
   "input",
   ()=>{
     validateFileSize();
-
     invalidateResult();
   }
 );
@@ -2450,11 +2040,8 @@ saveButton.addEventListener(
   "click",
   saveConfiguration
 );
-
 </script>
-
 </body>
-
 </html>
 `;
 
@@ -2464,13 +2051,10 @@ saveButton.addEventListener(
       headers:{
         "Content-Type":
           "text/html; charset=utf-8",
-
         "Cache-Control":
           "no-store",
-
         "X-Content-Type-Options":
           "nosniff",
-
         "Referrer-Policy":
           "no-referrer"
       }
