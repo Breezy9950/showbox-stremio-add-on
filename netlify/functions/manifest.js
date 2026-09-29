@@ -2222,42 +2222,114 @@ h1{
 
   font-size:11px;
 
-  line-height:1.5;
-}
+  line-height:@media(max-width:600px){
 
-@media(max-width:600px){
+  .page{
+    padding:18px 14px 28px;
+  }
 
   .container{
-    width:
-      calc(100% - 24px);
-
-    padding:
-      35px 0 60px;
+    max-width:100%;
   }
 
-  .settings-title{
-    font-size:40px;
+  .header{
+    margin-bottom:18px;
   }
 
-  .section-title,
-  .configuration-title{
-    font-size:27px;
+  .title{
+    font-size:26px;
+  }
+
+  .subtitle{
+    font-size:13px;
+  }
+
+  .section{
+    margin-bottom:16px;
+  }
+
+  .section-title{
+    font-size:19px;
+    margin-bottom:5px;
+  }
+
+  .section-description{
+    font-size:12px;
+    line-height:1.45;
+    margin-bottom:10px;
+  }
+
+  .card{
+    padding:12px;
+    border-radius:14px;
+  }
+
+  .file-size-card{
+    padding:10px;
+    border-radius:13px;
+  }
+
+  .file-size-heading{
+    padding:3px 6px 9px;
+    font-size:10px;
   }
 
   .file-size-inner{
-    padding:16px;
+    padding:14px;
+    border-radius:11px;
+  }
+
+  .file-size-inner-header{
+    margin-bottom:13px;
+    font-size:16px;
   }
 
   .file-size-fields{
-    gap:9px;
+    gap:8px;
   }
 
-  .result-row{
-    flex-direction:row;
+  .size-field label{
+    font-size:11px;
+    margin-bottom:5px;
+  }
+
+  .size-input{
+    height:40px;
+    padding:0 10px;
+    font-size:13px;
+  }
+
+  .quality-row,
+  .filter-row{
+    min-height:46px;
+    padding:9px 11px;
+  }
+
+  .quality-name,
+  .filter-name{
+    font-size:13px;
+  }
+
+  .quality-actions{
+    gap:5px;
+  }
+
+  .quality-actions button{
+    width:29px;
+    height:29px;
+  }
+
+  .save-button{
+    min-height:44px;
+    font-size:14px;
+  }
+
+  .back-button{
+    font-size:13px;
+    gap:7px;
   }
 
 }
-
 </style>
 
 </head>
