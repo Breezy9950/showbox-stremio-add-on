@@ -469,13 +469,6 @@ an existing addon configuration.
       "session"
     );
 
-  /*
-   * A Configure page must always have
-   * an explicit temporary session.
-   *
-   * The first request creates one and
-   * redirects to the session-bound URL.
-   */
   if(
     request.method==="GET"&&
     !sessionId
@@ -497,6 +490,7 @@ an existing addon configuration.
       null,
       {
         status:302,
+
         headers:{
           Location:
             redirectUrl.toString(),
@@ -508,10 +502,6 @@ an existing addon configuration.
     );
   }
 
-  /*
-   * Every request after the first one
-   * must use the same temporary session.
-   */
   const session=
     await checkConfigureSession(
       sessionId
@@ -601,6 +591,29 @@ an existing addon configuration.
       }
 
       if(
+        body.action==="check-session"
+      ){
+        return jsonResponse({
+          ok:true,
+
+          expiresAt:
+            currentSession.expiresAt
+        });
+      }
+
+      if(
+        body.action!=="save"
+      ){
+        return jsonResponse(
+          {
+            error:
+              "Invalid configuration action"
+          },
+          400
+        );
+      }
+
+      if(
         Array.isArray(
           body.qualities
         )&&
@@ -632,6 +645,12 @@ an existing addon configuration.
           "string"
           ?existingConfig.uiToken
           :"";
+
+      if(!uiToken){
+        throw new Error(
+          "The existing configuration does not contain a ShowBox UI token."
+        );
+      }
 
       const newConfig={
         ...existingConfig,
@@ -669,8 +688,14 @@ an existing addon configuration.
       }
 
       return jsonResponse({
+        configId:
+          finalConfigId,
+
         manifestUrl:
-          `${url.origin}/${finalConfigId}/manifest.json`
+          `${url.origin}/${finalConfigId}/manifest.json`,
+
+        stremioUrl:
+          `stremio://${url.host}/${finalConfigId}/manifest.json`
       });
     }
 
@@ -1374,13 +1399,6 @@ function permanentlyExpire(){
   saveButton.disabled=
     true;
 
-  /*
-   * Replace the current history entry
-   * instead of pushing another one.
-   *
-   * This prevents Back from returning
-   * to the expired Configure page.
-   */
   history.replaceState(
     null,
     "",
@@ -1410,22 +1428,6 @@ setTimeout(
     0,
     expiresAt-Date.now()
   )
-);
-
-/*
- * Handles Safari/iOS restoring the page
- * from its back-forward cache.
- */
-window.addEventListener(
-  "pageshow",
-  event=>{
-    if(
-      event.persisted||
-      Date.now()>=expiresAt
-    ){
-      permanentlyExpire();
-    }
-  }
 );
 
 async function verifySession(){
@@ -1492,6 +1494,23 @@ async function verifySession(){
     return true;
   }
 }
+
+window.addEventListener(
+  "pageshow",
+  async event=>{
+    if(
+      Date.now()>=expiresAt
+    ){
+      permanentlyExpire();
+
+      return;
+    }
+
+    if(event.persisted){
+      await verifySession();
+    }
+  }
+);
 
 function renderQualities(){
   qualityList.innerHTML="";
@@ -1760,6 +1779,8 @@ async function saveConfiguration(){
 
           body:
             JSON.stringify({
+              action:"save",
+
               sessionId,
 
               qualities,
@@ -1926,6 +1947,7 @@ camFilter.checked=
   filters.cam!==false;
 
 renderQualities();
+
 validate();
 
 saveButton.addEventListener(
