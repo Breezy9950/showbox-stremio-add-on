@@ -995,7 +995,7 @@ h1{
 .file-size-inner{
   padding:
     clamp(15px,1.8vw,20px);
-  padding-bottom: clamp(11px,1.2vw,14px);
+  padding-bottom: ;
 
   border:
     1px solid var(--border-light);
@@ -1073,13 +1073,27 @@ h1{
 }
 
 .file-size-error{
-  min-height:18px;
+  min-height:0;
 
-  margin-top:9px;
+  margin-top:0;
 
   color:#ff9b9b;
-
+  line-height:1.4;
   font-size:11px;
+}
+
+.file-size-error:empty{
+
+  display:none;
+
+}
+
+.file-size-error:not(:empty){
+
+  margin-top:8px;
+
+  padding-bottom:4px;
+
 }
 
 
