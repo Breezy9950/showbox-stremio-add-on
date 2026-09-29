@@ -1819,20 +1819,59 @@ h1{
     var(--surface);
 }
 
-.file-size-heading{
+.file-size-inner{
   padding:
-    5px 7px 12px;
+    20px;
 
-  color:
-    var(--muted-2);
+  border:
+    1px solid var(--border-light);
 
-  font-size:11px;
+  border-radius:
+    var(--radius-md);
+
+  background:
+    var(--surface-2);
+}
+
+.file-size-inner-header{
+  display:flex;
+
+  align-items:center;
+
+  gap:10px;
+
+  margin-bottom:18px;
+
+  color:var(--text);
+
+  font-size:18px;
 
   font-weight:700;
+}
 
-  letter-spacing:.12em;
+.file-size-help{
+  display:flex;
 
-  text-transform:uppercase;
+  align-items:center;
+
+  justify-content:center;
+
+  width:28px;
+
+  height:28px;
+
+  flex-shrink:0;
+
+  border-radius:50%;
+
+  background:
+    var(--surface-3);
+
+  color:var(--muted);
+
+  font-size:14px;
+
+  font-weight:700;
 }
 
 .file-size-fields{
@@ -2219,6 +2258,14 @@ h1{
     font-size:27px;
   }
 
+  .file-size-inner{
+    padding:18px;
+  }
+
+  .file-size-inner-header{
+    font-size:17px;
+  }
+
   .file-size-fields{
     gap:9px;
   }
@@ -2312,8 +2359,21 @@ Keep streams between the selected minimum and maximum size.
 
 <div class="file-size-card">
 
-<div class="file-size-heading">
-FILE SIZE
+<div class="file-size-inner">
+
+<div class="file-size-inner-header">
+
+<span>
+Keep streams between
+</span>
+
+<span
+  class="file-size-help"
+  aria-label="File size filter help"
+>
+?
+</span>
+
 </div>
 
 <div class="file-size-fields">
@@ -2321,7 +2381,7 @@ FILE SIZE
 <div class="size-field">
 
 <label for="minSize">
-Minimum (GB)
+Min (GB)
 </label>
 
 <input
@@ -2339,7 +2399,7 @@ Minimum (GB)
 <div class="size-field">
 
 <label for="maxSize">
-Maximum (GB)
+Max (GB)
 </label>
 
 <input
@@ -2359,6 +2419,8 @@ Maximum (GB)
 <div
   id="fileSizeStatus"
 ></div>
+
+</div>
 
 </div>
 
