@@ -1807,7 +1807,7 @@ h1{
 }
 
 .file-size-card{
-  padding:14px;
+  padding:12px;
 
   border:
     1px solid var(--border);
@@ -1819,9 +1819,25 @@ h1{
     var(--surface);
 }
 
+.file-size-heading{
+  padding:
+    4px 7px 11px;
+
+  color:
+    var(--muted-2);
+
+  font-size:11px;
+
+  font-weight:700;
+
+  letter-spacing:.12em;
+
+  text-transform:uppercase;
+}
+
 .file-size-inner{
   padding:
-    20px;
+    18px;
 
   border:
     1px solid var(--border-light);
@@ -1834,42 +1850,12 @@ h1{
 }
 
 .file-size-inner-header{
-  display:flex;
+  margin-bottom:16px;
 
-  align-items:center;
-
-  gap:10px;
-
-  margin-bottom:18px;
-
-  color:var(--text);
+  color:
+    var(--text);
 
   font-size:18px;
-
-  font-weight:700;
-}
-
-.file-size-help{
-  display:flex;
-
-  align-items:center;
-
-  justify-content:center;
-
-  width:28px;
-
-  height:28px;
-
-  flex-shrink:0;
-
-  border-radius:50%;
-
-  background:
-    var(--surface-3);
-
-  color:var(--muted);
-
-  font-size:14px;
 
   font-weight:700;
 }
@@ -2259,11 +2245,7 @@ h1{
   }
 
   .file-size-inner{
-    padding:18px;
-  }
-
-  .file-size-inner-header{
-    font-size:17px;
+    padding:16px;
   }
 
   .file-size-fields{
@@ -2359,21 +2341,14 @@ Keep streams between the selected minimum and maximum size.
 
 <div class="file-size-card">
 
+<div class="file-size-heading">
+FILE SIZE
+</div>
+
 <div class="file-size-inner">
 
 <div class="file-size-inner-header">
-
-<span>
 Keep streams between
-</span>
-
-<span
-  class="file-size-help"
-  aria-label="File size filter help"
->
-?
-</span>
-
 </div>
 
 <div class="file-size-fields">
