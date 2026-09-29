@@ -1,23 +1,3 @@
-Yes. I’ll use the new Configure UI as the exact visual reference and keep the Manifest functionality intact.
-
-Fixed in this version:
-
-* File-size heading now has the same funnel SVG as Configure.
-* File-size outer/inner boxes match Configure.
-* Inputs use the same natural/content-driven sizing as Configure.
-* Error area no longer reserves the thick empty space.
-* Error expands only when an actual error exists.
-* Configuration header is now just Settings — removed subtitle and Back button to match Configure.
-* Quality/filter cards and spacing are scaled down to the Configure proportions.
-* Mobile sizing follows Configure instead of the larger Manifest sizing.
-* Fixed the broken CSS around line-height:@media.
-* Removed obsolete Manifest-only UI CSS.
-* Kept homepage token page and all config-generation functionality intact.
-* Kept the 1-hour homepage session behavior.
-* Kept the existing rate limiting and config persistence behavior.
-
-Replace your entire manifest.js with this:
-
 import {
   createConfig,
   getConfig,
