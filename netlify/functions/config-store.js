@@ -26,7 +26,10 @@ function createId(){
 }
 
 export async function createConfig(config){
-  const store=getStoreByName(CONFIG_STORE);
+  const store=getStoreByName(
+    CONFIG_STORE
+  );
+
   const id=createId();
 
   await store.setJSON(
@@ -45,7 +48,9 @@ export async function getConfig(id){
     return null;
   }
 
-  const store=getStoreByName(CONFIG_STORE);
+  const store=getStoreByName(
+    CONFIG_STORE
+  );
 
   return await store.get(
     id,
@@ -56,14 +61,19 @@ export async function getConfig(id){
   );
 }
 
-export async function saveConfig(id,config){
+export async function saveConfig(
+  id,
+  config
+){
   if(!validId(id)){
     throw new Error(
       "Invalid configuration ID"
     );
   }
 
-  const store=getStoreByName(CONFIG_STORE);
+  const store=getStoreByName(
+    CONFIG_STORE
+  );
 
   await store.setJSON(
     id,
@@ -76,10 +86,17 @@ async function createSession(
   ttlMs,
   data={}
 ){
-  const store=getStoreByName(storeName);
+  const store=getStoreByName(
+    storeName
+  );
+
   const id=createId();
-  const createdAt=Date.now();
-  const expiresAt=createdAt+ttlMs;
+
+  const createdAt=
+    Date.now();
+
+  const expiresAt=
+    createdAt+ttlMs;
 
   await store.setJSON(
     id,
@@ -108,15 +125,18 @@ async function getActiveSession(
     return null;
   }
 
-  const store=getStoreByName(storeName);
-
-  const session=await store.get(
-    id,
-    {
-      type:"json",
-      consistency:"strong"
-    }
+  const store=getStoreByName(
+    storeName
   );
+
+  const session=
+    await store.get(
+      id,
+      {
+        type:"json",
+        consistency:"strong"
+      }
+    );
 
   if(
     !session||
@@ -125,15 +145,16 @@ async function getActiveSession(
     return null;
   }
 
-  const expiresAt=Number(
-    session.expiresAt
-  );
+  const expiresAt=
+    Number(session.expiresAt);
 
   if(!Number.isFinite(expiresAt)){
     return null;
   }
 
-  if(Date.now()>=expiresAt){
+  if(
+    Date.now()>=expiresAt
+  ){
     return null;
   }
 
@@ -147,7 +168,9 @@ export async function createHomepageSession(){
   );
 }
 
-export async function getHomepageSession(id){
+export async function getHomepageSession(
+  id
+){
   return await getActiveSession(
     HOMEPAGE_SESSION_STORE,
     id
@@ -167,14 +190,16 @@ export async function setHomepageSessionToken(
     );
   }
 
-  const store=getStoreByName(
-    HOMEPAGE_SESSION_STORE
-  );
+  const store=
+    getStoreByName(
+      HOMEPAGE_SESSION_STORE
+    );
 
-  const session=await getActiveSession(
-    HOMEPAGE_SESSION_STORE,
-    id
-  );
+  const session=
+    await getActiveSession(
+      HOMEPAGE_SESSION_STORE,
+      id
+    );
 
   if(!session){
     throw new Error(
@@ -198,31 +223,11 @@ export async function createConfigureSession(){
   );
 }
 
-export async function getConfigureSession(id){
+export async function getConfigureSession(
+  id
+){
   return await getActiveSession(
     CONFIGURE_SESSION_STORE,
     id
   );
-}
-
-export async function checkConfigureSession(id){
-  const session=await getActiveSession(
-    CONFIGURE_SESSION_STORE,
-    id
-  );
-
-  if(!session){
-    return {
-      ok:false,
-      state:"expired"
-    };
-  }
-
-  return {
-    ok:true,
-    state:"active",
-    expiresAt:Number(
-      session.expiresAt
-    )
-  };
 }
