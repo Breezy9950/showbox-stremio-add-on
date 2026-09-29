@@ -861,6 +861,7 @@ On iOS/iPadOS, if Stremio does not open automatically, copy the manifest URL and
 </div>
 
 <script>
+alert("CONFIGURE SCRIPT LOADED");
 "use strict";
 
 const qualities=${qualitiesJson};
