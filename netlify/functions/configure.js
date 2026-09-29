@@ -809,11 +809,12 @@ an existing addon configuration.
 }
 
 :root{
-  --border:#292c34;
-  --border-light:#30333b;
+  --bg:#0d0e11;
   --surface:#15161b;
   --surface-2:#1d1f25;
   --input:#252831;
+  --border:#292c34;
+  --border-light:#30333b;
   --text:#f1f1f3;
   --muted:#858892;
   --muted-2:#696c75;
@@ -823,11 +824,11 @@ body{
   margin:0;
 
   padding:
-    clamp(24px,4vw,54px)
+    clamp(28px,4vw,52px)
     16px
     60px;
 
-  background:#0d0e11;
+  background:var(--bg);
 
   color:var(--text);
 
@@ -841,71 +842,114 @@ body{
 .container{
   width:
     min(
-      clamp(560px,72vw,760px),
+      clamp(700px,74vw,960px),
       100%
     );
 
   margin:auto;
 }
 
+.header{
+  position:relative;
+
+  margin-bottom:
+    clamp(30px,4vw,44px);
+}
+
 h1{
   margin:0;
 
   font-size:
-    clamp(30px,5vw,42px);
+    clamp(40px,5.5vw,58px);
 
-  line-height:1;
+  line-height:.98;
 
-  letter-spacing:-1.4px;
+  letter-spacing:-2.5px;
+
+  font-weight:700;
 }
 
 .subtitle{
   margin:
-    8px 0
-    clamp(20px,3vw,28px);
+    10px 0 0;
 
   color:var(--muted);
 
   font-size:
-    clamp(12px,1.2vw,13px);
+    clamp(14px,1.5vw,16px);
 
   line-height:1.45;
 }
 
-.card{
-  padding:
-    clamp(14px,1.6vw,18px);
+.back-button{
+  position:absolute;
 
-  margin-top:
-    clamp(12px,1.5vw,16px);
+  top:
+    clamp(4px,1vw,10px);
+
+  right:0;
+
+  display:inline-flex;
+
+  align-items:center;
+
+  gap:8px;
+
+  min-height:
+    clamp(40px,4vw,48px);
+
+  padding:
+    0
+    clamp(13px,1.5vw,18px);
 
   border:
-    1px solid var(--border);
+    1px solid #343740;
 
   border-radius:
-    clamp(16px,2vw,20px);
+    clamp(10px,1.2vw,13px);
 
-  background:var(--surface);
+  background:var(--input);
+
+  color:#e7e7ea;
+
+  font-size:
+    clamp(12px,1.3vw,14px);
+
+  font-weight:600;
+
+  white-space:nowrap;
 }
 
-.card-title{
+.section{
+  margin-top:
+    clamp(26px,3.5vw,38px);
+}
+
+.section-title{
+  margin:0 0 6px;
+
+  color:var(--text);
+
   font-size:
-    clamp(16px,1.6vw,18px);
+    clamp(25px,3vw,34px);
+
+  line-height:1.1;
+
+  letter-spacing:-1px;
 
   font-weight:700;
-
-  line-height:1.2;
 }
 
-.card-description{
+.section-description{
   margin:
-    6px 0
-    clamp(14px,1.6vw,18px);
+    0
+    0
+    clamp(12px,1.5vw,18px);
 
   color:var(--muted);
 
   font-size:
-    clamp(11px,1.2vw,12px);
+    clamp(12px,1.4vw,14px);
 
   line-height:1.5;
 }
@@ -915,22 +959,22 @@ h1{
 
 .file-size-card{
   padding:
-    clamp(10px,1.1vw,12px);
+    clamp(11px,1.2vw,14px);
 
   border:
     1px solid var(--border);
 
   border-radius:
-    clamp(14px,1.8vw,18px);
+    clamp(15px,1.8vw,20px);
 
   background:var(--surface);
 }
 
 .file-size-heading{
   padding:
-    3px
-    6px
-    clamp(8px,1vw,11px);
+    4px
+    7px
+    clamp(9px,1vw,12px);
 
   color:var(--muted-2);
 
@@ -946,25 +990,27 @@ h1{
 
 .file-size-inner{
   padding:
-    clamp(14px,1.7vw,18px);
+    clamp(15px,1.8vw,20px);
 
   border:
     1px solid var(--border-light);
 
   border-radius:
-    clamp(10px,1.4vw,14px);
+    clamp(11px,1.4vw,15px);
 
   background:var(--surface-2);
 }
 
 .file-size-inner-header{
   margin-bottom:
-    clamp(12px,1.5vw,16px);
+    clamp(13px,1.6vw,17px);
 
   color:var(--text);
 
   font-size:
-    clamp(15px,1.6vw,18px);
+    clamp(16px,1.8vw,20px);
+
+  line-height:1.2;
 
   font-weight:700;
 }
@@ -976,7 +1022,7 @@ h1{
     1fr 1fr;
 
   gap:
-    clamp(8px,1vw,10px);
+    clamp(9px,1.2vw,12px);
 }
 
 .size-field label{
@@ -988,24 +1034,24 @@ h1{
   color:var(--muted-2);
 
   font-size:
-    clamp(10px,1vw,11px);
+    clamp(10px,1.1vw,12px);
 }
 
 .size-field input{
   width:100%;
 
   height:
-    clamp(42px,4vw,50px);
+    clamp(42px,4vw,52px);
 
   padding:
     0
-    clamp(10px,1.2vw,13px);
+    clamp(10px,1.3vw,14px);
 
   border:
     1px solid #343740;
 
   border-radius:
-    clamp(10px,1.3vw,12px);
+    clamp(10px,1.3vw,13px);
 
   background:var(--input);
 
@@ -1018,7 +1064,7 @@ h1{
 }
 
 .size-field input:focus{
-  border-color:#4a4e59;
+  border-color:#4b4f59;
 }
 
 .file-size-error{
@@ -1034,13 +1080,26 @@ h1{
 
 /* QUALITY */
 
+.quality-card{
+  padding:
+    clamp(10px,1.2vw,13px);
+
+  border:
+    1px solid var(--border);
+
+  border-radius:
+    clamp(15px,1.8vw,20px);
+
+  background:var(--surface);
+}
+
 .quality-list{
   display:flex;
 
   flex-direction:column;
 
   gap:
-    clamp(6px,1vw,8px);
+    clamp(6px,.9vw,9px);
 }
 
 .quality-row{
@@ -1051,28 +1110,28 @@ h1{
   justify-content:space-between;
 
   min-height:
-    clamp(48px,4.5vw,58px);
+    clamp(52px,5vw,62px);
 
   padding:
-    clamp(8px,1vw,10px)
-    clamp(9px,1.2vw,12px);
+    clamp(9px,1.1vw,12px)
+    clamp(11px,1.3vw,15px);
 
   border-radius:
-    clamp(11px,1.3vw,13px);
+    clamp(11px,1.3vw,14px);
 
   background:var(--surface-2);
 }
 
 .quality-row>input{
   width:
-    clamp(18px,1.8vw,20px);
+    clamp(18px,1.8vw,21px);
 
   height:
-    clamp(18px,1.8vw,20px);
+    clamp(18px,1.8vw,21px);
 
   margin:
     0
-    clamp(9px,1.2vw,12px)
+    clamp(10px,1.3vw,14px)
     0
     0;
 
@@ -1082,8 +1141,10 @@ h1{
 .quality-name{
   flex:1;
 
+  color:#ededf0;
+
   font-size:
-    clamp(13px,1.3vw,14px);
+    clamp(14px,1.5vw,17px);
 
   font-weight:600;
 }
@@ -1092,15 +1153,15 @@ h1{
   display:flex;
 
   gap:
-    clamp(5px,.7vw,6px);
+    clamp(5px,.7vw,7px);
 }
 
 .quality-controls button{
   width:
-    clamp(31px,3vw,36px);
+    clamp(32px,3.3vw,40px);
 
   height:
-    clamp(31px,3vw,36px);
+    clamp(32px,3.3vw,40px);
 
   padding:0;
 
@@ -1108,14 +1169,14 @@ h1{
     1px solid #343740;
 
   border-radius:
-    clamp(9px,1.1vw,10px);
+    clamp(9px,1.1vw,11px);
 
   background:var(--input);
 
   color:#c9cad0;
 
   font-size:
-    clamp(13px,1.4vw,15px);
+    clamp(13px,1.5vw,16px);
 }
 
 .quality-controls button:disabled{
@@ -1125,12 +1186,25 @@ h1{
 
 /* FILTERS */
 
-.filter-row{
+.filter-card{
   padding:
-    clamp(12px,1.4vw,15px);
+    clamp(10px,1.2vw,13px);
+
+  border:
+    1px solid var(--border);
 
   border-radius:
-    clamp(11px,1.3vw,13px);
+    clamp(15px,1.8vw,20px);
+
+  background:var(--surface);
+}
+
+.filter-row{
+  padding:
+    clamp(13px,1.5vw,17px);
+
+  border-radius:
+    clamp(11px,1.3vw,14px);
 
   background:var(--surface-2);
 }
@@ -1141,20 +1215,22 @@ h1{
   align-items:center;
 
   gap:
-    clamp(9px,1.2vw,12px);
+    clamp(9px,1.2vw,13px);
+
+  color:#ededf0;
 
   font-size:
-    clamp(13px,1.3vw,14px);
+    clamp(14px,1.5vw,17px);
 
   font-weight:600;
 }
 
 .filter-label input{
   width:
-    clamp(18px,1.8vw,20px);
+    clamp(18px,1.8vw,21px);
 
   height:
-    clamp(18px,1.8vw,20px);
+    clamp(18px,1.8vw,21px);
 }
 
 
@@ -1170,32 +1246,30 @@ h1{
   width:100%;
 
   height:
-    clamp(44px,4vw,50px);
+    clamp(46px,4.5vw,54px);
 
   margin-top:
-    clamp(18px,2vw,22px);
+    clamp(20px,2.5vw,28px);
 
   padding:
     0
-    clamp(16px,2vw,20px);
+    20px;
 
   border:0;
 
   border-radius:
-    clamp(12px,1.5vw,14px);
+    clamp(12px,1.5vw,15px);
 
   background:#f4f4f5;
 
   color:#101115;
 
   font-size:
-    clamp(13px,1.3vw,14px);
+    clamp(13px,1.4vw,15px);
 
   font-weight:700;
 
   line-height:1;
-
-  text-align:center;
 }
 
 .main:disabled{
@@ -1210,6 +1284,8 @@ h1{
   color:var(--muted);
 
   font-size:11px;
+
+  text-align:center;
 }
 
 
@@ -1219,27 +1295,51 @@ h1{
   display:none;
 
   margin-top:
-    clamp(22px,3vw,28px);
+    clamp(24px,3vw,32px);
+}
+
+.result-card{
+  padding:
+    clamp(14px,1.6vw,18px);
+
+  border:
+    1px solid var(--border);
+
+  border-radius:
+    clamp(15px,1.8vw,20px);
+
+  background:var(--surface);
+}
+
+.result-title{
+  margin-bottom:10px;
+
+  font-size:
+    clamp(16px,1.7vw,19px);
+
+  font-weight:700;
 }
 
 .manifest-url{
   overflow:auto;
 
   padding:
-    clamp(11px,1.2vw,13px);
+    clamp(11px,1.2vw,14px);
 
   border:
     1px solid #343740;
 
   border-radius:
-    clamp(10px,1.3vw,12px);
+    clamp(10px,1.3vw,13px);
 
   background:var(--surface-2);
 
   color:#c9cad0;
 
   font-size:
-    clamp(11px,1.1vw,12px);
+    clamp(11px,1.1vw,13px);
+
+  line-height:1.45;
 
   word-break:break-all;
 }
@@ -1247,7 +1347,7 @@ h1{
 .result-buttons{
   display:flex;
 
-  gap:8px;
+  gap:9px;
 
   margin-top:10px;
 }
@@ -1256,14 +1356,15 @@ h1{
   flex:1;
 
   height:
-    clamp(42px,3.8vw,46px);
+    clamp(42px,4vw,48px);
 
   border:0;
 
   border-radius:
-    clamp(10px,1.3vw,12px);
+    clamp(10px,1.2vw,13px);
 
-  font-size:12px;
+  font-size:
+    clamp(11px,1.2vw,13px);
 
   font-weight:700;
 }
@@ -1281,11 +1382,13 @@ h1{
 }
 
 .note{
-  margin-top:13px;
+  margin-top:
+    clamp(16px,2vw,22px);
 
   color:var(--muted-2);
 
-  font-size:10px;
+  font-size:
+    clamp(9px,1vw,11px);
 
   line-height:1.5;
 }
@@ -1299,71 +1402,86 @@ h1{
     padding:
       22px
       14px
-      50px;
+      48px;
   }
 
   .container{
-    width:
-      100%;
+    width:100%;
+  }
+
+  .header{
+    margin-bottom:28px;
   }
 
   h1{
-    font-size:28px;
+    padding-right:70px;
 
-    letter-spacing:-1px;
+    font-size:30px;
+
+    letter-spacing:-1.2px;
   }
 
   .subtitle{
     margin-top:7px;
 
-    margin-bottom:20px;
-
     font-size:12px;
   }
 
-  .card{
-    padding:12px;
+  .back-button{
+    top:0;
 
-    margin-top:12px;
+    min-height:36px;
 
-    border-radius:15px;
+    padding:
+      0
+      11px;
+
+    font-size:12px;
+
+    gap:6px;
   }
 
-  .card-title{
-    font-size:17px;
+  .section{
+    margin-top:25px;
   }
 
-  .card-description{
-    margin-top:5px;
+  .section-title{
+    margin-bottom:5px;
 
-    margin-bottom:14px;
+    font-size:23px;
+
+    letter-spacing:-.7px;
+  }
+
+  .section-description{
+    margin-bottom:11px;
 
     font-size:11px;
   }
 
   .file-size-card{
-    padding:10px;
+    padding:9px;
 
     border-radius:14px;
   }
 
   .file-size-heading{
     padding:
-      2px
+      3px
       6px
-      9px;
+      8px;
 
     font-size:10px;
   }
 
   .file-size-inner{
-    padding:14px;
+    padding:13px;
 
     border-radius:11px;
   }
 
   .file-size-inner-header{
-    margin-bottom:13px;
+    margin-bottom:12px;
 
     font-size:16px;
   }
@@ -1381,11 +1499,20 @@ h1{
   .size-field input{
     height:40px;
 
-    padding:0 10px;
+    padding:
+      0
+      10px;
 
     border-radius:10px;
 
     font-size:12px;
+  }
+
+  .quality-card,
+  .filter-card{
+    padding:9px;
+
+    border-radius:14px;
   }
 
   .quality-list{
@@ -1393,7 +1520,7 @@ h1{
   }
 
   .quality-row{
-    min-height:46px;
+    min-height:47px;
 
     padding:
       8px
@@ -1430,6 +1557,8 @@ h1{
 
   .filter-row{
     padding:12px;
+
+    border-radius:11px;
   }
 
   .filter-label{
@@ -1458,10 +1587,20 @@ h1{
     margin-top:22px;
   }
 
+  .result-card{
+    padding:12px;
+
+    border-radius:14px;
+  }
+
   .result-buttons button{
     height:42px;
 
     font-size:11px;
+  }
+
+  .note{
+    font-size:10px;
   }
 
 }
@@ -1477,20 +1616,32 @@ h1{
     padding-right:12px;
   }
 
-  .card{
-    padding:11px;
+  h1{
+    font-size:28px;
   }
 
-  .file-size-card{
-    padding:9px;
+  .back-button{
+    min-height:34px;
+
+    padding:
+      0
+      9px;
+
+    font-size:11px;
+  }
+
+  .section-title{
+    font-size:22px;
+  }
+
+  .file-size-card,
+  .quality-card,
+  .filter-card{
+    padding:8px;
   }
 
   .file-size-inner{
     padding:12px;
-  }
-
-  .size-row{
-    gap:7px;
   }
 
   .quality-row{
@@ -1515,14 +1666,36 @@ h1{
 
 <div class="container">
 
+<header class="header">
+
 <h1>
-ShowBox
+Settings
 </h1>
 
 <p class="subtitle">
-Configure your stream preferences.
+Fine-tune your stream quality and filtering preferences.
 </p>
 
+<button
+  id="backButton"
+  class="back-button"
+  type="button"
+>
+← Back
+</button>
+
+</header>
+
+
+<section class="section">
+
+<h2 class="section-title">
+File size
+</h2>
+
+<p class="section-description">
+Keep streams between the selected minimum and maximum size.
+</p>
 
 <div class="file-size-card">
 
@@ -1583,16 +1756,20 @@ Max (GB)
 
 </div>
 
+</section>
 
-<div class="card">
 
-<div class="card-title">
-Quality
-</div>
+<section class="section">
 
-<div class="card-description">
-Enable the qualities you want and use the arrows to change their priority.
-</div>
+<h2 class="section-title">
+Quality settings
+</h2>
+
+<p class="section-description">
+Enable the qualities you want. Move them up or down to set their priority.
+</p>
+
+<div class="quality-card">
 
 <div
   id="qualityList"
@@ -1601,17 +1778,20 @@ Enable the qualities you want and use the arrows to change their priority.
 
 </div>
 
+</section>
 
-<div class="card">
 
-<div class="card-title">
+<section class="section">
+
+<h2 class="section-title">
 Stream filters
-</div>
+</h2>
 
-<div class="card-description">
-Enable the stream types you want to keep.
-These settings do not change quality priority.
-</div>
+<p class="section-description">
+Enable the stream types you want to keep. These settings do not change quality priority.
+</p>
+
+<div class="filter-card">
 
 <div class="filter-row">
 
@@ -1631,6 +1811,8 @@ CAM
 </div>
 
 </div>
+
+</section>
 
 
 <button
@@ -1652,9 +1834,9 @@ Save Configuration
   class="result"
 >
 
-<div class="card">
+<div class="result-card">
 
-<div class="card-title">
+<div class="result-title">
 Manifest URL
 </div>
 
@@ -1690,8 +1872,7 @@ Install in Stremio
 
 <div class="note">
 On iOS/iPadOS, if Stremio does not open automatically,
-copy the manifest URL and add it manually through
-Stremio's Add-ons page.
+copy the manifest URL and add it manually through Stremio's Add-ons page.
 </div>
 
 </div>
@@ -1713,6 +1894,11 @@ const sessionId=
 
 const expiresAt=
   ${session.expiresAt};
+
+const backButton=
+  document.getElementById(
+    "backButton"
+  );
 
 const qualityList=
   document.getElementById(
@@ -1891,6 +2077,17 @@ window.addEventListener(
     if(event.persisted){
       await verifySession();
     }
+  }
+);
+
+backButton.addEventListener(
+  "click",
+  ()=>{
+    if(expired){
+      return;
+    }
+
+    history.back();
   }
 );
 
@@ -2239,6 +2436,7 @@ minSizeInput.addEventListener(
   "input",
   ()=>{
     invalidateResult();
+
     validate();
   }
 );
@@ -2247,6 +2445,7 @@ maxSizeInput.addEventListener(
   "input",
   ()=>{
     invalidateResult();
+
     validate();
   }
 );
