@@ -440,142 +440,165 @@ if (dataElement) {
   }
 
   function renderQualities() {
-    qualityList.innerHTML = "";
+  qualityList.innerHTML = "";
 
-    qualities.forEach(
-      (quality, index) => {
-        const row =
-          document.createElement(
-            "div"
-          );
-
-        row.className =
-          "quality-row";
-
-        const checkbox =
-          document.createElement(
-            "input"
-          );
-
-        checkbox.type =
-          "checkbox";
-
-        checkbox.className =
-          "quality-check";
-
-        checkbox.checked =
-          quality.enabled;
-
-        checkbox.addEventListener(
-          "change",
-          () => {
-            quality.enabled =
-              checkbox.checked;
-
-            invalidateResult();
-          }
+  qualities.forEach(
+    (quality, index) => {
+      const row =
+        document.createElement(
+          "div"
         );
 
-        const name =
-          document.createElement(
-            "div"
-          );
+      row.className =
+        "quality-row";
 
-        name.className =
-          "quality-name";
-
-        name.textContent =
-          quality.name;
-
-        const controls =
-          document.createElement(
-            "div"
-          );
-
-        controls.className =
-          "quality-controls";
-
-        const up =
-          document.createElement(
-            "button"
-          );
-
-        up.type = "button";
-        up.textContent = "↑";
-        up.disabled = index === 0;
-
-        up.addEventListener(
-          "click",
-          () => {
-            if (index <= 0) {
-              return;
-            }
-
-            [
-              qualities[index - 1],
-              qualities[index]
-            ] = [
-              qualities[index],
-              qualities[index - 1]
-            ];
-
-            invalidateResult();
-            renderQualities();
-          }
+      const checkbox =
+        document.createElement(
+          "input"
         );
 
-        const down =
-          document.createElement(
-            "button"
-          );
+      checkbox.type =
+        "checkbox";
 
-        down.type = "button";
-        down.textContent = "↓";
+      checkbox.className =
+        "quality-check";
 
-        down.disabled =
-          index ===
-          qualities.length - 1;
+      checkbox.checked =
+        quality.enabled;
 
-        down.addEventListener(
-          "click",
-          () => {
-            if (
-              index >=
+      checkbox.addEventListener(
+        "change",
+        () => {
+          quality.enabled =
+            checkbox.checked;
+
+          invalidateResult();
+        }
+      );
+
+      const name =
+        document.createElement(
+          "div"
+        );
+
+      name.className =
+        "quality-name";
+
+      name.textContent =
+        quality.name;
+
+      const controls =
+        document.createElement(
+          "div"
+        );
+
+      controls.className =
+        "quality-controls";
+
+      const up =
+        document.createElement(
+          "button"
+        );
+
+      up.type =
+        "button";
+
+      up.textContent =
+        "↑";
+
+      up.disabled =
+        index === 0;
+
+      up.addEventListener(
+        "click",
+        () => {
+          const currentIndex =
+            qualities.indexOf(
+              quality
+            );
+
+          if (
+            currentIndex <= 0
+          ) {
+            return;
+          }
+
+          [
+            qualities[currentIndex - 1],
+            qualities[currentIndex]
+          ] = [
+            qualities[currentIndex],
+            qualities[currentIndex - 1]
+          ];
+
+          invalidateResult();
+
+          renderQualities();
+        }
+      );
+
+      const down =
+        document.createElement(
+          "button"
+        );
+
+      down.type =
+        "button";
+
+      down.textContent =
+        "↓";
+
+      down.disabled =
+        index ===
+        qualities.length - 1;
+
+      down.addEventListener(
+        "click",
+        () => {
+          const currentIndex =
+            qualities.indexOf(
+              quality
+            );
+
+          if (
+            currentIndex < 0 ||
+            currentIndex >=
               qualities.length - 1
-            ) {
-              return;
-            }
-
-            [
-              qualities[index + 1],
-              qualities[index]
-            ] = [
-              qualities[index],
-              qualities[index + 1]
-            ];
-
-            invalidateResult();
-            renderQualities();
+          ) {
+            return;
           }
-        );
 
-        controls.append(
-          up,
-          down
-        );
+          [
+            qualities[currentIndex],
+            qualities[currentIndex + 1]
+          ] = [
+            qualities[currentIndex + 1],
+            qualities[currentIndex]
+          ];
 
-        row.append(
-          checkbox,
-          name,
-          controls
-        );
+          invalidateResult();
 
-        qualityList.appendChild(
-          row
-        );
-      }
-    );
-  }
+          renderQualities();
+        }
+      );
+
+      controls.append(
+        up,
+        down
+      );
+
+      row.append(
+        checkbox,
+        name,
+        controls
+      );
+
+      qualityList.appendChild(
+        row
+      );
+    }
+  );
+}
 
   function getFileSize() {
     const min =
@@ -1307,7 +1330,7 @@ html{
 }
 
 body{
-  margin:0;
+  margin:0 2vw;
   min-height:100vh;
   background:
     radial-gradient(
