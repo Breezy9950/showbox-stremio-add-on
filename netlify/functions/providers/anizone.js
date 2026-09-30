@@ -105,7 +105,9 @@ async function fetchWithTimeout(
     ...(options.headers || {})
   };
 
+  // Match the AniZone plugin's request options.
   const fetchOptions = {
+    skipSizeCheck: true,
     ...options,
     headers:
       mergedHeaders
@@ -171,6 +173,42 @@ async function fetchText(
     );
 
     if (!response.ok) {
+      let errorBody = "";
+
+      try {
+        errorBody =
+          await response.text();
+      } catch {}
+
+      log(
+        "AniZone request rejected",
+        {
+          url:
+            finalUrl,
+
+          status:
+            response.status,
+
+          server:
+            response.headers?.get?.(
+              "server"
+            ) || "",
+
+          contentType:
+            response.headers?.get?.(
+              "content-type"
+            ) || "",
+
+          bodyPreview:
+            errorBody
+              .slice(0, 500)
+              .replace(
+                /\s+/g,
+                " "
+              )
+        }
+      );
+
       return "";
     }
 
@@ -209,6 +247,47 @@ async function fetchWithCookies(
     );
 
     if (!response.ok) {
+      let errorBody = "";
+
+      try {
+        errorBody =
+          await response.text();
+      } catch {}
+
+      log(
+        "Episode page rejected",
+        {
+          url:
+            finalUrl,
+
+          status:
+            response.status,
+
+          server:
+            response.headers?.get?.(
+              "server"
+            ) || "",
+
+          contentType:
+            response.headers?.get?.(
+              "content-type"
+            ) || "",
+
+          location:
+            response.headers?.get?.(
+              "location"
+            ) || "",
+
+          bodyPreview:
+            errorBody
+              .slice(0, 500)
+              .replace(
+                /\s+/g,
+                " "
+              )
+        }
+      );
+
       return {
         text: "",
         cookies: "",
