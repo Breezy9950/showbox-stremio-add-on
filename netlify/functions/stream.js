@@ -11,6 +11,10 @@ import {
 } from "./providers/anizone.js";
 
 import {
+  getAnimeSdkStreams
+} from "./providers/animesdk.js";
+
+import {
   getStore
 } from "@netlify/blobs";
 
@@ -1065,21 +1069,16 @@ export default async (
       );
     }
 
-    // -----------------------------------------------------
-    // Provider selection
-    //
-    // FebBox + AniZone
-    // -----------------------------------------------------
-
 // -----------------------------------------------------
 // Provider selection
 //
-// FebBox + AniZone
+// FebBox + AniZone + anime-sdk
 // -----------------------------------------------------
 
 const [
   febboxStreams,
-  aniZoneStreams
+  aniZoneStreams,
+  animeSdkStreams
 ] = await Promise.all([
   getFebboxStreams({
     imdbId,
@@ -1112,6 +1111,22 @@ const [
     );
 
     return [];
+  }),
+
+  getAnimeSdkStreams({
+    imdbId,
+    type,
+    season,
+    episode
+  }).catch(error => {
+    console.error(
+      "[STREAM] Anime SDK provider failed:",
+      error?.stack ||
+        error?.message ||
+        error
+    );
+
+    return [];
   })
 ]);
 
@@ -1122,7 +1137,10 @@ console.log(
       febboxStreams.length,
 
     aniZone:
-      aniZoneStreams.length
+      aniZoneStreams.length,
+
+    animeSdk:
+      animeSdkStreams.length
   }
 );
 
@@ -1132,7 +1150,8 @@ console.log(
 
 const providerStreams = [
   ...febboxStreams,
-  ...aniZoneStreams
+  ...aniZoneStreams,
+  ...animeSdkStreams
 ];
 
 const streams =
