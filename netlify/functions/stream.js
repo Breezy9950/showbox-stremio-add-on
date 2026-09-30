@@ -468,13 +468,18 @@ function getStreamQuality(
     return nameQuality;
   }
 
-  const name4K =
-    /\b(?:4k|2160p|2160)\b/i.test(
+  if (
+    /\b(?:org|original)\b/i.test(
       nameText
-    );
+    )
+  ) {
+    return "ORG";
+  }
 
   if (
-    name4K
+    /\b(?:4k|2160p|2160)\b/i.test(
+      nameText
+    )
   ) {
     return "4K";
   }
@@ -487,9 +492,11 @@ function getStreamQuality(
   if (
     nameResolution
   ) {
-    return getCanonicalQuality(
-      nameResolution[1]
-    ) || "";
+    return (
+      getCanonicalQuality(
+        nameResolution[1]
+      ) || ""
+    );
   }
 
   // -------------------------------------------------------
@@ -501,13 +508,18 @@ function getStreamQuality(
       stream.title || ""
     );
 
-  const title4K =
-    /\b(?:4k|2160p|2160)\b/i.test(
+  if (
+    /\b(?:org|original)\b/i.test(
       title
-    );
+    )
+  ) {
+    return "ORG";
+  }
 
   if (
-    title4K
+    /\b(?:4k|2160p|2160)\b/i.test(
+      title
+    )
   ) {
     return "4K";
   }
@@ -520,9 +532,11 @@ function getStreamQuality(
   if (
     titleResolution
   ) {
-    return getCanonicalQuality(
-      titleResolution[1]
-    ) || "";
+    return (
+      getCanonicalQuality(
+        titleResolution[1]
+      ) || ""
+    );
   }
 
   return "";
@@ -572,11 +586,6 @@ function applyQualitySettings(
       }
     );
 
-  /*
-   * Create a direct priority lookup
-   * from the configured quality order.
-   */
-
   const priorityMap =
     new Map(
       qualityConfig.priority.map(
@@ -589,13 +598,6 @@ function applyQualitySettings(
         ]
       )
     );
-
-  /*
-   * Sort by quality priority.
-   *
-   * This groups all streams of the
-   * same quality together.
-   */
 
   filtered.sort(
     (
@@ -1251,9 +1253,9 @@ export default async (
 
           "Access-Control-Allow-Origin":
             "*"
+          }
         }
-      }
-    );
+      );
   }
 };
 
