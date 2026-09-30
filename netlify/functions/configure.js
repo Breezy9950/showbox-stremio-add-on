@@ -296,7 +296,7 @@ function invalidConfigResponse() {
 <style>
 *{box-sizing:border-box}
 body{
-  margin:0;
+  margin:0 2.5vw;
   padding:35px 18px;
   background:#0d0e11;
   color:#f1f1f3;
