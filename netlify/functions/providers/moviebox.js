@@ -1,23 +1,25 @@
 // netlify/functions/providers/moviebox.js
-console.log("[MovieBox PROVIDER] INDIA-SPOOF-2026-10-01-A");
+console.log("[MovieBox PROVIDER] TUI-SPOOF-2026-10-01-B");
 
 import CryptoJS from "crypto-js";
 
 // ============================================================
 // MovieBox provider
 //
-// HTTP-level client/device spoofing:
-//   - Android 14
-//   - Indian locale
-//   - India region
-//   - Asia/Calcutta timezone
-//   - Indian Android package metadata
-//   - Android User-Agent
-//   - en-IN Accept-Language
+// Based on the supplied Nuvio implementation, with the
+// additional client behavior currently used by MovieBox-TUI.
+//
+// Changes from previous version:
+//   - com.community.oneroom client identity
+//   - current TUI-style client metadata
+//   - X-Play-Mode: 2
+//   - sp_code: 40401
+//   - X-Forwarded-For spoofed IP
+//   - additional MovieBox hosts
 //
 // IMPORTANT:
-// This can spoof application-level metadata only.
-// It cannot change Netlify's actual public IP/egress region.
+// X-Forwarded-For does NOT change Netlify's actual source IP.
+// It only tests whether MovieBox trusts the forwarded IP header.
 // ============================================================
 
 const API_BASE = "https://api3.aoneroom.com";
@@ -25,7 +27,7 @@ const API_BASE = "https://api3.aoneroom.com";
 const PLAYER_BASE = "https://moviebox.ph";
 
 const PLAYER_USER_AGENT =
-  "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36";
+  "com.community.oneroom/50020120 (Linux; U; Android 13; en_US; 2201117TY; Build/TQ2A.230405.003; Cronet/135.0.7012.3)";
 
 const HOST_POOL = [
   "https://api6.aoneroom.com",
@@ -33,6 +35,8 @@ const HOST_POOL = [
   "https://api4.aoneroom.com",
   "https://api4sg.aoneroom.com",
   "https://api3.aoneroom.com",
+  "https://api6sg.aoneroom.com",
+  "https://api.inmoviebox.com",
 ];
 
 const KEY_B64_DEFAULT =
@@ -47,46 +51,183 @@ const TMDB_API_KEY =
 const TMDB_BASE_URL =
   "https://api.themoviedb.org/3";
 
-const BRAND_MODELS = {
-  Samsung: [
-    "SM-S918B",
-    "SM-A528B",
-    "SM-M336B",
-  ],
-
-  Xiaomi: [
-    "2201117TI",
-    "M2012K11AI",
-    "Redmi Note 11",
-  ],
-
-  OnePlus: [
-    "LE2111",
-    "CPH2449",
-    "IN2023",
-  ],
-
-  Google: [
-    "Pixel 6",
-    "Pixel 7",
-    "Pixel 8",
-  ],
-
-  Realme: [
-    "RMX3085",
-    "RMX3360",
-    "RMX3551",
-  ],
-};
-
-const TOKEN_URL =
-  "https://apig.inmoviebox.com/wefeed-mobile-bff/tab/ranking-list?tabId=0&categoryType=4516404531735022304&page=1&perPage=1";
+// ============================================================
+// CURRENT TUI CLIENT IDENTITY
+// ============================================================
 
 const PACKAGE_INFO = {
-  package_name: "com.community.mbox.in",
-  version_name: "4.0.03.0920.03",
-  version_code: 50020130,
+  package_name: "com.community.oneroom",
+  version_name: "4.0.01.0813.03",
+  version_code: 50020120,
 };
+
+const ANDROID_VERSION = "13";
+const ANDROID_BUILD = "TQ2A.230405.003";
+const DEVICE_BRAND = "Redmi";
+const DEVICE_MODEL = "2201117TY";
+const SYSTEM_LANGUAGE = "en";
+const NETWORK_TYPE = "NETWORK_WIFI";
+const REGION = "US";
+const TIMEZONE = "Asia/Kolkata";
+const INSTALL_STORE = "ps";
+const INSTALL_CHANNEL = "ps";
+const SP_CODE = "40401";
+const PLAY_MODE = "2";
+
+// ============================================================
+// SPOOFED FORWARDED IP
+//
+// Same prefix pool used by current MovieBox-TUI.
+// This is ONLY an HTTP header and does not change the actual
+// network source address.
+// ============================================================
+
+const SPOOFED_IP_PREFIXES = [
+  "103.241",
+  "49.36",
+  "117.195",
+  "106.198",
+  "122.162",
+  "157.32",
+  "182.70",
+  "103.58",
+  "27.60",
+  "59.90",
+];
+
+function randomSpoofedIp() {
+  const prefix =
+    SPOOFED_IP_PREFIXES[
+      Math.floor(
+        Math.random() *
+          SPOOFED_IP_PREFIXES.length
+      )
+    ];
+
+  const c =
+    Math.floor(
+      Math.random() * 253
+    ) + 1;
+
+  const d =
+    Math.floor(
+      Math.random() * 253
+    ) + 1;
+
+  return `${prefix}.${c}.${d}`;
+}
+
+// Keep one IP for the lifetime of this function instance,
+// matching the TUI behavior of generating the spoofed IP
+// when the client object is created.
+const SPOOFED_IP =
+  randomSpoofedIp();
+
+// ============================================================
+// DEVICE / SESSION
+// ============================================================
+
+function randomHex(length) {
+  const chars =
+    "0123456789abcdef";
+
+  let result = "";
+
+  for (let i = 0; i < length; i++) {
+    result +=
+      chars[
+        Math.floor(
+          Math.random() * 16
+        )
+      ];
+  }
+
+  return result;
+}
+
+function randomUuid() {
+  return [
+    randomHex(8),
+    randomHex(4),
+    randomHex(4),
+    randomHex(4),
+    randomHex(12),
+  ].join("-");
+}
+
+const deviceId =
+  randomHex(32);
+
+const gaid =
+  randomUuid();
+
+let bearerToken = null;
+
+// ============================================================
+// CLIENT INFO
+// ============================================================
+
+function buildClientInfo() {
+  return JSON.stringify({
+    package_name:
+      PACKAGE_INFO.package_name,
+
+    version_name:
+      PACKAGE_INFO.version_name,
+
+    version_code:
+      PACKAGE_INFO.version_code,
+
+    os:
+      "android",
+
+    os_version:
+      ANDROID_VERSION,
+
+    install_ch:
+      INSTALL_CHANNEL,
+
+    device_id:
+      deviceId,
+
+    install_store:
+      INSTALL_STORE,
+
+    gaid,
+
+    brand:
+      DEVICE_BRAND,
+
+    model:
+      DEVICE_MODEL,
+
+    system_language:
+      SYSTEM_LANGUAGE,
+
+    net:
+      NETWORK_TYPE,
+
+    region:
+      REGION,
+
+    timezone:
+      TIMEZONE,
+
+    sp_code:
+      SP_CODE,
+
+    "X-Play-Mode":
+      PLAY_MODE,
+  });
+}
+
+const CLIENT_INFO =
+  buildClientInfo();
+
+const CLIENT_USER_AGENT =
+  `${PACKAGE_INFO.package_name}/${PACKAGE_INFO.version_code} ` +
+  `(Linux; U; Android ${ANDROID_VERSION}; en_US; ${DEVICE_MODEL}; ` +
+  `Build/${ANDROID_BUILD}; Cronet/135.0.7012.3)`;
 
 // ============================================================
 // AUTH
@@ -96,34 +237,39 @@ const SECRET_KEY_DEFAULT =
   CryptoJS.enc.Base64.parse(
     CryptoJS.enc.Base64.parse(
       KEY_B64_DEFAULT
-    ).toString(CryptoJS.enc.Utf8)
+    ).toString(
+      CryptoJS.enc.Utf8
+    )
   );
 
 const SECRET_KEY_ALT =
   CryptoJS.enc.Base64.parse(
     CryptoJS.enc.Base64.parse(
       KEY_B64_ALT
-    ).toString(CryptoJS.enc.Utf8)
+    ).toString(
+      CryptoJS.enc.Utf8
+    )
   );
-
-let deviceId = "";
-let selectedBrand = "";
-let selectedModel = "";
-let bearerToken = null;
 
 function decodeJwtExpiry(token) {
   try {
-    const parts = token.split(".");
+    const parts =
+      token.split(".");
 
-    if (parts.length < 2) {
+    if (
+      parts.length < 2
+    ) {
       return 0;
     }
 
-    let base64 = parts[1]
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
+    let base64 =
+      parts[1]
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
 
-    while (base64.length % 4) {
+    while (
+      base64.length % 4
+    ) {
       base64 += "=";
     }
 
@@ -153,53 +299,8 @@ function isTokenValid(token) {
 
   return (
     exp >
-    Date.now() / 1000 + 3600
-  );
-}
-
-function initializeSession() {
-  if (deviceId) {
-    return;
-  }
-
-  const chars =
-    "0123456789abcdef";
-
-  for (let i = 0; i < 32; i++) {
-    deviceId +=
-      chars[
-        Math.floor(
-          Math.random() * 16
-        )
-      ];
-  }
-
-  const brands =
-    Object.keys(BRAND_MODELS);
-
-  selectedBrand =
-    brands[
-      Math.floor(
-        Math.random() *
-          brands.length
-      )
-    ];
-
-  const models =
-    BRAND_MODELS[
-      selectedBrand
-    ];
-
-  selectedModel =
-    models[
-      Math.floor(
-        Math.random() *
-          models.length
-      )
-    ];
-
-  console.log(
-    `[MovieBox] Spoofed device: ${selectedBrand} ${selectedModel}`
+    Date.now() / 1000 +
+      3600
   );
 }
 
@@ -210,7 +311,10 @@ function md5(input) {
     );
 }
 
-function hmacMd5(key, data) {
+function hmacMd5(
+  key,
+  data
+) {
   return CryptoJS.HmacMD5(
     data,
     key
@@ -219,10 +323,14 @@ function hmacMd5(key, data) {
   );
 }
 
-function generateXClientToken(timestamp) {
+function generateXClientToken(
+  timestamp
+) {
   const ts =
-    (timestamp || Date.now())
-      .toString();
+    (
+      timestamp ||
+      Date.now()
+    ).toString();
 
   const reversed =
     ts
@@ -259,24 +367,27 @@ function buildCanonicalString(
         urlObj.searchParams.keys()
       ).sort();
 
-    if (params.length > 0) {
-      query = params
-        .map((key) => {
-          const values =
-            urlObj.searchParams
-              .getAll(key);
+    if (params.length) {
+      query =
+        params
+          .map((key) => {
+            const values =
+              urlObj.searchParams
+                .getAll(key);
 
-          return values
-            .map(
-              (val) =>
-                `${key}=${val}`
-            )
-            .join("&");
-        })
-        .join("&");
+            return values
+              .map(
+                (val) =>
+                  `${key}=${val}`
+              )
+              .join("&");
+          })
+          .join("&");
     }
   } catch {
-    if (url.includes("?")) {
+    if (
+      url.includes("?")
+    ) {
       const parts =
         url.split("?");
 
@@ -310,7 +421,9 @@ function buildCanonicalString(
 
   if (body) {
     const bodyWords =
-      CryptoJS.enc.Utf8.parse(body);
+      CryptoJS.enc.Utf8.parse(
+        body
+      );
 
     bodyLength =
       bodyWords.sigBytes.toString();
@@ -371,7 +484,13 @@ function generateXTrSignature(
 
 // ============================================================
 // TOKEN
+//
+// Keep the original Nuvio token endpoint. Unlike API requests,
+// this endpoint is not rewritten to another host.
 // ============================================================
+
+const TOKEN_URL =
+  "https://apig.inmoviebox.com/wefeed-mobile-bff/tab/ranking-list?tabId=0&categoryType=4516404531735022304&page=1&perPage=1";
 
 async function getCachedToken() {
   if (
@@ -448,8 +567,6 @@ async function movieBoxRequest(
   customHeaders = {},
   isTokenFetch = false
 ) {
-  initializeSession();
-
   const timestamp =
     Date.now();
 
@@ -459,7 +576,9 @@ async function movieBoxRequest(
     );
 
   const headerContentType =
-    customHeaders["Content-Type"] ||
+    customHeaders[
+      "Content-Type"
+    ] ||
     (
       body
         ? "application/json; charset=utf-8"
@@ -467,7 +586,9 @@ async function movieBoxRequest(
     );
 
   const accept =
-    customHeaders["Accept"] ||
+    customHeaders[
+      "Accept"
+    ] ||
     "application/json";
 
   const xTrSignature =
@@ -481,54 +602,6 @@ async function movieBoxRequest(
       timestamp
     );
 
-  // ==========================================================
-  // INDIAN ANDROID CLIENT SPOOF
-  // ==========================================================
-
-  const xClientInfo =
-    JSON.stringify({
-      ...PACKAGE_INFO,
-
-      os: "android",
-
-      os_version: "14",
-
-      device_id:
-        deviceId,
-
-      install_store:
-        "official",
-
-      gaid:
-        "1b2212c1-dadf-43c3-a0c8-bd6ce48ae22d",
-
-      brand:
-        selectedBrand.toLowerCase(),
-
-      model:
-        selectedModel,
-
-      system_language:
-        "en",
-
-      net:
-        "NETWORK_WIFI",
-
-      region:
-        "IN",
-
-      timezone:
-        "Asia/Calcutta",
-
-      sp_code:
-        "",
-    });
-
-  const androidUserAgent =
-    `${PACKAGE_INFO.package_name}/${PACKAGE_INFO.version_code} ` +
-    `(Linux; U; Android 14; en_IN; ${selectedModel}; ` +
-    `Build/UD1A.230803.041; Cronet/145.0.7582.0)`;
-
   const headers = {
     Accept:
       accept,
@@ -537,7 +610,10 @@ async function movieBoxRequest(
       headerContentType,
 
     "Accept-Language":
-      "en-IN,en;q=0.9",
+      "en-US,en;q=0.9",
+
+    Connection:
+      "keep-alive",
 
     "x-client-token":
       xClientToken,
@@ -546,23 +622,21 @@ async function movieBoxRequest(
       xTrSignature,
 
     "User-Agent":
-      androidUserAgent,
+      CLIENT_USER_AGENT,
 
     "x-client-info":
-      xClientInfo,
+      CLIENT_INFO,
 
     "x-client-status":
       "0",
 
-    // Indian Android locale hints.
-    "X-Language":
-      "en",
+    // Current MovieBox-TUI behavior.
+    "x-forwarded-for":
+      SPOOFED_IP,
 
-    "X-Region":
-      "IN",
-
-    "X-Timezone":
-      "Asia/Calcutta",
+    // Current TUI client behavior.
+    "X-Play-Mode":
+      PLAY_MODE,
 
     ...customHeaders,
   };
@@ -572,7 +646,7 @@ async function movieBoxRequest(
       await getCachedToken();
 
     if (token) {
-      headers["Authorization"] =
+      headers.Authorization =
         `Bearer ${token}`;
     }
   }
@@ -596,14 +670,6 @@ async function movieBoxRequest(
     return null;
   }
 
-  // ==========================================================
-  // TOKEN ENDPOINT:
-  // Keep apig.inmoviebox.com as the original Nuvio endpoint.
-  //
-  // API endpoints:
-  // Use the same Nuvio host pool.
-  // ==========================================================
-
   const apiHosts =
     new Set(
       HOST_POOL.map(
@@ -622,7 +688,9 @@ async function movieBoxRequest(
           ...HOST_POOL
             .map(
               (host) =>
-                new URL(host).host
+                new URL(
+                  host
+                ).host
             )
             .filter(
               (host) =>
@@ -634,11 +702,9 @@ async function movieBoxRequest(
           originalUrl.host,
         ];
 
+  // Try the complete current TUI-style pool.
   const maxAttempts =
-    Math.min(
-      3,
-      hosts.length
-    );
+    hosts.length;
 
   for (
     let attempt = 0;
@@ -656,6 +722,10 @@ async function movieBoxRequest(
 
       console.log(
         `[MovieBox] ${method} ${requestUrl.host}${requestUrl.pathname}`
+      );
+
+      console.log(
+        `[MovieBox] X-Forwarded-For: ${SPOOFED_IP}`
       );
 
       const res =
@@ -686,14 +756,14 @@ async function movieBoxRequest(
           );
         }
 
+        // Retry the same statuses used by the
+        // current MovieBox-TUI implementation.
         if (
-          (
-            res.status === 403 ||
-            res.status === 429 ||
-            res.status >= 500
-          ) &&
-          attempt + 1 <
-            maxAttempts
+          res.status === 403 ||
+          res.status === 406 ||
+          res.status === 407 ||
+          res.status === 429 ||
+          res.status >= 500
         ) {
           continue;
         }
@@ -714,8 +784,6 @@ async function movieBoxRequest(
           text;
       }
 
-      // Capture a fresh token if MovieBox
-      // sends one in x-user.
       const xUser =
         res.headers.get(
           "x-user"
@@ -747,17 +815,12 @@ async function movieBoxRequest(
           res.headers,
       };
     } catch (err) {
-      if (
-        attempt + 1 ===
-        maxAttempts
-      ) {
-        console.error(
-          "[MovieBox Request Error]",
-          err.message
-        );
+      console.error(
+        `[MovieBox] Request error on ${hosts[attempt]}:`,
+        err.message
+      );
 
-        return null;
-      }
+      continue;
     }
   }
 
@@ -780,12 +843,15 @@ async function resolveImdbToTmdb(
       `&external_source=imdb_id`;
 
     const res =
-      await fetch(url, {
-        headers: {
-          Accept:
-            "application/json",
-        },
-      });
+      await fetch(
+        url,
+        {
+          headers: {
+            Accept:
+              "application/json",
+          },
+        }
+      );
 
     if (!res.ok) {
       console.error(
@@ -801,10 +867,15 @@ async function resolveImdbToTmdb(
 
     const results =
       mediaType === "movie"
-        ? data.movie_results || []
-        : data.tv_results || [];
+        ? data.movie_results ||
+          []
+        : data.tv_results ||
+          [];
 
-    return results[0] || null;
+    return (
+      results[0] ||
+      null
+    );
   } catch (e) {
     console.error(
       "[MovieBox TMDB Find Error]",
@@ -826,21 +897,24 @@ async function fetchTmdbDetails(
       `&append_to_response=external_ids`;
 
     const res =
-      await fetch(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-            "AppleWebKit/537.36 " +
-            "(KHTML, like Gecko) " +
-            "Chrome/121.0.0.0 Safari/537.36",
+      await fetch(
+        url,
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+              "AppleWebKit/537.36 " +
+              "(KHTML, like Gecko) " +
+              "Chrome/121.0.0.0 Safari/537.36",
 
-          Accept:
-            "application/json",
+            Accept:
+              "application/json",
 
-          Connection:
-            "keep-alive",
-        },
-      });
+            Connection:
+              "keep-alive",
+          },
+        }
+      );
 
     if (!res.ok) {
       return null;
@@ -949,7 +1023,8 @@ async function searchMovieBox(
     response.data.data &&
     response.data.data.results
   ) {
-    let allSubjects = [];
+    let allSubjects =
+      [];
 
     response.data.data.results
       .forEach(
@@ -1428,7 +1503,7 @@ function getAudioLabel(
 }
 
 // ============================================================
-// SIGNED RESOURCE
+// SIGNED RESOURCE / POLICY
 // ============================================================
 
 function extractPolicyResource(
@@ -1689,7 +1764,7 @@ async function getStreamLinks(
       PLAYER_USER_AGENT,
 
     "Accept-Language":
-      "en-IN,en;q=0.9",
+      "en-US,en;q=0.9",
 
     "x-request-lang":
       "en",
@@ -1699,6 +1774,9 @@ async function getStreamLinks(
 
     "x-no-high-risk-restrict":
       "0",
+
+    "X-Play-Mode":
+      PLAY_MODE,
   };
 
   for (
@@ -2043,11 +2121,6 @@ async function getStreamLinks(
     }
   }
 
-  // ==========================================================
-  // ORIGINAL QUALITY ORDER
-  // No quality filtering.
-  // ==========================================================
-
   const qualityRank = {
     "2160p": 2160,
     "4k": 2160,
@@ -2260,7 +2333,7 @@ async function fetchSubtitles(
 }
 
 // ============================================================
-// PUBLIC ADAPTER
+// PUBLIC STREMIO ADAPTER
 // ============================================================
 
 export async function getStreams({
@@ -2280,6 +2353,22 @@ export async function getStreams({
 
   console.log(
     `[MovieBox] Resolving IMDb ${imdbId} -> TMDB`
+  );
+
+  console.log(
+    `[MovieBox] Client: ${PACKAGE_INFO.package_name}/${PACKAGE_INFO.version_code}`
+  );
+
+  console.log(
+    `[MovieBox] Device: ${DEVICE_BRAND} ${DEVICE_MODEL} Android ${ANDROID_VERSION}`
+  );
+
+  console.log(
+    `[MovieBox] Region: ${REGION} | Timezone: ${TIMEZONE}`
+  );
+
+  console.log(
+    `[MovieBox] X-Forwarded-For: ${SPOOFED_IP}`
   );
 
   const tmdbResult =
