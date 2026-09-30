@@ -3,6 +3,7 @@
   "dependencies": {
     "crypto-js": "^4.2.0",
     "@netlify/blobs": "^10.0.0",
-    "cheerio": "^1.0.0"
+    "cheerio": "^1.0.0",
+    "anime-sdk": "^1.1.0"
   }
 }
