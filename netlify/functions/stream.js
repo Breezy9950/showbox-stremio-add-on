@@ -1253,6 +1253,7 @@ function getTechnicalMetadata(
   fileName,
   quality
 ) {
+
   const name =
     cleanFilename(
       fileName
@@ -1262,6 +1263,7 @@ function getTechnicalMetadata(
     name.toUpperCase();
 
   const result = [];
+
 
   // -------------------------------------------------------
   // Source / release type
@@ -1275,9 +1277,11 @@ function getTechnicalMetadata(
       upper
     )
   ) {
+
     result.push(
       "WEB-DL"
     );
+
   } else if (
     /\bWEB[- .]?RIP\b/.test(
       upper
@@ -1286,9 +1290,11 @@ function getTechnicalMetadata(
       upper
     )
   ) {
+
     result.push(
       "WEB-RIP"
     );
+
   } else if (
     /\bBLU[- .]?RAY\b/.test(
       upper
@@ -1297,17 +1303,21 @@ function getTechnicalMetadata(
       upper
     )
   ) {
+
     result.push(
       "BluRay"
     );
+
   } else if (
     /\bBDRIP\b/.test(
       upper
     )
   ) {
+
     result.push(
       "BDRip"
     );
+
   } else if (
     /\bTELECINE\b/.test(
       upper
@@ -1316,18 +1326,23 @@ function getTechnicalMetadata(
       upper
     )
   ) {
+
     result.push(
       "TELECINE"
     );
+
   } else if (
     /\bCAM\b/.test(
       upper
     )
   ) {
+
     result.push(
       "CAM"
     );
+
   }
+
 
   // -------------------------------------------------------
   // Dynamic range
@@ -1341,10 +1356,15 @@ function getTechnicalMetadata(
       upper
     )
   ) {
+
     result.push(
       "DV"
     );
-  } else if (
+
+  }
+
+
+  if (
     /\bHDR10\+\b/.test(
       upper
     ) ||
@@ -1352,34 +1372,43 @@ function getTechnicalMetadata(
       upper
     )
   ) {
+
     result.push(
       "HDR10+"
     );
+
   } else if (
     /\bHDR10\b/.test(
       upper
     )
   ) {
+
     result.push(
       "HDR10"
     );
+
   } else if (
     /\bHDR\b/.test(
       upper
     )
   ) {
+
     result.push(
       "HDR"
     );
+
   } else if (
     /\bHLG\b/.test(
       upper
     )
   ) {
+
     result.push(
       "HLG"
     );
+
   }
+
 
   // -------------------------------------------------------
   // Audio codec
@@ -1390,52 +1419,66 @@ function getTechnicalMetadata(
       upper
     )
   ) {
+
     result.push(
       "Atmos"
     );
+
   }
+
 
   if (
     /\bDDP[ ._-]?7[ ._-]?1\b/.test(
       upper
     )
   ) {
+
     result.push(
       "DDP7.1"
     );
+
   } else if (
     /\bDDP[ ._-]?5[ ._-]?1\b/.test(
       upper
     )
   ) {
+
     result.push(
       "DDP5.1"
     );
+
   } else if (
     /\bDD[ ._-]?5[ ._-]?1\b/.test(
       upper
     )
   ) {
+
     result.push(
       "DD5.1"
     );
+
   } else if (
     /\bDTS[- .]?(HD|X)?\b/.test(
       upper
     )
   ) {
+
     result.push(
       "DTS"
     );
+
   } else if (
     /\bAAC\b/.test(
       upper
     )
   ) {
+
     result.push(
       "AAC"
     );
+
   }
+
 
   // -------------------------------------------------------
   // Video codec
@@ -1452,9 +1495,11 @@ function getTechnicalMetadata(
       upper
     )
   ) {
+
     result.push(
       "H.265"
     );
+
   } else if (
     /\bAVC\b/.test(
       upper
@@ -1466,18 +1511,23 @@ function getTechnicalMetadata(
       upper
     )
   ) {
+
     result.push(
       "H.264"
     );
+
   } else if (
     /\bAV1\b/.test(
       upper
     )
   ) {
+
     result.push(
       "AV1"
     );
+
   }
+
 
   return result;
 }
@@ -1801,82 +1851,45 @@ function buildTechnicalLine(
 
 function buildStreamTitle(
   item,
+  tmdbDetails,
   type,
   season,
   episode
 ) {
+
   const lines = [];
 
+
   const title =
-    getTitleFromFilename(
-      item.fileName,
+    buildTitle(
+      tmdbDetails,
       type
     );
+
 
   if (
     title
   ) {
+
     lines.push(
       title
     );
+
   }
+
 
   if (
     type === "series" &&
     Number.isFinite(season) &&
     Number.isFinite(episode)
   ) {
+
     lines.push(
       `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`
     );
+
   }
 
-  const technical =
-    buildTechnicalLine(
-      item
-    );
-
-  if (
-    technical
-  ) {
-    lines.push(
-      technical
-    );
-  }
-
-  if (
-    item.size
-  ) {
-    lines.push(
-      item.size
-    );
-  }
-
-  const audioLanguages =
-    getAudioLanguages(
-      item
-    );
-
-  if (
-    audioLanguages.length
-  ) {
-    lines.push(
-      `Audio: ${audioLanguages.join(", ")}`
-    );
-  }
-
-  const subtitleLanguages =
-    getSubtitleLanguages(
-      item
-    );
-
-  if (
-    subtitleLanguages.length
-  ) {
-    lines.push(
-      `Subtitles: ${subtitleLanguages.join(", ")}`
-    );
-  }
 
   return lines.join(
     "\n"
