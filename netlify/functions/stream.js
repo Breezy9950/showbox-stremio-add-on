@@ -7,14 +7,6 @@ import {
 } from "./providers/febbox.js";
 
 import {
-  getAniZoneStreams
-} from "./providers/anizone.js";
-
-import {
-  getAnimeSdkStreams
-} from "./providers/animesdk.js";
-
-import {
   getStore
 } from "@netlify/blobs";
 
@@ -1071,92 +1063,32 @@ export default async (
 
 // -----------------------------------------------------
 // Provider selection
-//
-// FebBox + AniZone + anime-sdk
 // -----------------------------------------------------
 
-const [
-  febboxStreams,
-  aniZoneStreams,
-  animeSdkStreams
-] = await Promise.all([
-  getFebboxStreams({
-    imdbId,
-    type,
-    season,
-    episode,
-    token
-  }).catch(error => {
-    console.error(
-      "[STREAM] FebBox provider failed:",
-      error?.stack ||
-        error?.message ||
-        error
-    );
+    const febboxStreams = await getFebboxStreams({
+  imdbId,
+  type,
+  season,
+  episode,
+  token
+}).catch(error => {
+  console.error(
+    "[STREAM] FebBox provider failed:",
+    error?.stack ||
+      error?.message ||
+      error
+  );
 
-    return [];
-  }),
-
-  getAniZoneStreams({
-    imdbId,
-    type,
-    season,
-    episode
-  }).catch(error => {
-    console.error(
-      "[STREAM] AniZone provider failed:",
-      error?.stack ||
-        error?.message ||
-        error
-    );
-
-    return [];
-  }),
-
-  getAnimeSdkStreams({
-    imdbId,
-    type,
-    season,
-    episode
-  }).catch(error => {
-    console.error(
-      "[STREAM] Anime SDK provider failed:",
-      error?.stack ||
-        error?.message ||
-        error
-    );
-
-    return [];
-  })
-]);
-
-console.log(
-  "[STREAM] Provider results:",
-  {
-    febbox:
-      febboxStreams.length,
-
-    aniZone:
-      aniZoneStreams.length,
-
-    animeSdk:
-      animeSdkStreams.length
-  }
-);
+  return [];
+});
 
 // -----------------------------------------------------
 // Combine provider results
 // -----------------------------------------------------
 
-const providerStreams = [
-  ...febboxStreams,
-  ...aniZoneStreams,
-  ...animeSdkStreams
-];
-
 const streams =
   dedupeStreams(
-    providerStreams
+    febboxStreams
   );
 
     // -----------------------------------------------------
