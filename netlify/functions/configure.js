@@ -19,6 +19,7 @@ const DEFAULT_QUALITIES = [
 const MAX_CONFIG_BODY_BYTES = 16 * 1024;
 const MAX_QUALITY_ITEMS = 7;
 const MAX_FILE_SIZE_GB = 200;
+const SESSION_COOKIE = "showbox_configure_session";
 
 function jsonResponse(data,status=200){
   return new Response(JSON.stringify(data),{
@@ -99,18 +100,8 @@ function getConfigIdFromRequest(request){
   const url=new URL(request.url);
 
   const match=
-    url.pathname.match(/^\/configure\/([^/]+)(?:\/[a-f0-9]{32})?\/?$/i) ||
-    url.pathname.match(/^\/([^/]+)\/configure(?:\/[a-f0-9]{32})?\/?$/i);
-
-  return match?.[1]||null;
-}
-
-function getSessionIdFromRequest(request){
-  const url=new URL(request.url);
-
-  const match=
-    url.pathname.match(/^\/configure\/[^/]+\/([a-f0-9]{32})\/?$/i) ||
-    url.pathname.match(/^\/[^/]+\/configure\/([a-f0-9]{32})\/?$/i);
+    url.pathname.match(/^\/configure\/([^/]+)\/?$/) ||
+    url.pathname.match(/^\/([^/]+)\/configure\/?$/);
 
   return match?.[1]||null;
 }
@@ -125,6 +116,41 @@ async function getConfigFromRequest(request){
   if(stored) return stored;
 
   return decodeConfig(configId);
+}
+
+function getCookie(request,name){
+  const header=request.headers.get("cookie");
+
+  if(!header) return null;
+
+  const cookies=header.split(";");
+
+  for(const cookie of cookies){
+    const index=cookie.indexOf("=");
+
+    if(index===-1) continue;
+
+    const key=cookie.slice(0,index).trim();
+
+    if(key!==name) continue;
+
+    return decodeURIComponent(
+      cookie.slice(index+1).trim()
+    );
+  }
+
+  return null;
+}
+
+function sessionCookie(id){
+  return [
+    `${SESSION_COOKIE}=${encodeURIComponent(id)}`,
+    "Path=/",
+    "Max-Age=300",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Secure"
+  ].join("; ");
 }
 
 function expiredResponse(){
@@ -201,7 +227,7 @@ function clientScript(){
     return;
   }
 
-  const clientDeadline=
+  const deadline=
     performance.now()+duration;
 
   setTimeout(
@@ -212,7 +238,7 @@ function clientScript(){
   window.addEventListener("pageshow",event=>{
     if(
       event.persisted ||
-      performance.now()>=clientDeadline
+      performance.now()>=deadline
     ){
       expire();
     }
@@ -280,7 +306,7 @@ function clientScript(){
   }
 
   async function saveConfiguration(){
-    if(performance.now()>=clientDeadline){
+    if(performance.now()>=deadline){
       expire();
       return;
     }
@@ -425,9 +451,7 @@ export const config={
   method:["GET","POST"],
   path:[
     "/configure/:config",
-    "/configure/:config/:session",
     "/:config/configure",
-    "/:config/configure/:session",
     "/configure-client.js"
   ]
 };
@@ -505,9 +529,6 @@ export default async function handler(request){
       );
     }
 
-    const pathSessionId=
-      getSessionIdFromRequest(request);
-
     const sessionId=body?.sessionId;
 
     if(
@@ -518,13 +539,6 @@ export default async function handler(request){
         {error:"Configuration session is required"},
         400
       );
-    }
-
-    if(
-      !pathSessionId||
-      pathSessionId!==sessionId
-    ){
-      return expiredResponse();
     }
 
     const session=
@@ -618,9 +632,6 @@ export default async function handler(request){
   }
 
   if(request.method==="GET"){
-    const configId=
-      getConfigIdFromRequest(request);
-
     const existingConfig=
       await getConfigFromRequest(request);
 
@@ -628,47 +639,41 @@ export default async function handler(request){
       return invalidConfigResponse();
     }
 
-    const sessionId=
-      getSessionIdFromRequest(request);
+    let sessionId=
+      getCookie(
+        request,
+        SESSION_COOKIE
+      );
 
-    let session;
+    let session=
+      sessionId
+        ?await getConfigureSession(sessionId)
+        :null;
 
     /*
-     * First visit:
-     *   /configure/:config
+     * No active session:
+     * create a fresh 5-minute session.
      *
-     * Create the temporary session and bind it to the URL:
-     *   /configure/:config/:session
+     * An expired session does NOT get refreshed here because
+     * the browser will be sent to the expired page by the
+     * client timer before a normal reload is expected.
      *
-     * Once this session expires, the session-bound URL
-     * can never create another session.
+     * The session cookie itself is only valid for 5 minutes.
      */
-    if(!sessionId){
+    if(!session){
       session=
         await createConfigureSession();
 
-      const redirectUrl=
-        new URL(request.url);
-
-      redirectUrl.pathname=
-        `${url.pathname.replace(/\\/$/,"")}/${session.id}`;
-
-      return new Response(null,{
-        status:302,
-        headers:{
-          "Location":redirectUrl.toString(),
-          "Cache-Control":"no-store",
-          "Referrer-Policy":"no-referrer"
-        }
-      });
+      sessionId=session.id;
     }
 
-    session=
-      await getConfigureSession(
-        sessionId
+    const remainingMs=
+      Math.max(
+        0,
+        Number(session.expiresAt)-Date.now()
       );
 
-    if(!session){
+    if(remainingMs<=0){
       return expiredResponse();
     }
 
@@ -686,16 +691,6 @@ export default async function handler(request){
       normalizeFilters(
         existingConfig.filters
       );
-
-    const remainingMs=
-      Math.max(
-        0,
-        Number(session.expiresAt)-Date.now()
-      );
-
-    if(remainingMs<=0){
-      return expiredResponse();
-    }
 
     const configData=JSON.stringify({
       qualities,
@@ -988,6 +983,7 @@ export default async function handler(request){
         headers:{
           "Content-Type":"text/html; charset=utf-8",
           "Cache-Control":"no-store",
+          "Set-Cookie":sessionCookie(session.id),
           "X-Content-Type-Options":"nosniff",
           "Referrer-Policy":"no-referrer"
         }
