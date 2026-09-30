@@ -724,17 +724,22 @@ qualityList.addEventListener(
       event.target.closest(
         ".move-button"
       );
+
     if (!button) {
       return;
     }
+
     const row =
       button.closest(
         ".quality-row"
       );
+
     const rows =
       getRows();
+
     const index =
       rows.indexOf(row);
+
     if (
       button.dataset.action ===
         "up" &&
@@ -745,6 +750,7 @@ qualityList.addEventListener(
         rows[index - 1]
       );
     }
+
     if (
       button.dataset.action ===
         "down" &&
@@ -756,9 +762,30 @@ qualityList.addEventListener(
         row
       );
     }
+
+    const updatedRows =
+      getRows();
+
+    updatedRows.forEach(
+      (updatedRow, updatedIndex) => {
+        const buttons =
+          updatedRow.querySelectorAll(
+            ".move-button"
+          );
+
+        buttons[0].disabled =
+          updatedIndex === 0;
+
+        buttons[1].disabled =
+          updatedIndex ===
+          updatedRows.length - 1;
+      }
+    );
+
     settingsChanged();
   }
 );
+
 minSizeInput.addEventListener(
   "input",
   () => {
@@ -766,6 +793,7 @@ minSizeInput.addEventListener(
     settingsChanged();
   }
 );
+
 maxSizeInput.addEventListener(
   "input",
   () => {
@@ -773,6 +801,7 @@ maxSizeInput.addEventListener(
     settingsChanged();
   }
 );
+
 tokenInput.addEventListener(
   "input",
   () => {
@@ -790,20 +819,24 @@ tokenInput.addEventListener(
     checkStatus.className = "";
   }
 );
+
 generateButton.addEventListener(
   "click",
   generate
 );
+
 saveConfiguration.addEventListener(
   "click",
   save
 );
+
 copyButton.addEventListener(
   "click",
   async () => {
     if (!manifestUrl.value) {
       return;
     }
+
     try {
       await navigator.clipboard.writeText(
         manifestUrl.value
@@ -816,8 +849,10 @@ copyButton.addEventListener(
         "copy"
       );
     }
+
     copyButton.textContent =
       "Copied";
+
     setTimeout(
       () => {
         copyButton.textContent =
@@ -827,6 +862,7 @@ copyButton.addEventListener(
     );
   }
 );
+
 installButton.addEventListener(
   "click",
   event => {
@@ -838,6 +874,7 @@ installButton.addEventListener(
     }
   }
 );
+
 })();
 `;
 }
@@ -1348,7 +1385,7 @@ html{
   background:var(--bg);
 }
 body{
-  margin:0 1.2vw;
+  margin:0 2.5vw;
   min-height:100vh;
   background:
     radial-gradient(
