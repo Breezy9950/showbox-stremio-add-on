@@ -1071,68 +1071,74 @@ export default async (
     // FebBox + AniZone
     // -----------------------------------------------------
 
-    const [
-      febboxStreams,
-      aniZoneStreams
-    ] = await Promise.all([
-      getFebboxStreams(
-        imdbId,
-        type,
-        season,
-        episode,
-        config
-      ).catch(error => {
-        console.error(
-          "[STREAM] FebBox provider failed:",
-          error?.stack ||
-            error?.message ||
-            error
-        );
+// -----------------------------------------------------
+// Provider selection
+//
+// FebBox + AniZone
+// -----------------------------------------------------
 
-        return [];
-      }),
-
-      getAniZoneStreams({
-        imdbId,
-        type,
-        season,
-        episode
-      }).catch(error => {
-        console.error(
-          "[STREAM] AniZone provider failed:",
-          error?.stack ||
-            error?.message ||
-            error
-        );
-
-        return [];
-      })
-    ]);
-
-    console.log(
-      "[STREAM] Provider results:",
-      {
-        febbox:
-          febboxStreams.length,
-
-        aniZone:
-          aniZoneStreams.length
-      }
+const [
+  febboxStreams,
+  aniZoneStreams
+] = await Promise.all([
+  getFebboxStreams({
+    imdbId,
+    type,
+    season,
+    episode,
+    token
+  }).catch(error => {
+    console.error(
+      "[STREAM] FebBox provider failed:",
+      error?.stack ||
+        error?.message ||
+        error
     );
 
-    // -----------------------------------------------------
-    // Combine provider results
-    // -----------------------------------------------------
+    return [];
+  }),
 
-    const providerStreams = [
-      ...febboxStreams,
-      ...aniZoneStreams
-    ];
+  getAniZoneStreams({
+    imdbId,
+    type,
+    season,
+    episode
+  }).catch(error => {
+    console.error(
+      "[STREAM] AniZone provider failed:",
+      error?.stack ||
+        error?.message ||
+        error
+    );
 
-    const streams =
-      dedupeStreams(
-        providerStreams
-      );
+    return [];
+  })
+]);
+
+console.log(
+  "[STREAM] Provider results:",
+  {
+    febbox:
+      febboxStreams.length,
+
+    aniZone:
+      aniZoneStreams.length
+  }
+);
+
+// -----------------------------------------------------
+// Combine provider results
+// -----------------------------------------------------
+
+const providerStreams = [
+  ...febboxStreams,
+  ...aniZoneStreams
+];
+
+const streams =
+  dedupeStreams(
+    providerStreams
+  );
 
     // -----------------------------------------------------
     // Common CAM / Telecine filtering
