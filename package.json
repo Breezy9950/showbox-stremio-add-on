@@ -3,6 +3,6 @@
   "dependencies": {
     "crypto-js": "^4.2.0",
     "@netlify/blobs": "^10.0.0",
-    "cheerio-without-node-native": "^2.1.2"
+    "cheerio": "^1.0.0"
   }
 }
