@@ -43,9 +43,9 @@ const meta =
     }
   );
 
-// ---------------------------------------------------------
-// Providers
-// ---------------------------------------------------------
+// =========================================================
+// PROVIDERS
+// =========================================================
 
 const providers = [
   new GogoanimeProvider(
@@ -114,12 +114,6 @@ async function getAniListId(
   const data =
     await response.json();
 
-  /*
-   * The mapper may expose the AniList
-   * value in different nesting depending
-   * on the returned mapping record.
-   */
-
   const candidates = [
     data?.anilist_id,
     data?.anilistId,
@@ -144,11 +138,6 @@ async function getAniListId(
       return id;
     }
   }
-
-  /*
-   * Some mapper responses return an
-   * array of mapping records.
-   */
 
   const records =
     Array.isArray(
@@ -191,102 +180,6 @@ async function getAniListId(
 }
 
 // =========================================================
-// SEASON OFFSET
-// =========================================================
-
-async function getSeasonOffset(
-  metaUrn,
-  season
-) {
-  if (
-    !Number.isFinite(
-      season
-    ) ||
-    season <= 1
-  ) {
-    return 0;
-  }
-
-  let current =
-    await meta.fetchMediaInfo(
-      metaUrn
-    );
-
-  let offset =
-    0;
-
-  const visited =
-    new Set();
-
-  /*
-   * AniList represents later seasons as
-   * sequel entries.
-
-   * Walk backwards through PREQUEL
-   * relations and add each previous
-   * season's episode count.
-   */
-
-  for (
-    let i = 0;
-    i < 8;
-    i++
-  ) {
-    if (
-      !current ||
-      visited.has(
-        current.id
-      )
-    ) {
-      break;
-    }
-
-    visited.add(
-      current.id
-    );
-
-    const prequel =
-      (
-        current.relations ||
-        []
-      ).find(
-        relation =>
-          relation.relationType ===
-          "PREQUEL"
-      );
-
-    if (
-      !prequel
-    ) {
-      break;
-    }
-
-    try {
-      const previous =
-        await meta.fetchMediaInfo(
-          prequel.id
-        );
-
-      if (
-        typeof previous.episodeCount ===
-        "number"
-      ) {
-        offset +=
-          previous.episodeCount;
-      }
-
-      current =
-        previous;
-
-    } catch {
-      break;
-    }
-  }
-
-  return offset;
-}
-
-// =========================================================
 // NORMALIZE SDK STREAM
 // =========================================================
 
@@ -323,7 +216,7 @@ function normalizeSdkStream(
       stream => {
         let quality =
           stream.quality ||
-          "auto";
+          "ORG";
 
         if (
           quality ===
@@ -386,7 +279,7 @@ function normalizeSdkStream(
 }
 
 // =========================================================
-// RESOLVE ONE PROVIDER
+// RESOLVE PROVIDER
 // =========================================================
 
 async function resolveProvider(
@@ -396,85 +289,56 @@ async function resolveProvider(
   providerName
 ) {
   try {
-    /*
-     * Fetch the provider's episode list
-     * through the SDK mapping layer.
-     */
-
-    const units =
-      await meta.fetchContentUnits(
+    console.log(
+      `[ANIME-SDK] Resolving ${providerName}`,
+      {
         metaUrn,
-        provider
-      );
-
-    if (
-      !Array.isArray(
-        units
-      ) ||
-      !units.length
-    ) {
-      console.log(
-        `[ANIME-SDK] ${providerName}: no episodes`
-      );
-
-      return [];
-    }
-
-    /*
-     * First try the requested episode
-     * directly.
-     */
-
-    let unit =
-      units.find(
-        item =>
-          item.number ===
+        episode:
           episodeNumber
-      );
+      }
+    );
 
     /*
-     * If this is a multi-season provider
-     * with continuous numbering, the
-     * caller can pass an absolute episode.
+     * IMPORTANT:
+     *
+     * Use the metadata layer's resolveStream()
+     * rather than manually calling
+     * fetchContentUnits() followed by
+     * provider.resolveStream().
+     *
+     * The metadata layer handles:
+     *
+     * AniList → provider mapping
+     * provider-native lookup
+     * MALSync / Anify / ARM fallback
+     * fuzzy matching
+     * absolute episode matching
      */
-
-    if (
-      !unit
-    ) {
-      console.log(
-        `[ANIME-SDK] ${providerName}: episode ${episodeNumber} not found`
-      );
-
-      return [];
-    }
-
-    const languages =
-      unit.availableLanguages ||
-      ["sub"];
-
-    /*
-     * Prefer sub, then fall back to
-     * whatever language the provider exposes.
-     */
-
-    const language =
-      languages.includes(
-        "sub"
-      )
-        ? "sub"
-        : languages[0];
 
     const resolved =
-      await provider.resolveStream(
-        unit.id,
-        language
+      await meta.resolveStream(
+        metaUrn,
+        episodeNumber,
+        provider,
+        "sub"
       );
 
-    return normalizeSdkStream(
-      resolved,
-      providerName,
-      episodeNumber
+    const streams =
+      normalizeSdkStream(
+        resolved,
+        providerName,
+        episodeNumber
+      );
+
+    console.log(
+      `[ANIME-SDK] ${providerName} resolved`,
+      {
+        streams:
+          streams.length
+      }
     );
+
+    return streams;
 
   } catch (
     error
@@ -509,9 +373,7 @@ export async function getAnimeSdkStreams({
   }
 
   /*
-   * The SDK is anime-oriented.
-   * Don't attempt to use it for
-   * non-anime content.
+   * Resolve IMDb → AniList.
    */
 
   const aniListId =
@@ -541,10 +403,9 @@ export async function getAnimeSdkStreams({
     }
   );
 
-  /*
-   * Movies are represented as a
-   * single content unit.
-   */
+  // -------------------------------------------------------
+  // Movie
+  // -------------------------------------------------------
 
   if (
     type ===
@@ -553,9 +414,7 @@ export async function getAnimeSdkStreams({
     const results =
       await Promise.all(
         providers.map(
-          (
-            provider
-          ) =>
+          provider =>
             resolveProvider(
               provider,
               metaUrn,
@@ -567,6 +426,10 @@ export async function getAnimeSdkStreams({
 
     return results.flat();
   }
+
+  // -------------------------------------------------------
+  // Series
+  // -------------------------------------------------------
 
   if (
     type !==
@@ -587,31 +450,19 @@ export async function getAnimeSdkStreams({
   }
 
   /*
-   * For S1 this is simply episode N.
+   * The SDK metadata layer itself handles
+   * absolute episode matching and PREQUEL
+   * offsets when appropriate.
    *
-   * For later seasons, walk AniList's
-   * PREQUEL chain to calculate the
-   * absolute episode number used by
-   * providers that concatenate seasons.
+   * Therefore we pass the requested
+   * season episode number directly.
    */
 
-  const offset =
-    await getSeasonOffset(
-      metaUrn,
-      season
-    );
-
-  const absoluteEpisode =
-    offset +
-    episode;
-
   console.log(
-    "[ANIME-SDK] Episode mapping:",
+    "[ANIME-SDK] Episode request:",
     {
       season,
-      episode,
-      offset,
-      absoluteEpisode
+      episode
     }
   );
 
@@ -622,7 +473,7 @@ export async function getAnimeSdkStreams({
           resolveProvider(
             provider,
             metaUrn,
-            absoluteEpisode,
+            episode,
             provider.id
           )
       )
