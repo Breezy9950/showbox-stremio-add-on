@@ -1,24 +1,45 @@
-import { getConfig } from "./config-store.js";
-import { getStreams as getFebboxStreams } from "./providers/febbox.js";
-import { getStore } from "@netlify/blobs";
+import {
+  getConfig
+} from "./config-store.js";
 
-const STREAM_CACHE_STORE = "showbox-stream-cache";
-const STREAM_CACHE_TTL_MS = 2 * 60 * 1000;
+import {
+  getStreams as getFebboxStreams
+} from "./providers/febbox.js";
+
+import {
+  getStore
+} from "@netlify/blobs";
+
+// =========================================================
+// STREAM CACHE
+// =========================================================
+
+const STREAM_CACHE_STORE =
+  "showbox-stream-cache";
+
+const STREAM_CACHE_TTL_MS =
+  2 * 60 * 1000;
+
+// ---------------------------------------------------------
+// Cache store
+// ---------------------------------------------------------
 
 function getStreamCacheStore() {
+
   return getStore({
-    name: STREAM_CACHE_STORE,
-    consistency: "strong"
+    name:
+      STREAM_CACHE_STORE,
+
+    consistency:
+      "strong"
+
   });
+
 }
 
-function getConfigCacheKey(config) {
-  return JSON.stringify({
-    qualities: config?.qualities ?? null,
-    fileSize: config?.fileSize ?? null,
-    filters: config?.filters ?? null
-  });
-}
+// ---------------------------------------------------------
+// Cache key
+// ---------------------------------------------------------
 
 function getStreamCacheKey(
   rawConfig,
@@ -28,84 +49,272 @@ function getStreamCacheKey(
   episode,
   config
 ) {
+
+  const configSettings =
+    JSON.stringify({
+
+      qualities:
+        config?.qualities ?? null,
+
+      fileSize:
+        config?.fileSize ?? null,
+
+      filters:
+        config?.filters ?? null
+
+    });
+
   return [
+
     rawConfig,
+
     type,
+
     imdbId,
+
     season ?? "",
+
     episode ?? "",
-    getConfigCacheKey(config)
-  ].join("|");
+
+    configSettings
+
+  ].join(
+    "|"
+  );
+
 }
 
-async function getCachedStreams(key) {
-  const store = getStreamCacheStore();
+// ---------------------------------------------------------
+// Read cache
+// ---------------------------------------------------------
 
-  const cached = await store.get(key, {
-    type: "json",
-    consistency: "strong"
-  });
+async function getCachedStreams(
+  cacheKey
+) {
 
-  if (!cached || typeof cached !== "object") {
-    return null;
-  }
-
-  const createdAt = Number(cached.createdAt);
-
-  if (!Number.isFinite(createdAt)) {
-    return null;
-  }
-
-  if (Date.now() - createdAt >= STREAM_CACHE_TTL_MS) {
-    return null;
-  }
-
-  if (!Array.isArray(cached.streams)) {
-    return null;
-  }
-
-  return cached.streams;
-}
-
-async function cacheStreams(key, streams) {
-  const store = getStreamCacheStore();
-
-  await store.setJSON(key, {
-    createdAt: Date.now(),
-    streams
-  });
-}
-
-function decodeBase64Config(value) {
   try {
-    const normalized = value
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
 
-    const padded =
-      normalized +
-      "=".repeat((4 - (normalized.length % 4)) % 4);
+    const store =
+      getStreamCacheStore();
 
-    const decoded = Buffer.from(padded, "base64").toString("utf8");
+    const cached =
+      await store.get(
+        cacheKey,
+        {
+          type:
+            "json",
 
-    return JSON.parse(decoded);
+          consistency:
+            "strong"
+        }
+      );
+
+    if (
+      !cached ||
+      typeof cached !== "object"
+    ) {
+
+      return null;
+
+    }
+
+    const createdAt =
+      Number(
+        cached.createdAt
+      );
+
+    if (
+      !Number.isFinite(
+        createdAt
+      )
+    ) {
+
+      return null;
+
+    }
+
+    if (
+      Date.now() -
+        createdAt >=
+      STREAM_CACHE_TTL_MS
+    ) {
+
+      return null;
+
+    }
+
+    if (
+      !Array.isArray(
+        cached.streams
+      )
+    ) {
+
+      return null;
+
+    }
+
+    return cached.streams;
+
   } catch {
+
     return null;
+
   }
+
 }
 
-async function loadConfig(rawConfig) {
-  if (
-    typeof rawConfig === "string" &&
-    /^[a-f0-9]{32}$/i.test(rawConfig)
+// ---------------------------------------------------------
+// Write cache
+// ---------------------------------------------------------
+
+async function cacheStreams(
+  cacheKey,
+  streams
+) {
+
+  try {
+
+    const store =
+      getStreamCacheStore();
+
+    await store.setJSON(
+      cacheKey,
+      {
+        createdAt:
+          Date.now(),
+
+        streams
+      }
+    );
+
+  } catch {
+
+    // Cache failure must never
+    // break stream discovery.
+
+  }
+
+}
+
+// =========================================================
+// Base64URL
+// =========================================================
+
+function decodeBase64Url(
+  value
+) {
+
+  let base64 =
+    value
+      .replace(
+        /-/g,
+        "+"
+      )
+      .replace(
+        /_/g,
+        "/"
+      );
+
+  while (
+    base64.length % 4
   ) {
-    return await getConfig(rawConfig);
+
+    base64 += "=";
+
   }
 
-  return decodeBase64Config(rawConfig);
+  return Buffer
+    .from(
+      base64,
+      "base64"
+    )
+    .toString(
+      "utf8"
+    );
 }
+
+// ---------------------------------------------------------
+// Legacy configuration parser
+// ---------------------------------------------------------
+
+function parseConfig(
+  rawConfig
+) {
+
+  try {
+
+    const decoded =
+      decodeBase64Url(
+        rawConfig
+      );
+
+    return JSON.parse(
+      decoded
+    );
+
+  } catch {
+
+    return {};
+
+  }
+
+}
+
+// ---------------------------------------------------------
+// Load configuration
+// ---------------------------------------------------------
+
+async function loadConfig(
+  rawConfig
+) {
+
+  /*
+   * Persistent configuration IDs are
+   * 32-character hexadecimal values.
+   */
+
+  if (
+    /^[a-f0-9]{32}$/i.test(
+      rawConfig
+    )
+  ) {
+
+    const storedConfig =
+      await getConfig(
+        rawConfig
+      );
+
+    if (
+      storedConfig &&
+      typeof storedConfig === "object" &&
+      !Array.isArray(
+        storedConfig
+      )
+    ) {
+
+      return storedConfig;
+
+    }
+
+  }
+
+  /*
+   * Preserve legacy Base64
+   * configuration support.
+   */
+
+  return parseConfig(
+    rawConfig
+  );
+
+}
+
+// =========================================================
+// QUALITY CONFIGURATION
+// =========================================================
 
 const DEFAULT_QUALITIES = [
+
   "ORG",
   "4K",
   "1440p",
@@ -113,22 +322,31 @@ const DEFAULT_QUALITIES = [
   "720p",
   "480p",
   "360p"
+
 ];
 
-function getCanonicalQuality(value) {
-  const text = String(value || "")
-    .trim()
-    .toLowerCase();
+// ---------------------------------------------------------
+// Canonical quality name
+// ---------------------------------------------------------
 
-  if (!text) {
-    return "";
-  }
+function getCanonicalQuality(
+  value
+) {
+
+  const text =
+    String(
+      value || ""
+    )
+      .trim()
+      .toLowerCase();
 
   if (
     text === "org" ||
     text === "original"
   ) {
+
     return "ORG";
+
   }
 
   if (
@@ -136,486 +354,851 @@ function getCanonicalQuality(value) {
     text === "2160p" ||
     text === "2160"
   ) {
+
     return "4K";
+
   }
 
   if (
     text === "1440p" ||
     text === "1440"
   ) {
+
     return "1440p";
+
   }
 
   if (
     text === "1080p" ||
     text === "1080"
   ) {
+
     return "1080p";
+
   }
 
   if (
     text === "720p" ||
     text === "720"
   ) {
+
     return "720p";
+
   }
 
   if (
     text === "480p" ||
     text === "480"
   ) {
+
     return "480p";
+
   }
 
   if (
     text === "360p" ||
     text === "360"
   ) {
+
     return "360p";
-  }
 
-  return "";
-}
-
-function normalizeQualityConfig(config) {
-  if (!Array.isArray(config?.qualities)) {
-    return {
-      priority: [...DEFAULT_QUALITIES],
-      enabled: new Set(DEFAULT_QUALITIES),
-      configured: false
-    };
-  }
-
-  const priority = [];
-  const enabled = new Set();
-
-  for (const item of config.qualities) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-
-    const quality = getCanonicalQuality(
-      item.name
-    );
-
-    if (!quality) {
-      continue;
-    }
-
-    if (!priority.includes(quality)) {
-      priority.push(quality);
-    }
-
-    if (item.enabled === true) {
-      enabled.add(quality);
-    }
-  }
-
-  for (const quality of DEFAULT_QUALITIES) {
-    if (!priority.includes(quality)) {
-      priority.push(quality);
-    }
-  }
-
-  return {
-    priority,
-    enabled,
-    configured: true
-  };
-}
-
-function getStreamQuality(stream) {
-  if (!stream) {
-    return "";
-  }
-
-  /*
-   * Current FebBox provider format:
-   *
-   * name:
-   *   "ShowBox"
-   *
-   * title:
-   *   "Movie Title\n4K • WEB-RIP • H.265"
-   *
-   * Extract the quality from the first part of the
-   * technical metadata line.
-   */
-
-  const title = String(stream.title || "");
-
-  const lines = title.split("\n");
-
-  const technicalLine = lines[1] || "";
-
-  const qualityPart =
-    technicalLine
-      .split("•")[0]
-      .trim();
-
-  const quality =
-    getCanonicalQuality(qualityPart);
-
-  if (quality) {
-    return quality;
-  }
-
-  /*
-   * Keep compatibility with streams where the quality
-   * may already be represented by the stream name.
-   */
-  const name = String(stream.name || "").trim();
-
-  const nameQuality =
-    getCanonicalQuality(name);
-
-  if (nameQuality) {
-    return nameQuality;
-  }
-
-  return "";
-}
-
-function applyQualitySettings(streams, config) {
-  const {
-    priority,
-    enabled
-  } = normalizeQualityConfig(config);
-
-  const priorityIndex = new Map(
-    priority.map((quality, index) => [
-      quality,
-      index
-    ])
-  );
-
-  const filtered = [];
-
-  for (const stream of streams) {
-    const quality = getStreamQuality(stream);
-
-    /*
-     * Preserve the existing behavior for streams whose
-     * quality cannot be detected.
-     */
-    if (!quality) {
-      filtered.push({
-        stream,
-        order: priority.length
-      });
-
-      continue;
-    }
-
-    if (!enabled.has(quality)) {
-      continue;
-    }
-
-    filtered.push({
-      stream,
-      order:
-        priorityIndex.get(quality) ??
-        priority.length
-    });
-  }
-
-  /*
-   * Stable grouping:
-   *
-   * ORG
-   * ORG
-   * ORG
-   * 4K
-   * 4K
-   * 1080p
-   * 1080p
-   *
-   * The original order of streams inside each quality
-   * group is preserved.
-   */
-  return filtered
-    .map((entry, index) => ({
-      ...entry,
-      originalIndex: index
-    }))
-    .sort((a, b) => {
-      if (a.order !== b.order) {
-        return a.order - b.order;
-      }
-
-      return a.originalIndex - b.originalIndex;
-    })
-    .map(entry => entry.stream);
-}
-
-function normalizeStreamFilters(config) {
-  const filters = config?.filters;
-
-  return {
-    cam:
-      filters &&
-      typeof filters === "object" &&
-      filters.cam === true
-  };
-}
-
-function isCamOrTelecine(stream) {
-  const text = String(stream?.title || "");
-
-  return /\b(?:TELECINE|TC|TELESYNC|TS|CAMRIP|CAM)\b/i.test(
-    text
-  );
-}
-
-function applyStreamFilters(streams, config) {
-  const filters =
-    normalizeStreamFilters(config);
-
-  if (filters.cam) {
-    return streams;
-  }
-
-  return streams.filter(
-    stream => !isCamOrTelecine(stream)
-  );
-}
-
-function parseSizeToGB(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  const text = String(value).trim();
-
-  if (!text) {
-    return null;
-  }
-
-  const match = text.match(
-    /([\d.]+)\s*(TB|GB|MB|KB|B)\b/i
-  );
-
-  if (!match) {
-    return null;
-  }
-
-  const amount = Number(match[1]);
-
-  if (!Number.isFinite(amount)) {
-    return null;
-  }
-
-  const unit = match[2].toUpperCase();
-
-  if (unit === "TB") {
-    return amount * 1024;
-  }
-
-  if (unit === "GB") {
-    return amount;
-  }
-
-  if (unit === "MB") {
-    return amount / 1024;
-  }
-
-  if (unit === "KB") {
-    return amount / (1024 * 1024);
-  }
-
-  if (unit === "B") {
-    return amount / (1024 * 1024 * 1024);
   }
 
   return null;
+
 }
 
-function applyFileSizeSettings(streams, config) {
-  const fileSize = config?.fileSize;
+// ---------------------------------------------------------
+// Normalize quality configuration
+// ---------------------------------------------------------
+
+function normalizeQualityConfig(
+  config
+) {
 
   if (
-    !fileSize ||
-    typeof fileSize !== "object"
+    !Array.isArray(
+      config?.qualities
+    )
   ) {
-    return streams;
+
+    return {
+
+      enabled:
+        new Set(
+          DEFAULT_QUALITIES
+        ),
+
+      priority:
+        DEFAULT_QUALITIES.slice(),
+
+      configured:
+        false
+
+    };
+
   }
 
-  const min =
-    fileSize.min !== undefined &&
-    fileSize.min !== null &&
-    fileSize.min !== ""
-      ? Number(fileSize.min)
-      : null;
+  const priority = [];
 
-  const max =
-    fileSize.max !== undefined &&
-    fileSize.max !== null &&
-    fileSize.max !== ""
-      ? Number(fileSize.max)
-      : null;
+  const enabled =
+    new Set();
 
-  if (
-    (min === null || !Number.isFinite(min)) &&
-    (max === null || !Number.isFinite(max))
+  for (
+    const item of config.qualities
   ) {
-    return streams;
-  }
-
-  return streams.filter(stream => {
-    const size = parseSizeToGB(
-      stream?.behaviorHints?.filename ||
-      stream?.title ||
-      stream?.name
-    );
-
-    if (size === null) {
-      return true;
-    }
 
     if (
-      min !== null &&
-      Number.isFinite(min) &&
-      size < min
+      !item ||
+      !item.name
     ) {
-      return false;
-    }
 
-    if (
-      max !== null &&
-      Number.isFinite(max) &&
-      size > max
-    ) {
-      return false;
-    }
-
-    return true;
-  });
-}
-
-function dedupeStreams(streams) {
-  const seen = new Set();
-  const result = [];
-
-  for (const stream of streams) {
-    const url = String(stream?.url || "");
-
-    if (!url) {
       continue;
+
     }
 
-    if (seen.has(url)) {
+    const name =
+      getCanonicalQuality(
+        item.name
+      );
+
+    if (
+      !name
+    ) {
+
       continue;
-    }
 
-    seen.add(url);
-    result.push(stream);
-  }
-
-  return result;
-}
-
-function parseRequestPath(request) {
-  const url = new URL(request.url);
-
-  const match = url.pathname.match(
-    /^\/([^/]+)\/stream\/([^/]+)\/(.+?)(?:\.json)?$/
-  );
-
-  if (!match) {
-    return null;
-  }
-
-  const rawConfig = decodeURIComponent(match[1]);
-  const type = decodeURIComponent(match[2]);
-  const rawId = decodeURIComponent(match[3]);
-
-  if (!rawConfig || !type || !rawId) {
-    return null;
-  }
-
-  let imdbId = rawId;
-  let season = null;
-  let episode = null;
-
-  if (type === "series") {
-    const parts = rawId.split(":");
-
-    imdbId = parts[0];
-
-    if (parts.length >= 2) {
-      season = Number(parts[1]);
-    }
-
-    if (parts.length >= 3) {
-      episode = Number(parts[2]);
     }
 
     if (
-      !imdbId ||
-      !Number.isInteger(season) ||
-      !Number.isInteger(episode)
+      !priority.includes(
+        name
+      )
     ) {
-      return null;
+
+      priority.push(
+        name
+      );
+
     }
+
+    if (
+      item.enabled === true
+    ) {
+
+      enabled.add(
+        name
+      );
+
+    }
+
+  }
+
+  for (
+    const quality of DEFAULT_QUALITIES
+  ) {
+
+    if (
+      !priority.includes(
+        quality
+      )
+    ) {
+
+      priority.push(
+        quality
+      );
+
+    }
+
   }
 
   return {
-    rawConfig,
-    type,
-    imdbId,
-    season,
-    episode
+
+    enabled,
+
+    priority,
+
+    configured:
+      true
+
   };
+
 }
 
-export async function handler(request) {
-  try {
-    const parsed =
-      parseRequestPath(request);
+// ---------------------------------------------------------
+// Get quality from stream
+// ---------------------------------------------------------
 
-    if (!parsed) {
-      return {
-        statusCode: 404,
-        headers: {
-          "Content-Type":
-            "application/json; charset=utf-8",
-          "Cache-Control": "no-store"
-        },
-        body: JSON.stringify({
-          streams: []
-        })
-      };
+function getStreamQuality(
+  stream
+) {
+
+  if (
+    !stream
+  ) {
+
+    return "";
+
+  }
+
+  const name =
+    getCanonicalQuality(
+      stream.name
+    );
+
+  if (
+    name
+  ) {
+
+    return name;
+
+  }
+
+  const title =
+    String(
+      stream.title || ""
+    );
+
+  const firstTechnicalLine =
+    title.split(
+      "\n"
+    )[1] || "";
+
+  /*
+   * Current provider title format:
+   *
+   * 4K • WEB-RIP • H.265
+   *
+   * Only the first section is the
+   * quality. The rest is technical
+   * metadata.
+   */
+
+  const qualityPart =
+    firstTechnicalLine
+      .split("•")[0]
+      .trim();
+
+  return (
+    getCanonicalQuality(
+      qualityPart
+    ) ||
+    ""
+  );
+
+}
+
+// ---------------------------------------------------------
+// Apply quality settings
+// ---------------------------------------------------------
+
+function applyQualitySettings(
+  streams,
+  config
+) {
+
+  const qualityConfig =
+    normalizeQualityConfig(
+      config
+    );
+
+  if (
+    !qualityConfig.configured
+  ) {
+
+    return streams;
+
+  }
+
+  const filtered =
+    streams.filter(
+      stream => {
+
+        const quality =
+          getStreamQuality(
+            stream
+          );
+
+        /*
+         * Unknown qualities remain
+         * available.
+         */
+
+        if (
+          !quality
+        ) {
+
+          return true;
+
+        }
+
+        return qualityConfig.enabled.has(
+          quality
+        );
+
+      }
+    );
+
+  filtered.sort(
+    (
+      a,
+      b
+    ) => {
+
+      const qa =
+        getStreamQuality(
+          a
+        );
+
+      const qb =
+        getStreamQuality(
+          b
+        );
+
+      const ia =
+        qa
+          ? qualityConfig.priority.indexOf(
+              qa
+            )
+          : Infinity;
+
+      const ib =
+        qb
+          ? qualityConfig.priority.indexOf(
+              qb
+            )
+          : Infinity;
+
+      return ia - ib;
+
     }
+  );
 
-    const {
-      rawConfig,
-      type,
-      imdbId,
-      season,
-      episode
-    } = parsed;
+  return filtered;
 
-    const config =
-      await loadConfig(rawConfig);
+}
+
+// =========================================================
+// STREAM FILTER CONFIGURATION
+// =========================================================
+
+const DEFAULT_STREAM_FILTERS = {
+
+  cam:
+    false
+
+};
+
+// ---------------------------------------------------------
+// Normalize filters
+// ---------------------------------------------------------
+
+function normalizeStreamFilterConfig(
+  config
+) {
+
+  const filters =
+    config?.filters;
+
+  if (
+    !filters ||
+    typeof filters !== "object"
+  ) {
+
+    return {
+      ...DEFAULT_STREAM_FILTERS
+    };
+
+  }
+
+  return {
+
+    cam:
+      filters.cam === true
+
+  };
+
+}
+
+// ---------------------------------------------------------
+// CAM / Telecine detection
+// ---------------------------------------------------------
+
+function isCamOrTelecine(
+  fileName
+) {
+
+  const text =
+    String(
+      fileName || ""
+    ).toUpperCase();
+
+  return (
+
+    /\bTELECINE\b/.test(
+      text
+    ) ||
+
+    /(?:^|[._\-\s])TC(?:$|[._\-\s])/.test(
+      text
+    ) ||
+
+    /\bTELESYNC\b/.test(
+      text
+    ) ||
+
+    /(?:^|[._\-\s])TS(?:$|[._\-\s])/.test(
+      text
+    ) ||
+
+    /\bCAMRIP\b/.test(
+      text
+    ) ||
+
+    /\bCAM\b/.test(
+      text
+    )
+
+  );
+
+}
+
+// ---------------------------------------------------------
+// Apply stream filters
+// ---------------------------------------------------------
+
+function applyStreamFilters(
+  streams,
+  config
+) {
+
+  const filters =
+    normalizeStreamFilterConfig(
+      config
+    );
+
+  return streams.filter(
+    stream => {
+
+      /*
+       * The provider puts the original
+       * filename into the stream title.
+       *
+       * Keep this check defensive.
+       */
+
+      const title =
+        String(
+          stream.title || ""
+        );
+
+      if (
+        !filters.cam &&
+        isCamOrTelecine(
+          title
+        )
+      ) {
+
+        return false;
+
+      }
+
+      return true;
+
+    }
+  );
+
+}
+
+// =========================================================
+// FILE SIZE CONFIGURATION
+// =========================================================
+
+// ---------------------------------------------------------
+// Parse file size into GB
+// ---------------------------------------------------------
+
+function parseSizeGb(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined
+  ) {
+
+    return null;
+
+  }
+
+  const text =
+    String(
+      value
+    )
+      .trim()
+      .toUpperCase();
+
+  const match =
+    text.match(
+      /^([\d.]+)\s*(TB|GB|MB|KB|B)$/
+    );
+
+  if (
+    !match
+  ) {
+
+    return null;
+
+  }
+
+  const number =
+    Number(
+      match[1]
+    );
+
+  if (
+    !Number.isFinite(
+      number
+    )
+  ) {
+
+    return null;
+
+  }
+
+  const unit =
+    match[2];
+
+  if (
+    unit === "TB"
+  ) {
+
+    return number * 1024;
+
+  }
+
+  if (
+    unit === "GB"
+  ) {
+
+    return number;
+
+  }
+
+  if (
+    unit === "MB"
+  ) {
+
+    return number / 1024;
+
+  }
+
+  if (
+    unit === "KB"
+  ) {
+
+    return number /
+      (1024 * 1024);
+
+  }
+
+  if (
+    unit === "B"
+  ) {
+
+    return number /
+      (1024 * 1024 * 1024);
+
+  }
+
+  return null;
+
+}
+
+// ---------------------------------------------------------
+// Apply file-size settings
+// ---------------------------------------------------------
+
+function applyFileSizeSettings(
+  streams,
+  config
+) {
+
+  const fileSize =
+    config?.fileSize;
+
+  if (
+    !fileSize ||
+    (
+      fileSize.minGb === null &&
+      fileSize.maxGb === null
+    )
+  ) {
+
+    return streams;
+
+  }
+
+  const minGb =
+    Number.isFinite(
+      Number(
+        fileSize.minGb
+      )
+    )
+      ? Number(
+          fileSize.minGb
+        )
+      : null;
+
+  const maxGb =
+    Number.isFinite(
+      Number(
+        fileSize.maxGb
+      )
+    )
+      ? Number(
+          fileSize.maxGb
+        )
+      : null;
+
+  if (
+    minGb === null &&
+    maxGb === null
+  ) {
+
+    return streams;
+
+  }
+
+  return streams.filter(
+    stream => {
+
+      const sizeGb =
+        parseSizeGb(
+          stream.size
+        );
+
+      /*
+       * Unknown sizes are kept.
+       */
+
+      if (
+        sizeGb === null
+      ) {
+
+        return true;
+
+      }
+
+      if (
+        minGb !== null &&
+        sizeGb < minGb
+      ) {
+
+        return false;
+
+      }
+
+      if (
+        maxGb !== null &&
+        sizeGb > maxGb
+      ) {
+
+        return false;
+
+      }
+
+      return true;
+
+    }
+  );
+
+}
+
+// =========================================================
+// DEDUPLICATION
+// =========================================================
+
+function dedupeStreams(
+  streams
+) {
+
+  const seen =
+    new Set();
+
+  return streams.filter(
+    stream => {
+
+      if (
+        !stream ||
+        !stream.url
+      ) {
+
+        return false;
+
+      }
+
+      if (
+        seen.has(
+          stream.url
+        )
+      ) {
+
+        return false;
+
+      }
+
+      seen.add(
+        stream.url
+      );
+
+      return true;
+
+    }
+  );
+
+}
+
+// =========================================================
+// MAIN HANDLER
+// =========================================================
+
+export default async (
+  req,
+  context
+) => {
+
+  try {
+
+    const url =
+      new URL(
+        req.url
+      );
+
+    const pathname =
+      url.pathname;
+
+    // -----------------------------------------------------
+    // Extract request
+    // -----------------------------------------------------
+
+    const match =
+      pathname.match(
+        /^\/([^/]+)\/stream\/([^/]+)\/(.+)$/
+      );
 
     if (
-      !config ||
-      typeof config !== "object" ||
-      typeof config.uiToken !== "string" ||
-      !config.uiToken
+      !match
     ) {
-      return {
-        statusCode: 200,
-        headers: {
-          "Content-Type":
-            "application/json; charset=utf-8",
-          "Cache-Control": "no-store"
-        },
-        body: JSON.stringify({
-          streams: []
-        })
-      };
+
+      throw new Error(
+        "Invalid stream request path"
+      );
+
     }
+
+    const rawConfig =
+      match[1];
+
+    const type =
+      match[2];
+
+    let rawId =
+      decodeURIComponent(
+        match[3]
+      );
+
+    // -----------------------------------------------------
+    // Remove .json
+    // -----------------------------------------------------
+
+    rawId =
+      rawId.replace(
+        /\.json$/,
+        ""
+      );
+
+    // -----------------------------------------------------
+    // Parse IMDb / season / episode
+    // -----------------------------------------------------
+
+    let imdbId;
+
+    let season;
+
+    let episode;
+
+    if (
+      type === "series"
+    ) {
+
+      const parts =
+        rawId.split(
+          ":"
+        );
+
+      imdbId =
+        parts[0];
+
+      season =
+        Number(
+          parts[1]
+        );
+
+      episode =
+        Number(
+          parts[2]
+        );
+
+      if (
+        !imdbId ||
+        !Number.isFinite(
+          season
+        ) ||
+        !Number.isFinite(
+          episode
+        )
+      ) {
+
+        throw new Error(
+          `Invalid series ID: ${rawId}`
+        );
+
+      }
+
+    } else {
+
+      imdbId =
+        rawId;
+
+    }
+
+    // -----------------------------------------------------
+    // Load persistent config
+    // -----------------------------------------------------
+
+    const config =
+      await loadConfig(
+        rawConfig
+      );
+
+    const token =
+      config.uiToken ||
+      "";
+
+    if (
+      !token
+    ) {
+
+      throw new Error(
+        "No ShowBox UI token configured"
+      );
+
+    }
+
+    // -----------------------------------------------------
+    // Cache lookup
+    // -----------------------------------------------------
 
     const cacheKey =
       getStreamCacheKey(
@@ -627,104 +1210,200 @@ export async function handler(request) {
         config
       );
 
-    const cached =
-      await getCachedStreams(cacheKey);
+    const cachedStreams =
+      await getCachedStreams(
+        cacheKey
+      );
 
-    if (cached) {
-      return {
-        statusCode: 200,
-        headers: {
-          "Content-Type":
-            "application/json; charset=utf-8",
-          "Cache-Control": "no-store",
-          "Access-Control-Allow-Origin": "*",
-          "X-Content-Type-Options": "nosniff",
-          "Referrer-Policy": "no-referrer"
-        },
-        body: JSON.stringify({
-          streams: cached
-        })
-      };
+    if (
+      cachedStreams
+    ) {
+
+      return new Response(
+        JSON.stringify({
+          streams:
+            cachedStreams
+        }),
+        {
+          status:
+            200,
+
+          headers: {
+
+            "Content-Type":
+              "application/json",
+
+            "Access-Control-Allow-Origin":
+              "*"
+
+          }
+
+        }
+      );
+
     }
+
+    // -----------------------------------------------------
+    // Provider selection
+    //
+    // FebBox is currently the only provider.
+    // Adding another provider later only requires
+    // registering it here.
+    // -----------------------------------------------------
 
     const providerStreams =
       await getFebboxStreams({
+
         imdbId,
+
         type,
+
         season,
+
         episode,
-        token: config.uiToken,
+
+        token,
+
         config
+
       });
 
-    let streams = Array.isArray(providerStreams)
-      ? providerStreams
-      : [];
+    // -----------------------------------------------------
+    // Combine provider results
+    // -----------------------------------------------------
 
-    streams = dedupeStreams(streams);
+    const streams =
+      dedupeStreams(
+        [
+          ...providerStreams
+        ]
+      );
 
-    streams = applyStreamFilters(
-      streams,
-      config
-    );
+    // -----------------------------------------------------
+    // Common CAM / Telecine filtering
+    // -----------------------------------------------------
 
-    streams = applyQualitySettings(
-      streams,
-      config
-    );
+    const filteredStreams =
+      applyStreamFilters(
+        streams,
+        config
+      );
 
-    streams = applyFileSizeSettings(
-      streams,
-      config
-    );
+    // -----------------------------------------------------
+    // Common quality settings
+    // -----------------------------------------------------
 
-    streams = dedupeStreams(streams);
+    const qualityFilteredStreams =
+      applyQualitySettings(
+        filteredStreams,
+        config
+      );
+
+    // -----------------------------------------------------
+    // Common file-size settings
+    // -----------------------------------------------------
+
+    const configuredStreams =
+      applyFileSizeSettings(
+        qualityFilteredStreams,
+        config
+      );
+
+    if (
+      !configuredStreams.length
+    ) {
+
+      throw new Error(
+        "No streams remain after filtering"
+      );
+
+    }
+
+    // -----------------------------------------------------
+    // Cache final provider-independent result
+    // -----------------------------------------------------
 
     await cacheStreams(
       cacheKey,
-      streams
+      configuredStreams
     );
 
-    return {
-      statusCode: 200,
-      headers: {
-        "Content-Type":
-          "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*",
-        "X-Content-Type-Options": "nosniff",
-        "Referrer-Policy": "no-referrer"
-      },
-      body: JSON.stringify({
-        streams
-      })
-    };
+    // -----------------------------------------------------
+    // Return Stremio response
+    // -----------------------------------------------------
+
+    return new Response(
+      JSON.stringify({
+        streams:
+          configuredStreams
+      }),
+      {
+        status:
+          200,
+
+        headers: {
+
+          "Content-Type":
+            "application/json",
+
+          "Access-Control-Allow-Origin":
+            "*"
+
+        }
+
+      }
+    );
+
   } catch {
-    return {
-      statusCode: 200,
-      headers: {
-        "Content-Type":
-          "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*",
-        "X-Content-Type-Options": "nosniff",
-        "Referrer-Policy": "no-referrer"
-      },
-      body: JSON.stringify({
+
+    return new Response(
+      JSON.stringify({
         streams: []
-      })
-    };
+      }),
+      {
+        status:
+          200,
+
+        headers: {
+
+          "Content-Type":
+            "application/json",
+
+          "Access-Control-Allow-Origin":
+            "*"
+
+        }
+
+      }
+    );
+
   }
-}
+
+};
+
+// =========================================================
+// NETLIFY ROUTE
+// =========================================================
 
 export const config = {
-  path: "/:config/stream/:type/:id.json",
+
+  path:
+    "/:config/stream/:type/:id.json",
+
   rateLimit: {
-    windowLimit: 60,
-    windowSize: 60,
-    aggregateBy: [
-      "ip",
-      "domain"
-    ]
+
+    windowLimit:
+      60,
+
+    windowSize:
+      60,
+
+    aggregateBy:
+      [
+        "ip",
+        "domain"
+      ]
+
   }
+
 };
