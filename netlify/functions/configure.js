@@ -99,8 +99,18 @@ function getConfigIdFromRequest(request){
   const url=new URL(request.url);
 
   const match=
-    url.pathname.match(/^\/configure\/([^/]+)\/?$/) ||
-    url.pathname.match(/^\/([^/]+)\/configure\/?$/);
+    url.pathname.match(/^\/configure\/([^/]+)(?:\/[a-f0-9]{32})?\/?$/i) ||
+    url.pathname.match(/^\/([^/]+)\/configure(?:\/[a-f0-9]{32})?\/?$/i);
+
+  return match?.[1]||null;
+}
+
+function getSessionIdFromRequest(request){
+  const url=new URL(request.url);
+
+  const match=
+    url.pathname.match(/^\/configure\/[^/]+\/([a-f0-9]{32})\/?$/i) ||
+    url.pathname.match(/^\/[^/]+\/configure\/([a-f0-9]{32})\/?$/i);
 
   return match?.[1]||null;
 }
@@ -161,7 +171,7 @@ function clientScript(){
     fileSize:initialFileSize,
     filters:initialFilters,
     sessionId,
-    expiresAt
+    remainingMs
   }=data;
 
   const qualityContainer=document.getElementById("qualities");
@@ -175,29 +185,34 @@ function clientScript(){
   const installButton=document.getElementById("install-button");
 
   function expire(){
-    window.location.replace("/__showbox_configure_expired__");
+    window.location.replace(
+      "/__showbox_configure_expired__"
+    );
   }
 
-  const remaining=Number(expiresAt)-Date.now();
+  const duration=Number(remainingMs);
 
   if(
     !sessionId ||
-    !Number.isFinite(Number(expiresAt)) ||
-    remaining<=0
+    !Number.isFinite(duration) ||
+    duration<=0
   ){
     expire();
     return;
   }
 
+  const clientDeadline=
+    performance.now()+duration;
+
   setTimeout(
     expire,
-    remaining
+    duration
   );
 
   window.addEventListener("pageshow",event=>{
     if(
       event.persisted ||
-      Date.now()>=Number(expiresAt)
+      performance.now()>=clientDeadline
     ){
       expire();
     }
@@ -265,7 +280,7 @@ function clientScript(){
   }
 
   async function saveConfiguration(){
-    if(Date.now()>=Number(expiresAt)){
+    if(performance.now()>=clientDeadline){
       expire();
       return;
     }
@@ -410,7 +425,9 @@ export const config={
   method:["GET","POST"],
   path:[
     "/configure/:config",
+    "/configure/:config/:session",
     "/:config/configure",
+    "/:config/configure/:session",
     "/configure-client.js"
   ]
 };
@@ -488,6 +505,9 @@ export default async function handler(request){
       );
     }
 
+    const pathSessionId=
+      getSessionIdFromRequest(request);
+
     const sessionId=body?.sessionId;
 
     if(
@@ -498,6 +518,13 @@ export default async function handler(request){
         {error:"Configuration session is required"},
         400
       );
+    }
+
+    if(
+      !pathSessionId||
+      pathSessionId!==sessionId
+    ){
+      return expiredResponse();
     }
 
     const session=
@@ -601,25 +628,21 @@ export default async function handler(request){
       return invalidConfigResponse();
     }
 
-    /*
-     * The session ID is bound to the Configure URL.
-     *
-     * First visit:
-     *   /configure/:config
-     *
-     * gets redirected to:
-     *   /configure/:config?__showbox_session=<id>
-     *
-     * Every later GET must provide that same session.
-     * Once it expires, the URL can no longer create a new session.
-     */
     const sessionId=
-      url.searchParams.get(
-        "__showbox_session"
-      );
+      getSessionIdFromRequest(request);
 
     let session;
 
+    /*
+     * First visit:
+     *   /configure/:config
+     *
+     * Create the temporary session and bind it to the URL:
+     *   /configure/:config/:session
+     *
+     * Once this session expires, the session-bound URL
+     * can never create another session.
+     */
     if(!sessionId){
       session=
         await createConfigureSession();
@@ -627,10 +650,8 @@ export default async function handler(request){
       const redirectUrl=
         new URL(request.url);
 
-      redirectUrl.searchParams.set(
-        "__showbox_session",
-        session.id
-      );
+      redirectUrl.pathname=
+        `${url.pathname.replace(/\\/$/,"")}/${session.id}`;
 
       return new Response(null,{
         status:302,
@@ -666,12 +687,22 @@ export default async function handler(request){
         existingConfig.filters
       );
 
+    const remainingMs=
+      Math.max(
+        0,
+        Number(session.expiresAt)-Date.now()
+      );
+
+    if(remainingMs<=0){
+      return expiredResponse();
+    }
+
     const configData=JSON.stringify({
       qualities,
       fileSize,
       filters,
       sessionId:session.id,
-      expiresAt:session.expiresAt
+      remainingMs
     }).replace(
       /</g,
       "\\u003c"
