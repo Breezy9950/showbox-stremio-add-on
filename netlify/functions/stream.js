@@ -448,48 +448,84 @@ function getStreamQuality(
     return "";
   }
 
-  const name =
+  // -------------------------------------------------------
+  // Check stream name
+  // -------------------------------------------------------
+
+  const nameText =
+    String(
+      stream.name || ""
+    ).trim();
+
+  const nameQuality =
     getCanonicalQuality(
-      stream.name
+      nameText
     );
 
   if (
-    name
+    nameQuality
   ) {
-    return name;
+    return nameQuality;
   }
+
+  const name4K =
+    /\b(?:4k|2160p|2160)\b/i.test(
+      nameText
+    );
+
+  if (
+    name4K
+  ) {
+    return "4K";
+  }
+
+  const nameResolution =
+    nameText.match(
+      /\b(1440p|1440|1080p|1080|720p|720|480p|480|360p|360)\b/i
+    );
+
+  if (
+    nameResolution
+  ) {
+    return getCanonicalQuality(
+      nameResolution[1]
+    ) || "";
+  }
+
+  // -------------------------------------------------------
+  // Check entire stream title
+  // -------------------------------------------------------
 
   const title =
     String(
       stream.title || ""
     );
 
-  const firstTechnicalLine =
-    title.split(
-      "\n"
-    )[1] || "";
+  const title4K =
+    /\b(?:4k|2160p|2160)\b/i.test(
+      title
+    );
 
-  /*
-   * Current provider title format:
-   *
-   * 4K • WEB-RIP • H.265
-   *
-   * Only the first section is the
-   * quality. The rest is technical
-   * metadata.
-   */
+  if (
+    title4K
+  ) {
+    return "4K";
+  }
 
-  const qualityPart =
-    firstTechnicalLine
-      .split("•")[0]
-      .trim();
+  const titleResolution =
+    title.match(
+      /\b(1440p|1440|1080p|1080|720p|720|480p|480|360p|360)\b/i
+    );
 
-  return (
-    getCanonicalQuality(
-      qualityPart
-    ) ||
-    ""
-  );
+  if (
+    titleResolution
+  ) {
+    return getCanonicalQuality(
+      titleResolution[1]
+    ) || "";
+  }
+
+  return "";
 }
 
 // ---------------------------------------------------------
@@ -536,6 +572,31 @@ function applyQualitySettings(
       }
     );
 
+  /*
+   * Create a direct priority lookup
+   * from the configured quality order.
+   */
+
+  const priorityMap =
+    new Map(
+      qualityConfig.priority.map(
+        (
+          quality,
+          index
+        ) => [
+          quality,
+          index
+        ]
+      )
+    );
+
+  /*
+   * Sort by quality priority.
+   *
+   * This groups all streams of the
+   * same quality together.
+   */
+
   filtered.sort(
     (
       a,
@@ -552,15 +613,21 @@ function applyQualitySettings(
         );
 
       const ia =
-        qa
-          ? qualityConfig.priority.indexOf(
+        qa &&
+        priorityMap.has(
+          qa
+        )
+          ? priorityMap.get(
               qa
             )
           : Infinity;
 
       const ib =
-        qb
-          ? qualityConfig.priority.indexOf(
+        qb &&
+        priorityMap.has(
+          qb
+        )
+          ? priorityMap.get(
               qb
             )
           : Infinity;
@@ -1061,35 +1128,36 @@ export default async (
       );
     }
 
-// -----------------------------------------------------
-// Provider selection
-// -----------------------------------------------------
+    // -----------------------------------------------------
+    // Provider selection
+    // -----------------------------------------------------
 
-    const febboxStreams = await getFebboxStreams({
-  imdbId,
-  type,
-  season,
-  episode,
-  token
-}).catch(error => {
-  console.error(
-    "[STREAM] FebBox provider failed:",
-    error?.stack ||
-      error?.message ||
-      error
-  );
+    const febboxStreams =
+      await getFebboxStreams({
+        imdbId,
+        type,
+        season,
+        episode,
+        token
+      }).catch(error => {
+        console.error(
+          "[STREAM] FebBox provider failed:",
+          error?.stack ||
+            error?.message ||
+            error
+        );
 
-  return [];
-});
+        return [];
+      });
 
-// -----------------------------------------------------
-// Combine provider results
-// -----------------------------------------------------
+    // -----------------------------------------------------
+    // Combine provider results
+    // -----------------------------------------------------
 
-const streams =
-  dedupeStreams(
-    febboxStreams
-  );
+    const streams =
+      dedupeStreams(
+        febboxStreams
+      );
 
     // -----------------------------------------------------
     // Common CAM / Telecine filtering
