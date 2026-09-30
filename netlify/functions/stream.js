@@ -7,6 +7,10 @@ import {
 } from "./providers/febbox.js";
 
 import {
+  getAniZoneStreams
+} from "./anizone.js";
+
+import {
   getStore
 } from "@netlify/blobs";
 
@@ -1069,7 +1073,16 @@ export default async (
     // registering it here.
     // -----------------------------------------------------
 
-const providerStreams =
+/*const providerStreams =
+  await getFebboxStreams(
+    imdbId,
+    type,
+    season,
+    episode,
+    config
+  );  */
+
+    const providerStreams =
   await getFebboxStreams(
     imdbId,
     type,
