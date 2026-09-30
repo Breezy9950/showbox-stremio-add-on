@@ -25,16 +25,13 @@ const STREAM_CACHE_TTL_MS =
 // ---------------------------------------------------------
 
 function getStreamCacheStore() {
-
   return getStore({
     name:
       STREAM_CACHE_STORE,
 
     consistency:
       "strong"
-
   });
-
 }
 
 // ---------------------------------------------------------
@@ -49,10 +46,8 @@ function getStreamCacheKey(
   episode,
   config
 ) {
-
   const configSettings =
     JSON.stringify({
-
       qualities:
         config?.qualities ?? null,
 
@@ -61,27 +56,16 @@ function getStreamCacheKey(
 
       filters:
         config?.filters ?? null
-
     });
 
   return [
-
     rawConfig,
-
     type,
-
     imdbId,
-
     season ?? "",
-
     episode ?? "",
-
     configSettings
-
-  ].join(
-    "|"
-  );
-
+  ].join("|");
 }
 
 // ---------------------------------------------------------
@@ -91,9 +75,7 @@ function getStreamCacheKey(
 async function getCachedStreams(
   cacheKey
 ) {
-
   try {
-
     const store =
       getStreamCacheStore();
 
@@ -113,9 +95,7 @@ async function getCachedStreams(
       !cached ||
       typeof cached !== "object"
     ) {
-
       return null;
-
     }
 
     const createdAt =
@@ -128,9 +108,7 @@ async function getCachedStreams(
         createdAt
       )
     ) {
-
       return null;
-
     }
 
     if (
@@ -138,9 +116,7 @@ async function getCachedStreams(
         createdAt >=
       STREAM_CACHE_TTL_MS
     ) {
-
       return null;
-
     }
 
     if (
@@ -148,19 +124,14 @@ async function getCachedStreams(
         cached.streams
       )
     ) {
-
       return null;
-
     }
 
     return cached.streams;
 
   } catch {
-
     return null;
-
   }
-
 }
 
 // ---------------------------------------------------------
@@ -171,9 +142,7 @@ async function cacheStreams(
   cacheKey,
   streams
 ) {
-
   try {
-
     const store =
       getStreamCacheStore();
 
@@ -188,12 +157,9 @@ async function cacheStreams(
     );
 
   } catch {
-
     // Cache failure must never
     // break stream discovery.
-
   }
-
 }
 
 // =========================================================
@@ -203,7 +169,6 @@ async function cacheStreams(
 function decodeBase64Url(
   value
 ) {
-
   let base64 =
     value
       .replace(
@@ -218,9 +183,7 @@ function decodeBase64Url(
   while (
     base64.length % 4
   ) {
-
     base64 += "=";
-
   }
 
   return Buffer
@@ -240,9 +203,7 @@ function decodeBase64Url(
 function parseConfig(
   rawConfig
 ) {
-
   try {
-
     const decoded =
       decodeBase64Url(
         rawConfig
@@ -253,11 +214,8 @@ function parseConfig(
     );
 
   } catch {
-
     return {};
-
   }
-
 }
 
 // ---------------------------------------------------------
@@ -267,7 +225,6 @@ function parseConfig(
 async function loadConfig(
   rawConfig
 ) {
-
   /*
    * Persistent configuration IDs are
    * 32-character hexadecimal values.
@@ -278,7 +235,6 @@ async function loadConfig(
       rawConfig
     )
   ) {
-
     const storedConfig =
       await getConfig(
         rawConfig
@@ -291,11 +247,8 @@ async function loadConfig(
         storedConfig
       )
     ) {
-
       return storedConfig;
-
     }
-
   }
 
   /*
@@ -306,7 +259,6 @@ async function loadConfig(
   return parseConfig(
     rawConfig
   );
-
 }
 
 // =========================================================
@@ -314,7 +266,6 @@ async function loadConfig(
 // =========================================================
 
 const DEFAULT_QUALITIES = [
-
   "ORG",
   "4K",
   "1440p",
@@ -322,7 +273,6 @@ const DEFAULT_QUALITIES = [
   "720p",
   "480p",
   "360p"
-
 ];
 
 // ---------------------------------------------------------
@@ -332,7 +282,6 @@ const DEFAULT_QUALITIES = [
 function getCanonicalQuality(
   value
 ) {
-
   const text =
     String(
       value || ""
@@ -344,9 +293,7 @@ function getCanonicalQuality(
     text === "org" ||
     text === "original"
   ) {
-
     return "ORG";
-
   }
 
   if (
@@ -354,58 +301,45 @@ function getCanonicalQuality(
     text === "2160p" ||
     text === "2160"
   ) {
-
     return "4K";
-
   }
 
   if (
     text === "1440p" ||
     text === "1440"
   ) {
-
     return "1440p";
-
   }
 
   if (
     text === "1080p" ||
     text === "1080"
   ) {
-
     return "1080p";
-
   }
 
   if (
     text === "720p" ||
     text === "720"
   ) {
-
     return "720p";
-
   }
 
   if (
     text === "480p" ||
     text === "480"
   ) {
-
     return "480p";
-
   }
 
   if (
     text === "360p" ||
     text === "360"
   ) {
-
     return "360p";
-
   }
 
   return null;
-
 }
 
 // ---------------------------------------------------------
@@ -415,15 +349,12 @@ function getCanonicalQuality(
 function normalizeQualityConfig(
   config
 ) {
-
   if (
     !Array.isArray(
       config?.qualities
     )
   ) {
-
     return {
-
       enabled:
         new Set(
           DEFAULT_QUALITIES
@@ -434,9 +365,7 @@ function normalizeQualityConfig(
 
       configured:
         false
-
     };
-
   }
 
   const priority = [];
@@ -447,14 +376,11 @@ function normalizeQualityConfig(
   for (
     const item of config.qualities
   ) {
-
     if (
       !item ||
       !item.name
     ) {
-
       continue;
-
     }
 
     const name =
@@ -465,9 +391,7 @@ function normalizeQualityConfig(
     if (
       !name
     ) {
-
       continue;
-
     }
 
     if (
@@ -475,54 +399,40 @@ function normalizeQualityConfig(
         name
       )
     ) {
-
       priority.push(
         name
       );
-
     }
 
     if (
       item.enabled === true
     ) {
-
       enabled.add(
         name
       );
-
     }
-
   }
 
   for (
     const quality of DEFAULT_QUALITIES
   ) {
-
     if (
       !priority.includes(
         quality
       )
     ) {
-
       priority.push(
         quality
       );
-
     }
-
   }
 
   return {
-
     enabled,
-
     priority,
-
     configured:
       true
-
   };
-
 }
 
 // ---------------------------------------------------------
@@ -532,13 +442,10 @@ function normalizeQualityConfig(
 function getStreamQuality(
   stream
 ) {
-
   if (
     !stream
   ) {
-
     return "";
-
   }
 
   const name =
@@ -549,9 +456,7 @@ function getStreamQuality(
   if (
     name
   ) {
-
     return name;
-
   }
 
   const title =
@@ -585,7 +490,6 @@ function getStreamQuality(
     ) ||
     ""
   );
-
 }
 
 // ---------------------------------------------------------
@@ -596,7 +500,6 @@ function applyQualitySettings(
   streams,
   config
 ) {
-
   const qualityConfig =
     normalizeQualityConfig(
       config
@@ -605,15 +508,12 @@ function applyQualitySettings(
   if (
     !qualityConfig.configured
   ) {
-
     return streams;
-
   }
 
   const filtered =
     streams.filter(
       stream => {
-
         const quality =
           getStreamQuality(
             stream
@@ -627,15 +527,12 @@ function applyQualitySettings(
         if (
           !quality
         ) {
-
           return true;
-
         }
 
         return qualityConfig.enabled.has(
           quality
         );
-
       }
     );
 
@@ -644,7 +541,6 @@ function applyQualitySettings(
       a,
       b
     ) => {
-
       const qa =
         getStreamQuality(
           a
@@ -670,12 +566,10 @@ function applyQualitySettings(
           : Infinity;
 
       return ia - ib;
-
     }
   );
 
   return filtered;
-
 }
 
 // =========================================================
@@ -683,10 +577,8 @@ function applyQualitySettings(
 // =========================================================
 
 const DEFAULT_STREAM_FILTERS = {
-
   cam:
     false
-
 };
 
 // ---------------------------------------------------------
@@ -696,7 +588,6 @@ const DEFAULT_STREAM_FILTERS = {
 function normalizeStreamFilterConfig(
   config
 ) {
-
   const filters =
     config?.filters;
 
@@ -704,20 +595,15 @@ function normalizeStreamFilterConfig(
     !filters ||
     typeof filters !== "object"
   ) {
-
     return {
       ...DEFAULT_STREAM_FILTERS
     };
-
   }
 
   return {
-
     cam:
       filters.cam === true
-
   };
-
 }
 
 // ---------------------------------------------------------
@@ -727,14 +613,12 @@ function normalizeStreamFilterConfig(
 function isCamOrTelecine(
   fileName
 ) {
-
   const text =
     String(
       fileName || ""
     ).toUpperCase();
 
   return (
-
     /\bTELECINE\b/.test(
       text
     ) ||
@@ -758,9 +642,7 @@ function isCamOrTelecine(
     /\bCAM\b/.test(
       text
     )
-
   );
-
 }
 
 // ---------------------------------------------------------
@@ -771,7 +653,6 @@ function applyStreamFilters(
   streams,
   config
 ) {
-
   const filters =
     normalizeStreamFilterConfig(
       config
@@ -779,7 +660,6 @@ function applyStreamFilters(
 
   return streams.filter(
     stream => {
-
       /*
        * The provider puts the original
        * filename into the stream title.
@@ -798,16 +678,12 @@ function applyStreamFilters(
           title
         )
       ) {
-
         return false;
-
       }
 
       return true;
-
     }
   );
-
 }
 
 // =========================================================
@@ -821,14 +697,11 @@ function applyStreamFilters(
 function parseSizeGb(
   value
 ) {
-
   if (
     value === null ||
     value === undefined
   ) {
-
     return null;
-
   }
 
   const text =
@@ -846,9 +719,7 @@ function parseSizeGb(
   if (
     !match
   ) {
-
     return null;
-
   }
 
   const number =
@@ -861,9 +732,7 @@ function parseSizeGb(
       number
     )
   ) {
-
     return null;
-
   }
 
   const unit =
@@ -872,47 +741,36 @@ function parseSizeGb(
   if (
     unit === "TB"
   ) {
-
     return number * 1024;
-
   }
 
   if (
     unit === "GB"
   ) {
-
     return number;
-
   }
 
   if (
     unit === "MB"
   ) {
-
     return number / 1024;
-
   }
 
   if (
     unit === "KB"
   ) {
-
     return number /
       (1024 * 1024);
-
   }
 
   if (
     unit === "B"
   ) {
-
     return number /
       (1024 * 1024 * 1024);
-
   }
 
   return null;
-
 }
 
 // ---------------------------------------------------------
@@ -923,7 +781,6 @@ function applyFileSizeSettings(
   streams,
   config
 ) {
-
   const fileSize =
     config?.fileSize;
 
@@ -934,9 +791,7 @@ function applyFileSizeSettings(
       fileSize.maxGb === null
     )
   ) {
-
     return streams;
-
   }
 
   const minGb =
@@ -965,14 +820,11 @@ function applyFileSizeSettings(
     minGb === null &&
     maxGb === null
   ) {
-
     return streams;
-
   }
 
   return streams.filter(
     stream => {
-
       const sizeGb =
         parseSizeGb(
           stream.size
@@ -985,34 +837,26 @@ function applyFileSizeSettings(
       if (
         sizeGb === null
       ) {
-
         return true;
-
       }
 
       if (
         minGb !== null &&
         sizeGb < minGb
       ) {
-
         return false;
-
       }
 
       if (
         maxGb !== null &&
         sizeGb > maxGb
       ) {
-
         return false;
-
       }
 
       return true;
-
     }
   );
-
 }
 
 // =========================================================
@@ -1022,20 +866,16 @@ function applyFileSizeSettings(
 function dedupeStreams(
   streams
 ) {
-
   const seen =
     new Set();
 
   return streams.filter(
     stream => {
-
       if (
         !stream ||
         !stream.url
       ) {
-
         return false;
-
       }
 
       if (
@@ -1043,9 +883,7 @@ function dedupeStreams(
           stream.url
         )
       ) {
-
         return false;
-
       }
 
       seen.add(
@@ -1053,10 +891,8 @@ function dedupeStreams(
       );
 
       return true;
-
     }
   );
-
 }
 
 // =========================================================
@@ -1067,9 +903,7 @@ export default async (
   req,
   context
 ) => {
-
   try {
-
     const url =
       new URL(
         req.url
@@ -1090,11 +924,9 @@ export default async (
     if (
       !match
     ) {
-
       throw new Error(
         "Invalid stream request path"
       );
-
     }
 
     const rawConfig =
@@ -1123,15 +955,12 @@ export default async (
     // -----------------------------------------------------
 
     let imdbId;
-
     let season;
-
     let episode;
 
     if (
       type === "series"
     ) {
-
       const parts =
         rawId.split(
           ":"
@@ -1159,18 +988,14 @@ export default async (
           episode
         )
       ) {
-
         throw new Error(
           `Invalid series ID: ${rawId}`
         );
-
       }
 
     } else {
-
       imdbId =
         rawId;
-
     }
 
     // -----------------------------------------------------
@@ -1189,11 +1014,9 @@ export default async (
     if (
       !token
     ) {
-
       throw new Error(
         "No ShowBox UI token configured"
       );
-
     }
 
     // -----------------------------------------------------
@@ -1218,7 +1041,6 @@ export default async (
     if (
       cachedStreams
     ) {
-
       return new Response(
         JSON.stringify({
           streams:
@@ -1229,18 +1051,14 @@ export default async (
             200,
 
           headers: {
-
             "Content-Type":
               "application/json",
 
             "Access-Control-Allow-Origin":
               "*"
-
           }
-
         }
       );
-
     }
 
     // -----------------------------------------------------
@@ -1253,19 +1071,12 @@ export default async (
 
     const providerStreams =
       await getFebboxStreams({
-
         imdbId,
-
         type,
-
         season,
-
         episode,
-
         token,
-
         config
-
       });
 
     // -----------------------------------------------------
@@ -1312,11 +1123,9 @@ export default async (
     if (
       !configuredStreams.length
     ) {
-
       throw new Error(
         "No streams remain after filtering"
       );
-
     }
 
     // -----------------------------------------------------
@@ -1342,20 +1151,16 @@ export default async (
           200,
 
         headers: {
-
           "Content-Type":
             "application/json",
 
           "Access-Control-Allow-Origin":
             "*"
-
         }
-
       }
     );
 
   } catch {
-
     return new Response(
       JSON.stringify({
         streams: []
@@ -1365,20 +1170,15 @@ export default async (
           200,
 
         headers: {
-
           "Content-Type":
             "application/json",
 
           "Access-Control-Allow-Origin":
             "*"
-
         }
-
       }
     );
-
   }
-
 };
 
 // =========================================================
@@ -1386,24 +1186,19 @@ export default async (
 // =========================================================
 
 export const config = {
-
   path:
     "/:config/stream/:type/:id.json",
 
   rateLimit: {
-
     windowLimit:
       60,
 
     windowSize:
       60,
 
-    aggregateBy:
-      [
-        "ip",
-        "domain"
-      ]
-
+    aggregateBy: [
+      "ip",
+      "domain"
+    ]
   }
-
 };
