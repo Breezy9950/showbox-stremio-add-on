@@ -1082,27 +1082,31 @@ export default async (
     config
   );  */
 
-    const providerStreams =
-  await getFebboxStreams(
+  const [febboxStreams,aniZoneStreams] = await Promise.all([
+  getFebboxStreams(
     imdbId,
     type,
     season,
     episode,
     config
-  );
+  ).catch(() => []),
+  getAniZoneStreams({
+    imdbId,
+    type,
+    season,
+    episode
+  }).catch(() => [])
+]);
 
 // -----------------------------------------------------
 // Combine provider results
 // -----------------------------------------------------
 
-const streams =
-  dedupeStreams(
-    providerStreams
-  );
-// -----------------------------------------------------
-// Combine provider results
-// -----------------------------------------------------
-
+const providerStreams = [
+  ...febboxStreams,
+  ...aniZoneStreams
+];
+    
 const streams =
   dedupeStreams(
     providerStreams
