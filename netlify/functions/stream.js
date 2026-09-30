@@ -1069,26 +1069,31 @@ export default async (
     // registering it here.
     // -----------------------------------------------------
 
-    const providerStreams =
-      await getFebboxStreams({
-        imdbId,
-        type,
-        season,
-        episode,
-        token,
-        config
-      });
+const providerStreams =
+  await getFebboxStreams(
+    imdbId,
+    type,
+    season,
+    episode,
+    config
+  );
 
-    // -----------------------------------------------------
-    // Combine provider results
-    // -----------------------------------------------------
+// -----------------------------------------------------
+// Combine provider results
+// -----------------------------------------------------
 
-    const streams =
-      dedupeStreams(
-        [
-          ...providerStreams
-        ]
-      );
+const streams =
+  dedupeStreams(
+    providerStreams
+  );
+// -----------------------------------------------------
+// Combine provider results
+// -----------------------------------------------------
+
+const streams =
+  dedupeStreams(
+    providerStreams
+  );
 
     // -----------------------------------------------------
     // Common CAM / Telecine filtering
