@@ -4,12 +4,6 @@ import {
   getConfig
 } from "./config-store.js";
 
-const TMDB_API_KEY =
-  "439c478a771f35c05022f9feabcca01c";
-
-const TMDB_BASE_URL =
-  "https://api.themoviedb.org/3";
-
 // ---------------------------------------------------------
 // Base64URL
 // ---------------------------------------------------------
@@ -201,103 +195,6 @@ function parseSingleToken(
     );
 
     return token;
-  }
-}
-
-// ---------------------------------------------------------
-// IMDb -> TMDB
-// ---------------------------------------------------------
-
-async function imdbToTmdb(
-  imdbId
-) {
-  console.log(
-    "[ShowBox] TMDB lookup:",
-    imdbId
-  );
-
-  const response =
-    await fetch(
-      `${TMDB_BASE_URL}/find/${encodeURIComponent(imdbId)}?api_key=${TMDB_API_KEY}&external_source=imdb_id`
-    );
-
-  console.log(
-    "[ShowBox] TMDB response:",
-    response.status
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `TMDB lookup failed: HTTP ${response.status}`
-    );
-  }
-
-  const data =
-    await response.json();
-
-  const movieResults =
-    Array.isArray(
-      data.movie_results
-    )
-      ? data.movie_results
-      : [];
-
-  const tvResults =
-    Array.isArray(
-      data.tv_results
-    )
-      ? data.tv_results
-      : [];
-
-  const result =
-    movieResults[0] ||
-    tvResults[0];
-
-  if (
-    !result ||
-    !result.id
-  ) {
-    throw new Error(
-      `TMDB ID not found for ${imdbId}`
-    );
-  }
-
-  console.log(
-    "[ShowBox] TMDB result:",
-    result.id
-  );
-
-  return String(
-    result.id
-  );
-}
-
-// ---------------------------------------------------------
-// TMDB title information
-// ---------------------------------------------------------
-
-async function getTMDBDetails(
-  tmdbId,
-  type
-) {
-  try {
-    const endpoint =
-      type === "series"
-        ? `/tv/${tmdbId}`
-        : `/movie/${tmdbId}`;
-
-    const response =
-      await fetch(
-        `${TMDB_BASE_URL}${endpoint}?api_key=${TMDB_API_KEY}`
-      );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    return await response.json();
-  } catch {
-    return null;
   }
 }
 
@@ -1166,6 +1063,141 @@ function cleanFilename(
 }
 
 // ---------------------------------------------------------
+// Extract title from FebBox filename
+// ---------------------------------------------------------
+
+function getTitleFromFilename(
+  fileName,
+  type
+) {
+  let title =
+    cleanFilename(
+      fileName
+    );
+
+  if (!title) {
+    return "";
+  }
+
+  /*
+   * For series, everything before S01E01
+   * is treated as the title.
+   */
+
+  if (
+    type === "series"
+  ) {
+    const episodeMatch =
+      title.match(
+        /(?:^|[\s._-])S\d{1,2}E\d{1,3}(?:[\s._-]|$)/i
+      );
+
+    if (
+      episodeMatch &&
+      episodeMatch.index !== undefined
+    ) {
+      title =
+        title
+          .slice(
+            0,
+            episodeMatch.index
+          )
+          .trim();
+    }
+  }
+
+  /*
+   * For movies and series, stop before the
+   * first recognizable release/technical marker.
+   */
+
+  const markers = [
+    /\s+(?:2160p|2160|4K)\b/i,
+    /\s+1440p\b/i,
+    /\s+1080p\b/i,
+    /\s+720p\b/i,
+    /\s+480p\b/i,
+    /\s+360p\b/i,
+    /\s+WEB[- .]?DL\b/i,
+    /\s+WEBDL\b/i,
+    /\s+WEB[- .]?RIP\b/i,
+    /\s+WEBRIP\b/i,
+    /\s+BLU[- .]?RAY\b/i,
+    /\s+BLURAY\b/i,
+    /\s+BDRIP\b/i,
+    /\s+TELECINE\b/i,
+    /\s+TELESYNC\b/i,
+    /\s+CAMRIP\b/i,
+    /\s+CAM\b/i,
+    /\s+HEVC\b/i,
+    /\s+H[ ._-]?265\b/i,
+    /\s+X265\b/i,
+    /\s+AVC\b/i,
+    /\s+H[ ._-]?264\b/i,
+    /\s+X264\b/i,
+    /\s+AV1\b/i,
+    /\s+DOLBY[ ._-]?VISION\b/i,
+    /\s+HDR10\+\b/i,
+    /\s+HDR10\b/i,
+    /\s+HDR\b/i,
+    /\s+ATMOS\b/i,
+    /\s+DDP[ ._-]?7[ ._-]?1\b/i,
+    /\s+DDP[ ._-]?5[ ._-]?1\b/i,
+    /\s+DD[ ._-]?5[ ._-]?1\b/i,
+    /\s+DTS\b/i,
+    /\s+AAC\b/i
+  ];
+
+  let cutIndex =
+    title.length;
+
+  for (
+    const marker of markers
+  ) {
+    const match =
+      title.match(
+        marker
+      );
+
+    if (
+      match &&
+      match.index !== undefined &&
+      match.index < cutIndex
+    ) {
+      cutIndex =
+        match.index;
+    }
+  }
+
+  title =
+    title
+      .slice(
+        0,
+        cutIndex
+      )
+      .trim();
+
+  /*
+   * Clean trailing separators left behind
+   * after removing the technical portion.
+   */
+
+  title =
+    title
+      .replace(
+        /[\s._-]+$/,
+        ""
+      )
+      .replace(
+        /[_]+/g,
+        " "
+      )
+      .trim();
+
+  return title;
+}
+
+// ---------------------------------------------------------
 // Technical metadata
 // ---------------------------------------------------------
 
@@ -1670,52 +1702,6 @@ function getSubtitleLanguages(
 }
 
 // ---------------------------------------------------------
-// Title
-// ---------------------------------------------------------
-
-function buildTitle(
-  tmdbDetails,
-  type
-) {
-  if (!tmdbDetails) {
-    return "";
-  }
-
-  if (
-    type === "series"
-  ) {
-    return (
-      tmdbDetails.name ||
-      tmdbDetails.original_name ||
-      ""
-    );
-  }
-
-  const title =
-    tmdbDetails.title ||
-    tmdbDetails.original_title ||
-    "";
-
-  const releaseDate =
-    tmdbDetails.release_date ||
-    "";
-
-  const year =
-    releaseDate
-      ? releaseDate.slice(0, 4)
-      : "";
-
-  if (
-    title &&
-    year
-  ) {
-    return `${title} (${year})`;
-  }
-
-  return title;
-}
-
-// ---------------------------------------------------------
 // Stream technical line
 // ---------------------------------------------------------
 
@@ -1767,7 +1753,6 @@ function buildTechnicalLine(
 
 function buildStreamTitle(
   item,
-  tmdbDetails,
   type,
   season,
   episode
@@ -1775,8 +1760,8 @@ function buildStreamTitle(
   const lines = [];
 
   const title =
-    buildTitle(
-      tmdbDetails,
+    getTitleFromFilename(
+      item.fileName,
       type
     );
 
@@ -1856,7 +1841,6 @@ function buildStreamTitle(
 
 function buildFebboxStreams(
   qualityResults,
-  tmdbDetails,
   type,
   season,
   episode
@@ -1873,7 +1857,6 @@ function buildFebboxStreams(
       title:
         buildStreamTitle(
           item,
-          tmdbDetails,
           type,
           season,
           episode
@@ -2161,12 +2144,32 @@ function getStreamQuality(
   /*
    * The quality is normally the first part
    * of the technical line.
+   *
+   * The title structure is:
+   *
+   * Movie:
+   *   title
+   *   technical
+   *   size
+   *
+   * Series:
+   *   title
+   *   S01E01
+   *   technical
+   *   size
+   *
+   * Preserve the existing series behavior.
    */
 
-  const firstLine =
+  const lines =
     title.split(
       "\n"
-    )[2] || "";
+    );
+
+  const firstLine =
+    lines.length >= 4
+      ? lines[2] || ""
+      : lines[1] || "";
 
   const qualityFromTitle =
     getCanonicalQuality(
@@ -2785,43 +2788,6 @@ export default async (
     }
 
     // -----------------------------------------------------
-    // IMDb -> TMDB
-    // -----------------------------------------------------
-
-    const tmdbId =
-      await imdbToTmdb(
-        imdbId
-      );
-
-    console.log(
-      `[ShowBox][${requestId}] TMDB:`,
-      tmdbId
-    );
-
-    // -----------------------------------------------------
-    // Get title metadata
-    // -----------------------------------------------------
-
-    const tmdbDetails =
-      await getTMDBDetails(
-        tmdbId,
-        type
-      );
-
-    console.log(
-      `[ShowBox][${requestId}] TMDB details:`,
-      {
-        found:
-          !!tmdbDetails,
-
-        title:
-          tmdbDetails?.title ||
-          tmdbDetails?.name ||
-          null
-      }
-    );
-
-    // -----------------------------------------------------
     // Parse ShowBox token
     // -----------------------------------------------------
 
@@ -2940,7 +2906,6 @@ export default async (
     const febboxStreams =
       buildFebboxStreams(
         filteredQualityResults,
-        tmdbDetails,
         type,
         season,
         episode
