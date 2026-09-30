@@ -1551,6 +1551,4 @@ async function getStreams({
   return finalStreams;
 }
 
-module.exports = {
-  getStreams
-};
+export { getStreams };
