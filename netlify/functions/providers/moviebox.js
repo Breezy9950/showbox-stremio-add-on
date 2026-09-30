@@ -1,11 +1,12 @@
 // netlify/functions/providers/moviebox.js
 console.log("[MovieBox PROVIDER] EXACT-NUVIO-2026-09-30-B");
+
 import CryptoJS from "crypto-js";
 
 // ============================================================
 // MovieBox - adapted from the exact working Nuvio implementation
 //
-// Only adapter changes:
+// Adapter changes:
 //   1. Accept IMDb ID instead of TMDB ID
 //   2. Resolve IMDb -> TMDB
 //   3. Export ESM getStreams() for the Netlify addon
@@ -577,36 +578,26 @@ async function movieBoxRequest(
           options
         );
 
+      // ======================================================
+      // DIAGNOSTIC 403/429/5XX HANDLING
+      // ======================================================
+
       if (!res.ok) {
-  let errorBody = "";
+        let errorBody = "";
 
-  try {
-    errorBody = await res.text();
-  } catch {}
+        try {
+          errorBody = await res.text();
+        } catch {}
 
-  console.log(
-    `[MovieBox] Request failed: ${res.status} ${requestUrl.host}`
-  );
+        console.log(
+          `[MovieBox] Request failed: ${res.status} ${requestUrl.host}`
+        );
 
-  if (errorBody) {
-    console.log(
-      `[MovieBox] Error body: ${errorBody.slice(0, 1000)}`
-    );
-  }
-
-  if (
-    (
-      res.status === 403 ||
-      res.status === 429 ||
-      res.status >= 500
-    ) &&
-    attempt + 1 < maxAttempts
-  ) {
-    continue;
-  }
-
-  return null;
-}
+        if (errorBody) {
+          console.log(
+            `[MovieBox] Error body: ${errorBody.slice(0, 1000)}`
+          );
+        }
 
         if (
           (
@@ -621,6 +612,10 @@ async function movieBoxRequest(
 
         return null;
       }
+
+      // ======================================================
+      // SUCCESSFUL RESPONSE
+      // ======================================================
 
       const text =
         await res.text();
@@ -656,8 +651,7 @@ async function movieBoxRequest(
                 token;
             }
           } catch {
-            // Same behavior as original:
-            // ignore malformed x-user here.
+            // Ignore malformed x-user.
           }
         }
       }
@@ -841,8 +835,6 @@ async function searchMovieBox(
   const url =
     `${API_BASE}/wefeed-mobile-bff/subject-api/search/v2`;
 
-  // IMPORTANT:
-  // The original plugin signs the STRINGIFIED body.
   const body =
     JSON.stringify({
       page: 1,
@@ -1328,8 +1320,7 @@ function getAudioLabel(
     language
   ) {
     language =
-      language.charAt(0)
-        .toUpperCase() +
+      language.charAt(0).toUpperCase() +
       language.slice(1);
   } else {
     language =
@@ -1950,7 +1941,7 @@ async function getStreamLinks(
     }
   }
 
-  // This is the ordering used by the original Nuvio source.
+  // Original Nuvio quality ordering.
   // No streams are removed based on quality.
   const qualityRank = {
     "2160p": 2160,
@@ -2101,7 +2092,7 @@ async function fetchSubtitles(
         );
     }
   } catch {
-    // Same as original.
+    // Ignore subtitle errors.
   }
 
   try {
@@ -2157,7 +2148,7 @@ async function fetchSubtitles(
         );
     }
   } catch {
-    // Same as original.
+    // Ignore subtitle errors.
   }
 
   return subtitles;
@@ -2165,19 +2156,6 @@ async function fetchSubtitles(
 
 // ============================================================
 // PUBLIC STREMIO ADAPTER
-// ============================================================
-//
-// Your stream.js calls:
-//
-// getStreams({
-//   imdbId,
-//   type,
-//   season,
-//   episode
-// })
-//
-// MovieBox itself still operates using the original TMDB-based
-// flow internally.
 // ============================================================
 
 export async function getStreams({
