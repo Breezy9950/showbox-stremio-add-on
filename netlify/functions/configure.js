@@ -120,6 +120,39 @@ function normalizeQualities(qualities) {
   return result;
 }
 
+function qualityRowsHtml(qualities) {
+  return qualities.map(
+    (quality, index) => `
+<div class="quality-row">
+
+<input
+class="quality-check"
+type="checkbox"
+${quality.enabled ? "checked" : ""}
+>
+
+<div class="quality-name">
+${quality.name}
+</div>
+
+<div class="quality-controls">
+
+<button
+type="button"
+${index === 0 ? "disabled" : ""}
+>↑</button>
+
+<button
+type="button"
+${index === qualities.length - 1 ? "disabled" : ""}
+>↓</button>
+
+</div>
+
+</div>`
+  ).join("");
+}
+
 function normalizeFilters(filters) {
   if (
     !filters ||
@@ -440,165 +473,165 @@ if (dataElement) {
   }
 
   function renderQualities() {
-  qualityList.innerHTML = "";
+    qualityList.innerHTML = "";
 
-  qualities.forEach(
-    (quality, index) => {
-      const row =
-        document.createElement(
-          "div"
-        );
+    qualities.forEach(
+      (quality, index) => {
+        const row =
+          document.createElement(
+            "div"
+          );
 
-      row.className =
-        "quality-row";
+        row.className =
+          "quality-row";
 
-      const checkbox =
-        document.createElement(
-          "input"
-        );
+        const checkbox =
+          document.createElement(
+            "input"
+          );
 
-      checkbox.type =
-        "checkbox";
+        checkbox.type =
+          "checkbox";
 
-      checkbox.className =
-        "quality-check";
+        checkbox.className =
+          "quality-check";
 
-      checkbox.checked =
-        quality.enabled;
+        checkbox.checked =
+          quality.enabled;
 
-      checkbox.addEventListener(
-        "change",
-        () => {
-          quality.enabled =
-            checkbox.checked;
+        checkbox.addEventListener(
+          "change",
+          () => {
+            quality.enabled =
+              checkbox.checked;
 
-          invalidateResult();
-        }
-      );
-
-      const name =
-        document.createElement(
-          "div"
-        );
-
-      name.className =
-        "quality-name";
-
-      name.textContent =
-        quality.name;
-
-      const controls =
-        document.createElement(
-          "div"
-        );
-
-      controls.className =
-        "quality-controls";
-
-      const up =
-        document.createElement(
-          "button"
-        );
-
-      up.type =
-        "button";
-
-      up.textContent =
-        "↑";
-
-      up.disabled =
-        index === 0;
-
-      up.addEventListener(
-        "click",
-        () => {
-          const currentIndex =
-            qualities.indexOf(
-              quality
-            );
-
-          if (
-            currentIndex <= 0
-          ) {
-            return;
+            invalidateResult();
           }
-
-          [
-            qualities[currentIndex - 1],
-            qualities[currentIndex]
-          ] = [
-            qualities[currentIndex],
-            qualities[currentIndex - 1]
-          ];
-
-          invalidateResult();
-
-          renderQualities();
-        }
-      );
-
-      const down =
-        document.createElement(
-          "button"
         );
 
-      down.type =
-        "button";
+        const name =
+          document.createElement(
+            "div"
+          );
 
-      down.textContent =
-        "↓";
+        name.className =
+          "quality-name";
 
-      down.disabled =
-        index ===
-        qualities.length - 1;
+        name.textContent =
+          quality.name;
 
-      down.addEventListener(
-        "click",
-        () => {
-          const currentIndex =
-            qualities.indexOf(
-              quality
-            );
+        const controls =
+          document.createElement(
+            "div"
+          );
 
-          if (
-            currentIndex < 0 ||
-            currentIndex >=
-              qualities.length - 1
-          ) {
-            return;
+        controls.className =
+          "quality-controls";
+
+        const up =
+          document.createElement(
+            "button"
+          );
+
+        up.type =
+          "button";
+
+        up.textContent =
+          "↑";
+
+        up.disabled =
+          index === 0;
+
+        up.addEventListener(
+          "click",
+          () => {
+            const currentIndex =
+              qualities.indexOf(
+                quality
+              );
+
+            if (
+              currentIndex <= 0
+            ) {
+              return;
+            }
+
+            [
+              qualities[currentIndex - 1],
+              qualities[currentIndex]
+            ] = [
+              qualities[currentIndex],
+              qualities[currentIndex - 1]
+            ];
+
+            invalidateResult();
+
+            renderQualities();
           }
+        );
 
-          [
-            qualities[currentIndex],
-            qualities[currentIndex + 1]
-          ] = [
-            qualities[currentIndex + 1],
-            qualities[currentIndex]
-          ];
+        const down =
+          document.createElement(
+            "button"
+          );
 
-          invalidateResult();
+        down.type =
+          "button";
 
-          renderQualities();
-        }
-      );
+        down.textContent =
+          "↓";
 
-      controls.append(
-        up,
-        down
-      );
+        down.disabled =
+          index ===
+          qualities.length - 1;
 
-      row.append(
-        checkbox,
-        name,
-        controls
-      );
+        down.addEventListener(
+          "click",
+          () => {
+            const currentIndex =
+              qualities.indexOf(
+                quality
+              );
 
-      qualityList.appendChild(
-        row
-      );
-    }
-  );
-}
+            if (
+              currentIndex < 0 ||
+              currentIndex >=
+                qualities.length - 1
+            ) {
+              return;
+            }
+
+            [
+              qualities[currentIndex],
+              qualities[currentIndex + 1]
+            ] = [
+              qualities[currentIndex + 1],
+              qualities[currentIndex]
+            ];
+
+            invalidateResult();
+
+            renderQualities();
+          }
+        );
+
+        controls.append(
+          up,
+          down
+        );
+
+        row.append(
+          checkbox,
+          name,
+          controls
+        );
+
+        qualityList.appendChild(
+          row
+        );
+      }
+    );
+  }
 
   function getFileSize() {
     const min =
@@ -964,10 +997,6 @@ export default async function handler(
     );
   }
 
-  /*
-   * The Configure session is bound to the
-   * URL so different tabs do not share it.
-   */
   const configureSessionId =
     url.searchParams.get(
       "__showbox_session"
@@ -1065,10 +1094,6 @@ export default async function handler(
           ? body.sessionId
           : "";
 
-      /*
-       * The session must exist both in the
-       * request body and in this tab's URL.
-       */
       if (
         !sessionId ||
         !configureSessionId ||
@@ -1216,14 +1241,6 @@ export default async function handler(
       return invalidConfigResponse();
     }
 
-    /*
-     * No session in the URL means this is
-     * the first visit to the Configure URL.
-     *
-     * Create exactly one 5-minute session
-     * and redirect to the URL containing
-     * that session ID.
-     */
     if (!configureSessionId) {
       const session =
         await createConfigureSession();
@@ -1251,12 +1268,6 @@ export default async function handler(
       );
     }
 
-    /*
-     * A session already present in the URL
-     * is never replaced.
-     *
-     * This makes each tab independent.
-     */
     const session =
       await getConfigureSession(
         configureSessionId
@@ -1270,6 +1281,9 @@ export default async function handler(
       normalizeQualities(
         configData.config.qualities
       );
+
+    const qualityRows =
+      qualityRowsHtml(qualities);
 
     const fileSize =
       normalizeFileSize(
@@ -1936,7 +1950,7 @@ Enable the qualities you want. Move them up or down to set their priority.
 <div
 id="qualityList"
 class="quality-list"
-></div>
+>${qualityRows}</div>
 
 </div>
 
