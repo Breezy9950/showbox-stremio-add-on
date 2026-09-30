@@ -4,6 +4,10 @@ import {
   getConfig
 } from "./config-store.js";
 
+import {
+  getStore
+} from "@netlify/blobs";
+
 // ---------------------------------------------------------
 // Upstream request limits
 // ---------------------------------------------------------
@@ -16,6 +20,165 @@ const MAX_FILES_PER_REQUEST =
 
 const QUALITY_REQUEST_CONCURRENCY =
   5;
+
+// ---------------------------------------------------------
+// Stream cache
+// ---------------------------------------------------------
+
+const STREAM_CACHE_STORE =
+  "showbox-stream-cache";
+
+const STREAM_CACHE_TTL_MS =
+  2 * 60 * 1000;
+
+function getStreamCacheStore() {
+  return getStore({
+    name:
+      STREAM_CACHE_STORE,
+
+    consistency:
+      "strong"
+  });
+}
+
+function getStreamCacheKey(
+  rawConfig,
+  type,
+  imdbId,
+  season,
+  episode
+) {
+  const source =
+    [
+      rawConfig,
+      type,
+      imdbId,
+      season ?? "",
+      episode ?? ""
+    ].join(
+      "|"
+    );
+
+  return CryptoJS.SHA256(
+    source
+  ).toString();
+}
+
+async function getCachedStreams(
+  cacheKey
+) {
+  try {
+    const store =
+      getStreamCacheStore();
+
+    const cached =
+      await store.get(
+        cacheKey,
+        {
+          type:
+            "json",
+
+          consistency:
+            "strong"
+        }
+      );
+
+    if (
+      !cached ||
+      typeof cached !== "object"
+    ) {
+      return null;
+    }
+
+    const expiresAt =
+      Number(
+        cached.expiresAt
+      );
+
+    if (
+      !Number.isFinite(
+        expiresAt
+      ) ||
+      Date.now() >= expiresAt
+    ) {
+      return null;
+    }
+
+    if (
+      !Array.isArray(
+        cached.streams
+      )
+    ) {
+      return null;
+    }
+
+    console.log(
+      "[ShowBox] Stream cache HIT:",
+      {
+        count:
+          cached.streams.length,
+
+        expiresIn:
+          Math.max(
+            0,
+            expiresAt -
+              Date.now()
+          )
+      }
+    );
+
+    return cached.streams;
+  } catch (error) {
+    console.log(
+      "[ShowBox] Stream cache read failed:",
+      error.message
+    );
+
+    return null;
+  }
+}
+
+async function cacheStreams(
+  cacheKey,
+  streams
+) {
+  try {
+    const store =
+      getStreamCacheStore();
+
+    const createdAt =
+      Date.now();
+
+    const expiresAt =
+      createdAt +
+      STREAM_CACHE_TTL_MS;
+
+    await store.setJSON(
+      cacheKey,
+      {
+        createdAt,
+        expiresAt,
+        streams
+      }
+    );
+
+    console.log(
+      "[ShowBox] Stream cache STORED:",
+      {
+        count:
+          streams.length,
+
+        ttl:
+          STREAM_CACHE_TTL_MS
+      }
+    );
+  } catch (error) {
+    console.log(
+      "[ShowBox] Stream cache write failed:",
+      error.message
+    );
+  }
+}
 
 // ---------------------------------------------------------
 // Fetch with timeout
@@ -2664,47 +2827,6 @@ export default async (
       );
 
     // -----------------------------------------------------
-    // Parse configuration
-    // -----------------------------------------------------
-
-    const config =
-      await loadConfig(
-        rawConfig
-      );
-
-    console.log(
-      `[ShowBox][${requestId}] Loaded config settings:`,
-      {
-        qualities:
-          config?.qualities,
-
-        filters:
-          config?.filters,
-
-        fileSize:
-          config?.fileSize
-      }
-    );
-
-    const token =
-      config.uiToken ||
-      "";
-
-    console.log(
-      `[ShowBox][${requestId}] Token loaded:`,
-      {
-        present:
-          !!token
-      }
-    );
-
-    if (!token) {
-      throw new Error(
-        "No ShowBox UI token configured"
-      );
-    }
-
-    // -----------------------------------------------------
     // Parse IMDb / season / episode
     // -----------------------------------------------------
 
@@ -2762,6 +2884,103 @@ export default async (
         {
           imdbId
         }
+      );
+    }
+
+    // -----------------------------------------------------
+    // Stream cache lookup
+    // -----------------------------------------------------
+
+    const streamCacheKey =
+      getStreamCacheKey(
+        rawConfig,
+        type,
+        imdbId,
+        season,
+        episode
+      );
+
+    const cachedStreams =
+      await getCachedStreams(
+        streamCacheKey
+      );
+
+    if (
+      cachedStreams
+    ) {
+      console.log(
+        `[ShowBox][${requestId}] Returning cached streams`
+      );
+
+      console.log(
+        `[ShowBox][${requestId}] ===== END CACHE =====`
+      );
+
+      return new Response(
+        JSON.stringify({
+          streams:
+            cachedStreams
+        }),
+        {
+          status:
+            200,
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            "Access-Control-Allow-Origin":
+              "*",
+
+            "Cache-Control":
+              "no-store"
+          }
+        }
+      );
+    }
+
+    console.log(
+      `[ShowBox][${requestId}] Stream cache MISS`
+    );
+
+    // -----------------------------------------------------
+    // Parse configuration
+    // -----------------------------------------------------
+
+    const config =
+      await loadConfig(
+        rawConfig
+      );
+
+    console.log(
+      `[ShowBox][${requestId}] Loaded config settings:`,
+      {
+        qualities:
+          config?.qualities,
+
+        filters:
+          config?.filters,
+
+        fileSize:
+          config?.fileSize
+      }
+    );
+
+    const token =
+      config.uiToken ||
+      "";
+
+    console.log(
+      `[ShowBox][${requestId}] Token loaded:`,
+      {
+        present:
+          !!token
+      }
+    );
+
+    if (!token) {
+      throw new Error(
+        "No ShowBox UI token configured"
       );
     }
 
@@ -2985,6 +3204,15 @@ export default async (
     }
 
     // -----------------------------------------------------
+    // Store final stream list in cache
+    // -----------------------------------------------------
+
+    await cacheStreams(
+      streamCacheKey,
+      configuredStreams
+    );
+
+    // -----------------------------------------------------
     // Final diagnostics
     // -----------------------------------------------------
 
@@ -3020,7 +3248,10 @@ export default async (
             "application/json",
 
           "Access-Control-Allow-Origin":
-            "*"
+            "*",
+
+          "Cache-Control":
+            "no-store"
         }
       }
     );
@@ -3051,7 +3282,10 @@ export default async (
             "application/json",
 
           "Access-Control-Allow-Origin":
-            "*"
+            "*",
+
+          "Cache-Control":
+            "no-store"
         }
       }
     );
