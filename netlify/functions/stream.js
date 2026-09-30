@@ -7,10 +7,6 @@ import {
 } from "./providers/febbox.js";
 
 import {
-  getStreams as getMovieboxStreams
-} from "./providers/moviebox.js";
-
-import {
   getStore
 } from "@netlify/blobs";
 
@@ -942,87 +938,6 @@ function dedupeStreams(
 }
 
 // =========================================================
-// PROVIDER GROUPING
-// =========================================================
-
-function getProvider(
-  stream
-) {
-  const provider =
-    String(
-      stream?.provider ||
-      ""
-    ).toLowerCase();
-
-  if (
-    provider ===
-      "moviebox" ||
-    String(
-      stream?.name || ""
-    )
-      .toLowerCase()
-      .startsWith(
-        "moviebox"
-      )
-  ) {
-    return "moviebox";
-  }
-
-  if (
-    provider ===
-      "febbox" ||
-    String(
-      stream?.name || ""
-    )
-      .toLowerCase()
-      .startsWith(
-        "febbox"
-      )
-  ) {
-    return "febbox";
-  }
-
-  return "other";
-}
-
-// ---------------------------------------------------------
-// Keep providers together
-// ---------------------------------------------------------
-
-function groupStreams(
-  movieboxStreams,
-  febboxStreams,
-  otherStreams = []
-) {
-  /*
-   * IMPORTANT:
-   *
-   * Do NOT globally sort this array after this point.
-   *
-   * MovieBox stays together.
-   * FebBox stays together.
-   *
-   * Result:
-   *
-   * MovieBox 4K
-   * MovieBox 1080p
-   * MovieBox 720p
-   * ...
-   *
-   * FebBox ...
-   * FebBox ...
-   */
-
-  return [
-    ...movieboxStreams,
-
-    ...febboxStreams,
-
-    ...otherStreams
-  ];
-}
-
-// =========================================================
 // MAIN HANDLER
 // =========================================================
 
@@ -1189,118 +1104,54 @@ export default async (
     }
 
     // =====================================================
-    // FETCH ALL PROVIDERS CONCURRENTLY
+    // FETCH FEBBOX
     // =====================================================
-
-    /*
-     * Both providers start at exactly the same time.
-     *
-     * We do NOT:
-     *
-     * await MovieBox
-     * await FebBox
-     *
-     * Instead:
-     *
-     * Promise.all([
-     *   MovieBox,
-     *   FebBox
-     * ])
-     *
-     * This prevents one provider from blocking
-     * the request to the other.
-     */
-
-    const [
-      movieboxResult,
-      febboxResult
-    ] =
-      await Promise.all([
-        getMovieboxStreams({
-          imdbId,
-          type,
-          season,
-          episode
-        }).catch(error => {
-          console.error(
-            "[STREAM] MovieBox provider failed:",
-            error?.stack ||
-              error?.message ||
-              error
-          );
-
-          return [];
-        }),
-
-        getFebboxStreams({
-          imdbId,
-          type,
-          season,
-          episode,
-          token
-        }).catch(error => {
-          console.error(
-            "[STREAM] FebBox provider failed:",
-            error?.stack ||
-              error?.message ||
-              error
-          );
-
-          return [];
-        })
-      ]);
-
-    // -----------------------------------------------------
-    // Ensure arrays
-    // -----------------------------------------------------
-
-    const movieboxStreams =
-      Array.isArray(
-        movieboxResult
-      )
-        ? movieboxResult
-        : [];
 
     const febboxStreams =
+      await getFebboxStreams({
+        imdbId,
+        type,
+        season,
+        episode,
+        token
+      }).catch(error => {
+        console.error(
+          "[STREAM] FebBox provider failed:",
+          error?.stack ||
+            error?.message ||
+            error
+        );
+
+        return [];
+      });
+
+    // -----------------------------------------------------
+    // Ensure array
+    // -----------------------------------------------------
+
+    const streams =
       Array.isArray(
-        febboxResult
+        febboxStreams
       )
-        ? febboxResult
+        ? febboxStreams
         : [];
 
     // =====================================================
-    // DEDUPE EACH PROVIDER SEPARATELY
+    // DEDUPE
     // =====================================================
 
-    /*
-     * Do this separately so a URL collision between
-     * providers cannot cause one provider's stream to
-     * disappear.
-     */
-
-    const uniqueMoviebox =
+    const uniqueStreams =
       dedupeStreams(
-        movieboxStreams
-      );
-
-    const uniqueFebbox =
-      dedupeStreams(
-        febboxStreams
+        streams
       );
 
     // =====================================================
     // COMMON CAM FILTER
     // =====================================================
 
-    const filteredMoviebox =
+    const filteredStreams =
       applyStreamFilters(
-        uniqueMoviebox,
-        config
-      );
-
-    const filteredFebbox =
-      applyStreamFilters(
-        uniqueFebbox,
+        uniqueStreams,
         config
       );
 
@@ -1308,15 +1159,9 @@ export default async (
     // COMMON QUALITY FILTER
     // =====================================================
 
-    const qualityMoviebox =
+    const qualityStreams =
       applyQualitySettings(
-        filteredMoviebox,
-        config
-      );
-
-    const qualityFebbox =
-      applyQualitySettings(
-        filteredFebbox,
+        filteredStreams,
         config
       );
 
@@ -1324,26 +1169,10 @@ export default async (
     // COMMON FILE SIZE FILTER
     // =====================================================
 
-    const configuredMoviebox =
-      applyFileSizeSettings(
-        qualityMoviebox,
-        config
-      );
-
-    const configuredFebbox =
-      applyFileSizeSettings(
-        qualityFebbox,
-        config
-      );
-
-    // =====================================================
-    // FINAL PROVIDER GROUPING
-    // =====================================================
-
     const configuredStreams =
-      groupStreams(
-        configuredMoviebox,
-        configuredFebbox
+      applyFileSizeSettings(
+        qualityStreams,
+        config
       );
 
     if (
