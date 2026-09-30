@@ -1851,7 +1851,6 @@ function buildTechnicalLine(
 
 function buildStreamTitle(
   item,
-  tmdbDetails,
   type,
   season,
   episode
@@ -1859,43 +1858,34 @@ function buildStreamTitle(
 
   const lines = [];
 
-
   const title =
-    buildTitle(
-      tmdbDetails,
+    getTitleFromFilename(
+      item.fileName,
       type
     );
-
 
   if (
     title
   ) {
-
     lines.push(
       title
     );
-
   }
-
 
   if (
     type === "series" &&
     Number.isFinite(season) &&
     Number.isFinite(episode)
   ) {
-
     lines.push(
       `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`
     );
-
   }
-
 
   return lines.join(
     "\n"
   );
 }
-
 // ---------------------------------------------------------
 // Build FebBox streams
 // ---------------------------------------------------------
