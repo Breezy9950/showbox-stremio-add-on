@@ -1,4 +1,4 @@
-Alright I found another issue current page expires  immediately if there is another expired page on another tab  import {
+  import {
   createConfig,
   getConfig,
   saveConfig,
