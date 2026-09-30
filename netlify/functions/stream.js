@@ -5,6 +5,52 @@ import {
 } from "./config-store.js";
 
 // ---------------------------------------------------------
+// Upstream request limits
+// ---------------------------------------------------------
+
+const UPSTREAM_TIMEOUT_MS =
+  10000;
+
+const MAX_FILES_PER_REQUEST =
+  25;
+
+// ---------------------------------------------------------
+// Fetch with timeout
+// ---------------------------------------------------------
+
+async function fetchWithTimeout(
+  url,
+  options = {},
+  timeoutMs = UPSTREAM_TIMEOUT_MS
+) {
+  const controller =
+    new AbortController();
+
+  const timeout =
+    setTimeout(
+      () => {
+        controller.abort();
+      },
+      timeoutMs
+    );
+
+  try {
+    return await fetch(
+      url,
+      {
+        ...options,
+        signal:
+          controller.signal
+      }
+    );
+  } finally {
+    clearTimeout(
+      timeout
+    );
+  }
+}
+
+// ---------------------------------------------------------
 // Base64URL
 // ---------------------------------------------------------
 
@@ -280,7 +326,7 @@ async function searchShowBoxMediaId(
     `${SHOWBOX_WEB_API}/search?keyword=${encodeURIComponent(imdbId)}`;
 
   const searchResponse =
-    await fetch(
+    await fetchWithTimeout(
       searchUrl,
       {
         headers:
@@ -323,7 +369,7 @@ async function searchShowBoxMediaId(
   );
 
   const detailResponse =
-    await fetch(
+    await fetchWithTimeout(
       detailUrl,
       {
         headers:
@@ -393,7 +439,9 @@ async function febboxShare(
   );
 
   const response =
-    await fetch(url);
+    await fetchWithTimeout(
+      url
+    );
 
   const text =
     await response.text();
@@ -479,7 +527,7 @@ async function febboxFileList(
     `https://www.febbox.com/file/file_share_list?share_key=${shareKey}`;
 
   const response =
-    await fetch(
+    await fetchWithTimeout(
       url,
       {
         headers: {
@@ -564,7 +612,7 @@ async function febboxSeasonFileList(
     `https://www.febbox.com/file/file_share_list?share_key=${shareKey}&parent_id=${seasonFolder.fid}&page=1`;
 
   const response =
-    await fetch(
+    await fetchWithTimeout(
       url,
       {
         headers: {
@@ -814,7 +862,7 @@ async function febboxQualityList(
   );
 
   const response =
-    await fetch(
+    await fetchWithTimeout(
       qualityUrl,
       {
         headers: {
@@ -2847,14 +2895,40 @@ export default async (
       );
 
     // -----------------------------------------------------
-    // Get qualities from ALL matching files
+    // Limit quality lookups per request
+    // -----------------------------------------------------
+
+    const filesToProcess =
+      files.slice(
+        0,
+        MAX_FILES_PER_REQUEST
+      );
+
+    if (
+      files.length >
+      MAX_FILES_PER_REQUEST
+    ) {
+      console.log(
+        "[ShowBox] File processing limit reached:",
+        {
+          total:
+            files.length,
+
+          processing:
+            MAX_FILES_PER_REQUEST
+        }
+      );
+    }
+
+    // -----------------------------------------------------
+    // Get qualities from matching files
     // -----------------------------------------------------
 
     const allQualityResults =
       [];
 
     for (
-      const file of files
+      const file of filesToProcess
     ) {
       try {
         const results =
@@ -3028,5 +3102,18 @@ export default async (
 
 export const config = {
   path:
-    "/:config/stream/:type/:id.json"
+    "/:config/stream/:type/:id.json",
+
+  rateLimit: {
+    windowLimit:
+      60,
+
+    windowSize:
+      60,
+
+    aggregateBy: [
+      "ip",
+      "domain"
+    ]
+  }
 };
