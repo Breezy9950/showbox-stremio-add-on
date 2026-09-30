@@ -511,34 +511,37 @@ async function movieBoxRequest(
     return null;
   }
 
-  const apiHosts =
-    new Set(
-      HOST_POOL.map(
-        host =>
-          new URL(host).host
-      )
-    );
+  let hosts;
 
-  const hosts =
-    apiHosts.has(
-      originalUrl.host
+/*
+ * IMPORTANT:
+ * The anonymous-token endpoint is NOT part of the
+ * aoneroom API host pool. It must always be requested
+ * from apig.inmoviebox.com.
+ */
+if (isTokenFetch) {
+  hosts = [originalUrl.host];
+} else {
+  const apiHosts = new Set(
+    HOST_POOL.map(
+      host => new URL(host).host
     )
-      ? [
-          originalUrl.host,
-          ...HOST_POOL
-            .map(
-              host =>
-                new URL(host).host
-            )
-            .filter(
-              host =>
-                host !==
-                originalUrl.host
-            )
-        ]
-      : [
-          originalUrl.host
-        ];
+  );
+
+  hosts = apiHosts.has(originalUrl.host)
+    ? [
+        originalUrl.host,
+        ...HOST_POOL
+          .map(
+            host => new URL(host).host
+          )
+          .filter(
+            host =>
+              host !== originalUrl.host
+          )
+      ]
+    : [originalUrl.host];
+}
 
   const maxAttempts =
     Math.min(
