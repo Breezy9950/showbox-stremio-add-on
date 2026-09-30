@@ -1,21 +1,23 @@
 // netlify/functions/providers/moviebox.js
-console.log("[MovieBox PROVIDER] EXACT-NUVIO-2026-09-30-B");
+console.log("[MovieBox PROVIDER] INDIA-SPOOF-2026-10-01-A");
 
 import CryptoJS from "crypto-js";
 
 // ============================================================
-// MovieBox - adapted from the exact working Nuvio implementation
+// MovieBox provider
 //
-// Adapter changes:
-//   1. Accept IMDb ID instead of TMDB ID
-//   2. Resolve IMDb -> TMDB
-//   3. Export ESM getStreams() for the Netlify addon
+// HTTP-level client/device spoofing:
+//   - Android 14
+//   - Indian locale
+//   - India region
+//   - Asia/Calcutta timezone
+//   - Indian Android package metadata
+//   - Android User-Agent
+//   - en-IN Accept-Language
 //
-// MovieBox authentication, search, playback, dubs, streams,
-// signed URLs, resource detectors and subtitles are kept as
-// close as possible to the supplied working Nuvio source.
-//
-// No quality filtering or MovieBox-specific stream restriction.
+// IMPORTANT:
+// This can spoof application-level metadata only.
+// It cannot change Netlify's actual public IP/egress region.
 // ============================================================
 
 const API_BASE = "https://api3.aoneroom.com";
@@ -87,7 +89,7 @@ const PACKAGE_INFO = {
 };
 
 // ============================================================
-// AUTH / UTILS
+// AUTH
 // ============================================================
 
 const SECRET_KEY_DEFAULT =
@@ -126,10 +128,14 @@ function decodeJwtExpiry(token) {
     }
 
     const parsed =
-      CryptoJS.enc.Base64.parse(base64)
-        .toString(CryptoJS.enc.Utf8);
+      CryptoJS.enc.Base64
+        .parse(base64)
+        .toString(
+          CryptoJS.enc.Utf8
+        );
 
-    const json = JSON.parse(parsed);
+    const json =
+      JSON.parse(parsed);
 
     return json.exp || 0;
   } catch {
@@ -142,7 +148,8 @@ function isTokenValid(token) {
     return false;
   }
 
-  const exp = decodeJwtExpiry(token);
+  const exp =
+    decodeJwtExpiry(token);
 
   return (
     exp >
@@ -150,95 +157,57 @@ function isTokenValid(token) {
   );
 }
 
-async function getCachedToken() {
-  if (isTokenValid(bearerToken)) {
-    return bearerToken;
+function initializeSession() {
+  if (deviceId) {
+    return;
   }
+
+  const chars =
+    "0123456789abcdef";
+
+  for (let i = 0; i < 32; i++) {
+    deviceId +=
+      chars[
+        Math.floor(
+          Math.random() * 16
+        )
+      ];
+  }
+
+  const brands =
+    Object.keys(BRAND_MODELS);
+
+  selectedBrand =
+    brands[
+      Math.floor(
+        Math.random() *
+          brands.length
+      )
+    ];
+
+  const models =
+    BRAND_MODELS[
+      selectedBrand
+    ];
+
+  selectedModel =
+    models[
+      Math.floor(
+        Math.random() *
+          models.length
+      )
+    ];
 
   console.log(
-    "[MovieBox] Fetching fresh anonymous token..."
+    `[MovieBox] Spoofed device: ${selectedBrand} ${selectedModel}`
   );
-
-  const url = TOKEN_URL;
-
-  const res = await movieBoxRequest(
-    "GET",
-    url,
-    null,
-    {},
-    true
-  );
-
-  if (res && res.headers) {
-    const xUser =
-      res.headers.get("x-user");
-
-    if (xUser) {
-      try {
-        const xUserJson =
-          JSON.parse(xUser);
-
-        const token =
-          xUserJson.token;
-
-        if (
-          token &&
-          isTokenValid(token)
-        ) {
-          bearerToken = token;
-          return token;
-        }
-      } catch (e) {
-        console.error(
-          "[MovieBox] Failed to parse x-user header for token",
-          e
-        );
-      }
-    }
-  }
-
-  return bearerToken || "";
-}
-
-function initializeSession() {
-  if (!deviceId) {
-    const chars =
-      "0123456789abcdef";
-
-    for (let i = 0; i < 32; i++) {
-      deviceId +=
-        chars[
-          Math.floor(
-            Math.random() * 16
-          )
-        ];
-    }
-
-    const brands =
-      Object.keys(BRAND_MODELS);
-
-    selectedBrand =
-      brands[
-        Math.floor(
-          Math.random() * brands.length
-        )
-      ];
-
-    const models =
-      BRAND_MODELS[selectedBrand];
-
-    selectedModel =
-      models[
-        Math.floor(
-          Math.random() * models.length
-        )
-      ];
-  }
 }
 
 function md5(input) {
   return CryptoJS.MD5(input)
-    .toString(CryptoJS.enc.Hex);
+    .toString(
+      CryptoJS.enc.Hex
+    );
 }
 
 function hmacMd5(key, data) {
@@ -317,13 +286,11 @@ function buildCanonicalString(
           ""
         );
 
-      const qParts =
+      query =
         parts[1]
           .split("&")
-          .sort();
-
-      query =
-        qParts.join("&");
+          .sort()
+          .join("&");
     } else {
       path =
         url.replace(
@@ -345,14 +312,11 @@ function buildCanonicalString(
     const bodyWords =
       CryptoJS.enc.Utf8.parse(body);
 
-    const totalBytes =
-      bodyWords.sigBytes;
+    bodyLength =
+      bodyWords.sigBytes.toString();
 
     bodyHash =
       md5(bodyWords);
-
-    bodyLength =
-      totalBytes.toString();
   }
 
   return (
@@ -406,7 +370,75 @@ function generateXTrSignature(
 }
 
 // ============================================================
-// EXACT MOVIEBOX REQUEST FLOW
+// TOKEN
+// ============================================================
+
+async function getCachedToken() {
+  if (
+    isTokenValid(
+      bearerToken
+    )
+  ) {
+    return bearerToken;
+  }
+
+  console.log(
+    "[MovieBox] Fetching fresh anonymous token..."
+  );
+
+  const res =
+    await movieBoxRequest(
+      "GET",
+      TOKEN_URL,
+      null,
+      {},
+      true
+    );
+
+  if (
+    res &&
+    res.headers
+  ) {
+    const xUser =
+      res.headers.get(
+        "x-user"
+      );
+
+    if (xUser) {
+      try {
+        const xUserJson =
+          JSON.parse(xUser);
+
+        const token =
+          xUserJson.token;
+
+        if (
+          token &&
+          isTokenValid(token)
+        ) {
+          bearerToken =
+            token;
+
+          console.log(
+            "[MovieBox] Anonymous token accepted"
+          );
+
+          return token;
+        }
+      } catch (e) {
+        console.error(
+          "[MovieBox] Failed to parse x-user header",
+          e.message
+        );
+      }
+    }
+  }
+
+  return bearerToken || "";
+}
+
+// ============================================================
+// MOVIEBOX REQUEST
 // ============================================================
 
 async function movieBoxRequest(
@@ -449,31 +481,63 @@ async function movieBoxRequest(
       timestamp
     );
 
+  // ==========================================================
+  // INDIAN ANDROID CLIENT SPOOF
+  // ==========================================================
+
   const xClientInfo =
     JSON.stringify({
       ...PACKAGE_INFO,
 
       os: "android",
+
       os_version: "14",
-      device_id: deviceId,
-      install_store: "official",
+
+      device_id:
+        deviceId,
+
+      install_store:
+        "official",
+
       gaid:
         "1b2212c1-dadf-43c3-a0c8-bd6ce48ae22d",
+
       brand:
         selectedBrand.toLowerCase(),
-      model: selectedModel,
-      system_language: "en",
-      net: "NETWORK_WIFI",
-      region: "IN",
-      timezone: "Asia/Calcutta",
-      sp_code: "",
+
+      model:
+        selectedModel,
+
+      system_language:
+        "en",
+
+      net:
+        "NETWORK_WIFI",
+
+      region:
+        "IN",
+
+      timezone:
+        "Asia/Calcutta",
+
+      sp_code:
+        "",
     });
 
+  const androidUserAgent =
+    `${PACKAGE_INFO.package_name}/${PACKAGE_INFO.version_code} ` +
+    `(Linux; U; Android 14; en_IN; ${selectedModel}; ` +
+    `Build/UD1A.230803.041; Cronet/145.0.7582.0)`;
+
   const headers = {
-    Accept: accept,
+    Accept:
+      accept,
 
     "Content-Type":
       headerContentType,
+
+    "Accept-Language":
+      "en-IN,en;q=0.9",
 
     "x-client-token":
       xClientToken,
@@ -482,15 +546,23 @@ async function movieBoxRequest(
       xTrSignature,
 
     "User-Agent":
-      `${PACKAGE_INFO.package_name}/${PACKAGE_INFO.version_code} ` +
-      `(Linux; U; Android 14; en_IN; ${selectedModel}; ` +
-      `Build/UD1A.230803.041; Cronet/145.0.7582.0)`,
+      androidUserAgent,
 
     "x-client-info":
       xClientInfo,
 
     "x-client-status":
       "0",
+
+    // Indian Android locale hints.
+    "X-Language":
+      "en",
+
+    "X-Region":
+      "IN",
+
+    "X-Timezone":
+      "Asia/Calcutta",
 
     ...customHeaders,
   };
@@ -511,7 +583,8 @@ async function movieBoxRequest(
   };
 
   if (body) {
-    options.body = body;
+    options.body =
+      body;
   }
 
   let originalUrl;
@@ -522,6 +595,14 @@ async function movieBoxRequest(
   } catch {
     return null;
   }
+
+  // ==========================================================
+  // TOKEN ENDPOINT:
+  // Keep apig.inmoviebox.com as the original Nuvio endpoint.
+  //
+  // API endpoints:
+  // Use the same Nuvio host pool.
+  // ==========================================================
 
   const apiHosts =
     new Set(
@@ -537,6 +618,7 @@ async function movieBoxRequest(
     )
       ? [
           originalUrl.host,
+
           ...HOST_POOL
             .map(
               (host) =>
@@ -572,21 +654,23 @@ async function movieBoxRequest(
       requestUrl.host =
         hosts[attempt];
 
+      console.log(
+        `[MovieBox] ${method} ${requestUrl.host}${requestUrl.pathname}`
+      );
+
       const res =
         await fetch(
           requestUrl.toString(),
           options
         );
 
-      // ======================================================
-      // DIAGNOSTIC 403/429/5XX HANDLING
-      // ======================================================
-
       if (!res.ok) {
-        let errorBody = "";
+        let errorBody =
+          "";
 
         try {
-          errorBody = await res.text();
+          errorBody =
+            await res.text();
         } catch {}
 
         console.log(
@@ -595,7 +679,10 @@ async function movieBoxRequest(
 
         if (errorBody) {
           console.log(
-            `[MovieBox] Error body: ${errorBody.slice(0, 1000)}`
+            `[MovieBox] Error body: ${errorBody.slice(
+              0,
+              1000
+            )}`
           );
         }
 
@@ -605,17 +692,14 @@ async function movieBoxRequest(
             res.status === 429 ||
             res.status >= 500
           ) &&
-          attempt + 1 < maxAttempts
+          attempt + 1 <
+            maxAttempts
         ) {
           continue;
         }
 
         return null;
       }
-
-      // ======================================================
-      // SUCCESSFUL RESPONSE
-      // ======================================================
 
       const text =
         await res.text();
@@ -626,39 +710,41 @@ async function movieBoxRequest(
         parsed =
           JSON.parse(text);
       } catch {
-        parsed = text;
+        parsed =
+          text;
       }
 
-      if (res.headers) {
-        const xUser =
-          res.headers.get(
-            "x-user"
-          );
+      // Capture a fresh token if MovieBox
+      // sends one in x-user.
+      const xUser =
+        res.headers.get(
+          "x-user"
+        );
 
-        if (xUser) {
-          try {
-            const xUserJson =
-              JSON.parse(xUser);
+      if (xUser) {
+        try {
+          const xUserJson =
+            JSON.parse(xUser);
 
-            const token =
-              xUserJson.token;
+          const token =
+            xUserJson.token;
 
-            if (
-              token &&
-              isTokenValid(token)
-            ) {
-              bearerToken =
-                token;
-            }
-          } catch {
-            // Ignore malformed x-user.
+          if (
+            token &&
+            isTokenValid(token)
+          ) {
+            bearerToken =
+              token;
           }
+        } catch {
+          // Ignore malformed x-user.
         }
       }
 
       return {
         data: parsed,
-        headers: res.headers,
+        headers:
+          res.headers,
       };
     } catch (err) {
       if (
@@ -756,6 +842,10 @@ async function fetchTmdbDetails(
         },
       });
 
+    if (!res.ok) {
+      return null;
+    }
+
     const data =
       await res.json();
 
@@ -795,7 +885,7 @@ async function fetchTmdbDetails(
 }
 
 // ============================================================
-// SEARCH / MATCHING
+// SEARCH
 // ============================================================
 
 function normalizeTitle(s) {
@@ -818,7 +908,10 @@ function normalizeTitle(s) {
     )
     .trim()
     .toLowerCase()
-    .replace(/:/g, " ")
+    .replace(
+      /:/g,
+      " "
+    )
     .replace(
       /[^\w\s]/g,
       " "
@@ -859,14 +952,18 @@ async function searchMovieBox(
     let allSubjects = [];
 
     response.data.data.results
-      .forEach((group) => {
-        if (group.subjects) {
-          allSubjects =
-            allSubjects.concat(
-              group.subjects
-            );
+      .forEach(
+        (group) => {
+          if (
+            group.subjects
+          ) {
+            allSubjects =
+              allSubjects.concat(
+                group.subjects
+              );
+          }
         }
-      });
+      );
 
     return allSubjects;
   }
@@ -890,10 +987,15 @@ function findBestMatch(
       ? 1
       : 2;
 
-  let bestMatch = null;
-  let bestScore = 0;
+  let bestMatch =
+    null;
 
-  for (const subject of subjects) {
+  let bestScore =
+    0;
+
+  for (
+    const subject of subjects
+  ) {
     if (
       subject.subjectType !==
       targetType
@@ -901,11 +1003,10 @@ function findBestMatch(
       continue;
     }
 
-    const title =
-      subject.title;
-
     const normTitle =
-      normalizeTitle(title);
+      normalizeTitle(
+        subject.title
+      );
 
     const year =
       subject.year ||
@@ -955,13 +1056,9 @@ function findBestMatch(
     }
   }
 
-  if (
-    bestScore >= 40
-  ) {
-    return bestMatch;
-  }
-
-  return null;
+  return bestScore >= 40
+    ? bestMatch
+    : null;
 }
 
 // ============================================================
@@ -982,7 +1079,8 @@ function getPlaybackPage(
   let detailPath =
     candidates.find(
       (value) =>
-        typeof value === "string" &&
+        typeof value ===
+          "string" &&
         value.trim()
     );
 
@@ -1034,9 +1132,7 @@ function getPlaybackPage(
       }
 
       break;
-    } catch {
-      // Ignore invalid candidate.
-    }
+    } catch {}
   }
 
   if (!detailPath) {
@@ -1320,7 +1416,8 @@ function getAudioLabel(
     language
   ) {
     language =
-      language.charAt(0).toUpperCase() +
+      language.charAt(0)
+        .toUpperCase() +
       language.slice(1);
   } else {
     language =
@@ -1331,7 +1428,7 @@ function getAudioLabel(
 }
 
 // ============================================================
-// SIGNED RESOURCE / POLICY
+// SIGNED RESOURCE
 // ============================================================
 
 function extractPolicyResource(
@@ -1364,10 +1461,13 @@ function extractPolicyResource(
           );
 
       const rem =
-        (4 -
-          (std.length %
-            4)) %
-        4;
+        (
+          4 -
+          (
+            std.length %
+            4
+          )
+        ) % 4;
 
       if (rem > 0) {
         std +=
@@ -1388,9 +1488,7 @@ function extractPolicyResource(
       if (decoded) {
         return `${decoded}/index.mpd`;
       }
-    } catch {
-      // Continue to CloudFront policy.
-    }
+    } catch {}
   }
 
   const cfMatch =
@@ -1451,8 +1549,7 @@ function extractPolicyResource(
             );
 
         const rem2 =
-          stdB64.length %
-          4;
+          stdB64.length % 4;
 
         if (rem2 > 0) {
           stdB64 +=
@@ -1498,9 +1595,7 @@ function extractPolicyResource(
             : `${trimmed}/index.mpd`;
         }
       }
-    } catch {
-      // Ignore invalid policy.
-    }
+    } catch {}
   }
 
   return null;
@@ -1593,6 +1688,9 @@ async function getStreamLinks(
     "User-Agent":
       PLAYER_USER_AGENT,
 
+    "Accept-Language":
+      "en-IN,en;q=0.9",
+
     "x-request-lang":
       "en",
 
@@ -1611,8 +1709,13 @@ async function getStreamLinks(
         new URLSearchParams({
           subjectId:
             item.id,
-          se: season,
-          ep: episode,
+
+          se:
+            season,
+
+          ep:
+            episode,
+
           streamSignType:
             "1",
         });
@@ -1665,10 +1768,7 @@ async function getStreamLinks(
           );
 
         if (
-          Array.isArray(
-            streamsList
-          ) &&
-          streamsList.length > 0
+          streamsList.length
         ) {
           for (
             const stream of streamsList
@@ -1823,9 +1923,9 @@ async function getStreamLinks(
           }
         }
 
-        // ====================================================
+        // ======================================================
         // RESOURCE DETECTOR FALLBACK
-        // ====================================================
+        // ======================================================
 
         if (
           !hasValidStream
@@ -1851,83 +1951,85 @@ async function getStreamLinks(
               const detector of detectors
             ) {
               if (
-                Array.isArray(
+                !Array.isArray(
                   detector.resolutionList
                 )
               ) {
-                for (
-                  const video of detector.resolutionList
+                continue;
+              }
+
+              for (
+                const video of detector.resolutionList
+              ) {
+                if (
+                  !video.resourceLink
                 ) {
-                  if (
-                    !video.resourceLink
-                  ) {
-                    continue;
-                  }
-
-                  const videoSe =
-                    video.se != null
-                      ? video.se
-                      : 0;
-
-                  const videoEp =
-                    video.ep != null
-                      ? video.ep
-                      : 0;
-
-                  if (
-                    (
-                      season > 0 ||
-                      episode > 0
-                    ) &&
-                    (
-                      videoSe !==
-                        season ||
-                      videoEp !==
-                        episode
-                    )
-                  ) {
-                    continue;
-                  }
-
-                  const quality =
-                    video.resolution
-                      ? `${video.resolution}p`
-                      : "Auto";
-
-                  const audioLabel =
-                    getAudioLabel(
-                      {},
-                      item.lang
-                    );
-
-                  allStreams.push({
-                    name:
-                      "MovieBox",
-
-                    title:
-                      `${mediaTitle}` +
-                      `${
-                        season > 0
-                          ? ` S${season}E${episode}`
-                          : ""
-                      }` +
-                      ` - ${quality}` +
-                      ` (${audioLabel})` +
-                      ` [Fallback]`,
-
-                    url:
-                      video.resourceLink,
-
-                    quality,
-
-                    headers: {
-                      ...playbackHeaders,
-                    },
-
-                    provider:
-                      "moviebox",
-                  });
+                  continue;
                 }
+
+                const videoSe =
+                  video.se != null
+                    ? video.se
+                    : 0;
+
+                const videoEp =
+                  video.ep != null
+                    ? video.ep
+                    : 0;
+
+                if (
+                  (
+                    season > 0 ||
+                    episode > 0
+                  ) &&
+                  (
+                    videoSe !==
+                      season ||
+                    videoEp !==
+                      episode
+                  )
+                ) {
+                  continue;
+                }
+
+                const quality =
+                  video.resolution
+                    ? `${video.resolution}p`
+                    : "Auto";
+
+                const audioLabel =
+                  getAudioLabel(
+                    {},
+                    item.lang
+                  );
+
+                allStreams.push({
+                  name:
+                    "MovieBox",
+
+                  title:
+                    `${mediaTitle}` +
+                    `${
+                      season > 0
+                        ? ` S${season}E${episode}`
+                        : ""
+                    }` +
+                    ` - ${quality}` +
+                    ` (${audioLabel})` +
+                    ` [Fallback]`,
+
+                  url:
+                    video.resourceLink,
+
+                  quality,
+
+                  headers: {
+                    ...playbackHeaders,
+                  },
+
+                  provider:
+                    "moviebox",
+                });
               }
             }
           }
@@ -1941,8 +2043,11 @@ async function getStreamLinks(
     }
   }
 
-  // Original Nuvio quality ordering.
-  // No streams are removed based on quality.
+  // ==========================================================
+  // ORIGINAL QUALITY ORDER
+  // No quality filtering.
+  // ==========================================================
+
   const qualityRank = {
     "2160p": 2160,
     "4k": 2160,
@@ -1975,7 +2080,7 @@ async function getStreamLinks(
 }
 
 // ============================================================
-// QUALITY PARSING
+// QUALITY
 // ============================================================
 
 function parseQualityNumber(
@@ -2064,36 +2169,36 @@ async function fetchSubtitles(
       capRes.data.data.extCaptions
         .forEach(
           (cap) => {
-            if (cap.url) {
-              subtitles.push({
-                url:
-                  cap.url,
-
-                language:
-                  cap.language ||
-                  cap.lanName ||
-                  cap.lan ||
-                  "en",
-
-                name:
-                  `${
-                    cap.lanName ||
-                    cap.language ||
-                    "Subtitle"
-                  } (${langLabel})`,
-
-                headers: {
-                  Referer:
-                    API_BASE,
-                },
-              });
+            if (!cap.url) {
+              return;
             }
+
+            subtitles.push({
+              url:
+                cap.url,
+
+              language:
+                cap.language ||
+                cap.lanName ||
+                cap.lan ||
+                "en",
+
+              name:
+                `${
+                  cap.lanName ||
+                  cap.language ||
+                  "Subtitle"
+                } (${langLabel})`,
+
+              headers: {
+                Referer:
+                  API_BASE,
+              },
+            });
           }
         );
     }
-  } catch {
-    // Ignore subtitle errors.
-  }
+  } catch {}
 
   try {
     const extCapUrl =
@@ -2120,42 +2225,42 @@ async function fetchSubtitles(
       extRes.data.data.extCaptions
         .forEach(
           (cap) => {
-            if (cap.url) {
-              subtitles.push({
-                url:
-                  cap.url,
-
-                language:
-                  cap.lan ||
-                  cap.lanName ||
-                  cap.language ||
-                  "en",
-
-                name:
-                  `${
-                    cap.lanName ||
-                    cap.lan ||
-                    "Subtitle"
-                  } (${langLabel})`,
-
-                headers: {
-                  Referer:
-                    API_BASE,
-                },
-              });
+            if (!cap.url) {
+              return;
             }
+
+            subtitles.push({
+              url:
+                cap.url,
+
+              language:
+                cap.lan ||
+                cap.lanName ||
+                cap.language ||
+                "en",
+
+              name:
+                `${
+                  cap.lanName ||
+                  cap.lan ||
+                  "Subtitle"
+                } (${langLabel})`,
+
+              headers: {
+                Referer:
+                  API_BASE,
+              },
+            });
           }
         );
     }
-  } catch {
-    // Ignore subtitle errors.
-  }
+  } catch {}
 
   return subtitles;
 }
 
 // ============================================================
-// PUBLIC STREMIO ADAPTER
+// PUBLIC ADAPTER
 // ============================================================
 
 export async function getStreams({
