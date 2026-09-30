@@ -1,4 +1,4 @@
-  import {
+import {
   createConfig,
   getConfig,
   saveConfig,
@@ -413,6 +413,18 @@ if (dataElement) {
     )
   );
 
+  window.addEventListener(
+    "pageshow",
+    () => {
+      if (
+        Date.now() >=
+        expiresAt
+      ) {
+        expire();
+      }
+    }
+  );
+
   function setStatus(
     message,
     type = ""
@@ -675,7 +687,8 @@ if (dataElement) {
     try {
       const response =
         await fetch(
-          window.location.pathname,
+          window.location.pathname +
+          window.location.search,
           {
             method: "POST",
 
@@ -928,6 +941,15 @@ export default async function handler(
     );
   }
 
+  /*
+   * The Configure session is bound to the
+   * URL so different tabs do not share it.
+   */
+  const configureSessionId =
+    url.searchParams.get(
+      "__showbox_session"
+    );
+
   if (request.method === "POST") {
     try {
       const contentLength =
@@ -1020,19 +1042,22 @@ export default async function handler(
           ? body.sessionId
           : "";
 
-      if (!sessionId) {
-        return jsonResponse(
-          {
-            error:
-              "Configure session is invalid"
-          },
-          403
-        );
+      /*
+       * The session must exist both in the
+       * request body and in this tab's URL.
+       */
+      if (
+        !sessionId ||
+        !configureSessionId ||
+        sessionId !==
+          configureSessionId
+      ) {
+        return expiredResponse();
       }
 
       const activeSession =
         await getConfigureSession(
-          sessionId
+          configureSessionId
         );
 
       if (!activeSession) {
@@ -1168,25 +1193,69 @@ export default async function handler(
       return invalidConfigResponse();
     }
 
-    const existingConfig =
-      configData.config;
+    /*
+     * No session in the URL means this is
+     * the first visit to the Configure URL.
+     *
+     * Create exactly one 5-minute session
+     * and redirect to the URL containing
+     * that session ID.
+     */
+    if (!configureSessionId) {
+      const session =
+        await createConfigureSession();
 
+      url.searchParams.set(
+        "__showbox_session",
+        session.id
+      );
+
+      return new Response(
+        null,
+        {
+          status: 302,
+          headers: {
+            Location:
+              url.toString(),
+            "Cache-Control":
+              "no-store",
+            "X-Content-Type-Options":
+              "nosniff",
+            "Referrer-Policy":
+              "no-referrer"
+          }
+        }
+      );
+    }
+
+    /*
+     * A session already present in the URL
+     * is never replaced.
+     *
+     * This makes each tab independent.
+     */
     const session =
-      await createConfigureSession();
+      await getConfigureSession(
+        configureSessionId
+      );
+
+    if (!session) {
+      return expiredResponse();
+    }
 
     const qualities =
       normalizeQualities(
-        existingConfig.qualities
+        configData.config.qualities
       );
 
     const fileSize =
       normalizeFileSize(
-        existingConfig.fileSize
+        configData.config.fileSize
       );
 
     const filters =
       normalizeFilters(
-        existingConfig.filters
+        configData.config.filters
       );
 
     const clientData =
@@ -1195,7 +1264,7 @@ export default async function handler(
         fileSize,
         filters,
         sessionId:
-          session.id,
+          configureSessionId,
         expiresAt:
           Number(session.expiresAt)
       }).replace(
@@ -1976,4 +2045,4 @@ id="showbox-config-data"
       }
     );
   }
-} 
+}
