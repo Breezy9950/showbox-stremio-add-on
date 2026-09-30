@@ -1695,6 +1695,14 @@ function getTitleFromFilename(
   title =
     title
       .replace(
+        /(\b(?:19|20)\d{2}\b).*$/i,
+        "$1"
+      );
+
+
+  title =
+    title
+      .replace(
         /[._]+/g,
         " "
       )
@@ -1898,10 +1906,6 @@ function buildFebboxStreams(
     item => ({
 
       name:
-        getQualityLabel(
-          item.quality,
-          item.fileName
-        ) ||
         "ShowBox",
 
 
