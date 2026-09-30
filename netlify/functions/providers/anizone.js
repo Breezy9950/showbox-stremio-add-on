@@ -1,4 +1,4 @@
-import * as cheerioModule from "cheerio-without-node-native";
+import * as cheerioModule from "cheerio";
 
 const cheerio =
   cheerioModule.default ||
