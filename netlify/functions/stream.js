@@ -1113,137 +1113,63 @@ function cleanFilename(
 // ---------------------------------------------------------
 // Extract title from FebBox filename
 // ---------------------------------------------------------
+function getTitleFromFilename(fileName, type) {
 
-function getTitleFromFilename(
-  fileName,
-  type
-) {
-  let title =
-    cleanFilename(
-      fileName
-    );
-
-  if (!title) {
+  if (
+    typeof fileName !== "string" ||
+    !fileName.trim()
+  ) {
     return "";
   }
 
-  /*
-   * For series, everything before S01E01
-   * is treated as the title.
-   */
+  let title = fileName
+    .replace(/\.[^.]+$/, "")
+    .trim();
 
-  if (
-    type === "series"
-  ) {
-    const episodeMatch =
-      title.match(
-        /(?:^|[\s._-])S\d{1,2}E\d{1,3}(?:[\s._-]|$)/i
-      );
+  if (type === "series") {
 
-    if (
-      episodeMatch &&
-      episodeMatch.index !== undefined
-    ) {
-      title =
-        title
-          .slice(
-            0,
-            episodeMatch.index
-          )
-          .trim();
-    }
+    title = title.replace(
+      /[.\s_-]+S\d{1,2}E\d{1,2}.*$/i,
+      ""
+    );
+
   }
 
-  /*
-   * For movies and series, stop before the
-   * first recognizable release/technical marker.
-   */
+  title = title.replace(
+    /[.\s_-]+(?:2160p|1440p|1080p|720p|576p|480p|360p|4K|UHD|8K|WEB[-_. ]?DL|WEB[-_. ]?Rip|WEBRip|BluRay|BRRip|BDRip|HDRip|HDTV|DVDRip|CAMRip|CAM|TELESYNC|TELECINE|TS|TC|REMUX|REPACK|PROPER|LIMITED|IMAX|AMZN|NF|DSNP|HMAX|ATVP|HULU|MAX|HBO|CRAVES|x264|x265|H264|H265|HEVC|AVC|AAC|AC3|EAC3|DDP|DD\+|DTS|TRUEHD|ATMOS|MULTI|DUAL|ENG|ENGLISH|SUB|DUB|YT|SUPPLY).*$/i,
+    ""
+  );
 
-  const markers = [
-    /\s+(?:2160p|2160|4K)\b/i,
-    /\s+1440p\b/i,
-    /\s+1080p\b/i,
-    /\s+720p\b/i,
-    /\s+480p\b/i,
-    /\s+360p\b/i,
-    /\s+WEB[- .]?DL\b/i,
-    /\s+WEBDL\b/i,
-    /\s+WEB[- .]?RIP\b/i,
-    /\s+WEBRIP\b/i,
-    /\s+BLU[- .]?RAY\b/i,
-    /\s+BLURAY\b/i,
-    /\s+BDRIP\b/i,
-    /\s+TELECINE\b/i,
-    /\s+TELESYNC\b/i,
-    /\s+CAMRIP\b/i,
-    /\s+CAM\b/i,
-    /\s+HEVC\b/i,
-    /\s+H[ ._-]?265\b/i,
-    /\s+X265\b/i,
-    /\s+AVC\b/i,
-    /\s+H[ ._-]?264\b/i,
-    /\s+X264\b/i,
-    /\s+AV1\b/i,
-    /\s+DOLBY[ ._-]?VISION\b/i,
-    /\s+HDR10\+\b/i,
-    /\s+HDR10\b/i,
-    /\s+HDR\b/i,
-    /\s+ATMOS\b/i,
-    /\s+DDP[ ._-]?7[ ._-]?1\b/i,
-    /\s+DDP[ ._-]?5[ ._-]?1\b/i,
-    /\s+DD[ ._-]?5[ ._-]?1\b/i,
-    /\s+DTS\b/i,
-    /\s+AAC\b/i
-  ];
+  title = title.replace(
+    /[._]+/g,
+    " "
+  );
 
-  let cutIndex =
-    title.length;
+  title = title.replace(
+    /\s{2,}/g,
+    " "
+  );
 
-  for (
-    const marker of markers
-  ) {
-    const match =
-      title.match(
-        marker
-      );
+  title = title.trim();
 
-    if (
-      match &&
-      match.index !== undefined &&
-      match.index < cutIndex
-    ) {
-      cutIndex =
-        match.index;
-    }
+  const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+
+  if (yearMatch) {
+
+    const year = yearMatch[0];
+
+    title = title
+      .replace(year, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+    title = `${title} (${year})`;
+
   }
-
-  title =
-    title
-      .slice(
-        0,
-        cutIndex
-      )
-      .trim();
-
-  /*
-   * Clean trailing separators left behind
-   * after removing the technical portion.
-   */
-
-  title =
-    title
-      .replace(
-        /[\s._-]+$/,
-        ""
-      )
-      .replace(
-        /[_]+/g,
-        " "
-      )
-      .trim();
 
   return title;
 }
+  
 
 // ---------------------------------------------------------
 // Technical metadata
@@ -1864,12 +1790,8 @@ function buildStreamTitle(
       type
     );
 
-  if (
-    title
-  ) {
-    lines.push(
-      title
-    );
+  if (title) {
+    lines.push(title);
   }
 
   if (
@@ -1882,9 +1804,16 @@ function buildStreamTitle(
     );
   }
 
-  return lines.join(
-    "\n"
-  );
+  const technical =
+    getTechnicalMetadata(
+      item.fileName
+    );
+
+  if (technical) {
+    lines.push(technical);
+  }
+
+  return lines.join("\n");
 }
 // ---------------------------------------------------------
 // Build FebBox streams
