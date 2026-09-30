@@ -1,4 +1,3 @@
-console.log("[MovieBox PROVIDER] EXACT-NUVIO-2026-09-30-B");
 import {
   getConfig
 } from "./config-store.js";
