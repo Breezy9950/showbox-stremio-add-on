@@ -578,9 +578,35 @@ async function movieBoxRequest(
         );
 
       if (!res.ok) {
-        console.log(
-          `[MovieBox] Request failed: ${res.status} ${requestUrl.host}`
-        );
+  let errorBody = "";
+
+  try {
+    errorBody = await res.text();
+  } catch {}
+
+  console.log(
+    `[MovieBox] Request failed: ${res.status} ${requestUrl.host}`
+  );
+
+  if (errorBody) {
+    console.log(
+      `[MovieBox] Error body: ${errorBody.slice(0, 1000)}`
+    );
+  }
+
+  if (
+    (
+      res.status === 403 ||
+      res.status === 429 ||
+      res.status >= 500
+    ) &&
+    attempt + 1 < maxAttempts
+  ) {
+    continue;
+  }
+
+  return null;
+}
 
         if (
           (
