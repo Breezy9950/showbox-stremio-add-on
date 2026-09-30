@@ -1113,7 +1113,11 @@ function cleanFilename(
 // ---------------------------------------------------------
 // Extract title from FebBox filename
 // ---------------------------------------------------------
-function getTitleFromFilename(fileName, type) {
+
+function getTitleFromFilename(
+  fileName,
+  type
+) {
 
   if (
     typeof fileName !== "string" ||
@@ -1122,54 +1126,74 @@ function getTitleFromFilename(fileName, type) {
     return "";
   }
 
-  let title = fileName
-    .replace(/\.[^.]+$/, "")
-    .trim();
+  let title =
+    fileName
+      .replace(
+        /\.[^.]+$/,
+        ""
+      )
+      .trim();
 
-  if (type === "series") {
+  if (
+    type === "series"
+  ) {
+    title =
+      title.replace(
+        /[.\s_-]+S\d{1,2}E\d{1,2}.*$/i,
+        ""
+      );
+  }
 
-    title = title.replace(
-      /[.\s_-]+S\d{1,2}E\d{1,2}.*$/i,
+  title =
+    title.replace(
+      /[.\s_-]+(?:2160p|1440p|1080p|720p|576p|480p|360p|4K|UHD|8K|WEB[-_. ]?DL|WEB[-_. ]?Rip|WEBRip|BluRay|BRRip|BDRip|HDRip|HDTV|DVDRip|CAMRip|CAM|TELESYNC|TELECINE|TS|TC|REMUX|REPACK|PROPER|LIMITED|IMAX|AMZN|NF|DSNP|HMAX|ATVP|HULU|MAX|HBO|CRAVES|x264|x265|H264|H265|HEVC|AVC|AAC|AC3|EAC3|DDP|DD\+|DTS|TRUEHD|ATMOS|MULTI|DUAL|ENG|ENGLISH|SUB|DUB|YT|SUPPLY).*$/i,
       ""
     );
 
-  }
+  title =
+    title.replace(
+      /[._]+/g,
+      " "
+    );
 
-  title = title.replace(
-    /[.\s_-]+(?:2160p|1440p|1080p|720p|576p|480p|360p|4K|UHD|8K|WEB[-_. ]?DL|WEB[-_. ]?Rip|WEBRip|BluRay|BRRip|BDRip|HDRip|HDTV|DVDRip|CAMRip|CAM|TELESYNC|TELECINE|TS|TC|REMUX|REPACK|PROPER|LIMITED|IMAX|AMZN|NF|DSNP|HMAX|ATVP|HULU|MAX|HBO|CRAVES|x264|x265|H264|H265|HEVC|AVC|AAC|AC3|EAC3|DDP|DD\+|DTS|TRUEHD|ATMOS|MULTI|DUAL|ENG|ENGLISH|SUB|DUB|YT|SUPPLY).*$/i,
-    ""
-  );
+  title =
+    title.replace(
+      /\s{2,}/g,
+      " "
+    );
 
-  title = title.replace(
-    /[._]+/g,
-    " "
-  );
+  title =
+    title.trim();
 
-  title = title.replace(
-    /\s{2,}/g,
-    " "
-  );
+  const yearMatch =
+    title.match(
+      /\b(19|20)\d{2}\b/
+    );
 
-  title = title.trim();
+  if (
+    yearMatch
+  ) {
+    const year =
+      yearMatch[0];
 
-  const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+    title =
+      title
+        .replace(
+          year,
+          ""
+        )
+        .replace(
+          /\s{2,}/g,
+          " "
+        )
+        .trim();
 
-  if (yearMatch) {
-
-    const year = yearMatch[0];
-
-    title = title
-      .replace(year, "")
-      .replace(/\s{2,}/g, " ")
-      .trim();
-
-    title = `${title} (${year})`;
-
+    title =
+      `${title} (${year})`;
   }
 
   return title;
 }
-  
 
 // ---------------------------------------------------------
 // Technical metadata
@@ -1189,7 +1213,6 @@ function getTechnicalMetadata(
     name.toUpperCase();
 
   const result = [];
-
 
   // -------------------------------------------------------
   // Source / release type
@@ -1266,9 +1289,7 @@ function getTechnicalMetadata(
     result.push(
       "CAM"
     );
-
   }
-
 
   // -------------------------------------------------------
   // Dynamic range
@@ -1286,12 +1307,10 @@ function getTechnicalMetadata(
     result.push(
       "DV"
     );
-
   }
 
-
   if (
-    /\bHDR10\+\b/.test(
+    /\bHDR10\+/.test(
       upper
     ) ||
     /\bHDR10PLUS\b/.test(
@@ -1332,9 +1351,7 @@ function getTechnicalMetadata(
     result.push(
       "HLG"
     );
-
   }
-
 
   // -------------------------------------------------------
   // Audio codec
@@ -1349,9 +1366,7 @@ function getTechnicalMetadata(
     result.push(
       "Atmos"
     );
-
   }
-
 
   if (
     /\bDDP[ ._-]?7[ ._-]?1\b/.test(
@@ -1402,9 +1417,7 @@ function getTechnicalMetadata(
     result.push(
       "AAC"
     );
-
   }
-
 
   // -------------------------------------------------------
   // Video codec
@@ -1451,9 +1464,7 @@ function getTechnicalMetadata(
     result.push(
       "AV1"
     );
-
   }
-
 
   return result;
 }
@@ -1790,8 +1801,12 @@ function buildStreamTitle(
       type
     );
 
-  if (title) {
-    lines.push(title);
+  if (
+    title
+  ) {
+    lines.push(
+      title
+    );
   }
 
   if (
@@ -1809,12 +1824,56 @@ function buildStreamTitle(
       item.fileName
     );
 
-  if (technical) {
-    lines.push(technical);
+  if (
+    Array.isArray(technical) &&
+    technical.length
+  ) {
+    lines.push(
+      technical.join(".")
+    );
   }
 
-  return lines.join("\n");
+  const audioLanguages =
+    getAudioLanguages(
+      item
+    );
+
+  if (
+    audioLanguages.length
+  ) {
+    lines.push(
+      `Audio: ${audioLanguages.join(", ")}`
+    );
+  }
+
+  const subtitleLanguages =
+    getSubtitleLanguages(
+      item
+    );
+
+  if (
+    subtitleLanguages.length
+  ) {
+    lines.push(
+      `Subtitles: ${subtitleLanguages.join(", ")}`
+    );
+  }
+
+  if (
+    item.size !== undefined &&
+    item.size !== null &&
+    String(item.size).trim()
+  ) {
+    lines.push(
+      String(item.size).trim()
+    );
+  }
+
+  return lines.join(
+    "\n"
+  );
 }
+
 // ---------------------------------------------------------
 // Build FebBox streams
 // ---------------------------------------------------------
@@ -2130,15 +2189,17 @@ function getStreamQuality(
    * Movie:
    *   title
    *   technical
+   *   audio
+   *   subtitles
    *   size
    *
    * Series:
    *   title
    *   S01E01
    *   technical
+   *   audio
+   *   subtitles
    *   size
-   *
-   * Preserve the existing series behavior.
    */
 
   const lines =
@@ -2146,14 +2207,21 @@ function getStreamQuality(
       "\n"
     );
 
-  const firstLine =
-    lines.length >= 4
-      ? lines[2] || ""
-      : lines[1] || "";
+  const technicalIndex =
+    lines.length >= 2 &&
+    /^S\d{2}E\d{2}$/i.test(
+      lines[1] || ""
+    )
+      ? 2
+      : 1;
+
+  const technicalLine =
+    lines[technicalIndex] || "";
 
   const qualityFromTitle =
     getCanonicalQuality(
-      firstLine
+      technicalLine
+        .split(".")[0]
     );
 
   if (
