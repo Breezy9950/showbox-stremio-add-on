@@ -14,6 +14,9 @@ const UPSTREAM_TIMEOUT_MS =
 const MAX_FILES_PER_REQUEST =
   25;
 
+const QUALITY_REQUEST_CONCURRENCY =
+  5;
+
 // ---------------------------------------------------------
 // Fetch with timeout
 // ---------------------------------------------------------
@@ -812,9 +815,9 @@ async function findFebboxFiles(
 
         fid:
           file.fid
-      })
-    )
-  );
+        })
+      )
+    );
 
   return matchingFiles;
 }
@@ -903,11 +906,6 @@ async function febboxQualityList(
   try {
     data =
       JSON.parse(text);
-
-    console.log(
-      "[ShowBox] FebBox quality JSON:",
-      JSON.stringify(data)
-    );
   } catch {
     data =
       null;
@@ -2180,28 +2178,6 @@ function getStreamQuality(
       stream.title || ""
     );
 
-  /*
-   * The quality is normally the first part
-   * of the technical line.
-   *
-   * The title structure is:
-   *
-   * Movie:
-   *   title
-   *   technical
-   *   audio
-   *   subtitles
-   *   size
-   *
-   * Series:
-   *   title
-   *   S01E01
-   *   technical
-   *   audio
-   *   subtitles
-   *   size
-   */
-
   const lines =
     title.split(
       "\n"
@@ -2246,11 +2222,6 @@ function applyQualitySettings(
       config
     );
 
-  /*
-   * Old configuration URLs don't have
-   * quality settings.
-   */
-
   if (
     !qualityConfig.configured
   ) {
@@ -2265,11 +2236,6 @@ function applyQualitySettings(
             stream
           );
 
-        /*
-         * Keep streams whose quality cannot
-         * be identified.
-         */
-
         if (!quality) {
           return true;
         }
@@ -2279,14 +2245,6 @@ function applyQualitySettings(
         );
       }
     );
-
-  /*
-   * Stable sort:
-   * recognized qualities follow the user's
-   * configured priority.
-   *
-   * Unknown qualities stay after them.
-   */
 
   filtered.sort(
     (a, b) => {
@@ -2354,13 +2312,6 @@ function normalizeStreamFilterConfig(
   const filters =
     config?.filters;
 
-  /*
-   * Old addon configurations don't have
-   * stream filters.
-   *
-   * Default: block CAM / Telecine streams.
-   */
-
   if (
     !filters ||
     typeof filters !== "object"
@@ -2410,17 +2361,6 @@ function applyStreamFilters(
     normalizeStreamFilterConfig(
       config
     );
-
-  /*
-   * Filter the original FebBox file
-   * metadata before streams are built.
-   *
-   * cam === false:
-   *     block CAM / Telecine
-   *
-   * cam === true:
-   *     allow CAM / Telecine
-   */
 
   const filtered =
     qualityResults.filter(
@@ -2564,11 +2504,6 @@ function applyFileSizeSettings(
   const fileSize =
     config?.fileSize;
 
-  /*
-   * No file-size configuration means
-   * preserve the existing behavior.
-   */
-
   if (
     !fileSize ||
     (
@@ -2615,11 +2550,6 @@ function applyFileSizeSettings(
           parseSizeGb(
             stream.size
           );
-
-        /*
-         * If the size is unavailable or
-         * cannot be parsed, keep the stream.
-         */
 
         if (
           sizeGb === null
@@ -2928,37 +2858,69 @@ export default async (
       [];
 
     for (
-      const file of filesToProcess
+      let start = 0;
+      start < filesToProcess.length;
+      start += QUALITY_REQUEST_CONCURRENCY
     ) {
-      try {
-        const results =
-          await febboxQualityList(
-            file,
-            shareKey,
-            parsedToken
-          );
+      const batch =
+        filesToProcess.slice(
+          start,
+          start +
+            QUALITY_REQUEST_CONCURRENCY
+        );
 
-        for (
-          const result of results
+      const results =
+        await Promise.allSettled(
+          batch.map(
+            file =>
+              febboxQualityList(
+                file,
+                shareKey,
+                parsedToken
+              )
+          )
+        );
+
+      for (
+        let i = 0;
+        i < results.length;
+        i++
+      ) {
+        const result =
+          results[i];
+
+        if (
+          result.status ===
+          "fulfilled"
         ) {
-          allQualityResults.push(
-            result
+          for (
+            const stream of result.value
+          ) {
+            allQualityResults.push(
+              stream
+            );
+          }
+        } else {
+          const file =
+            batch[i];
+
+          console.log(
+            "[ShowBox] FebBox file failed:",
+            {
+              file:
+                file?.file_name,
+
+              fid:
+                file?.fid,
+
+              error:
+                result.reason?.message ||
+                String(
+                  result.reason
+                )
+            }
           );
         }
-      } catch (error) {
-        console.log(
-          "[ShowBox] FebBox file failed:",
-          {
-            file:
-              file.file_name,
-
-            fid:
-              file.fid,
-
-            error:
-              error.message
-          }
-        );
       }
     }
 
