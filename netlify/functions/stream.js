@@ -1,3 +1,4 @@
+console.log("[MovieBox] NEW PROVIDER BUILD 2026-09-30-A");
 import {
   getConfig
 } from "./config-store.js";
