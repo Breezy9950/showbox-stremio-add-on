@@ -8,7 +8,7 @@ import {
 
 import {
   getAniZoneStreams
-} from "./anizone.js";
+} from "./providers/anizone.js";
 
 import {
   getStore
@@ -1068,49 +1068,71 @@ export default async (
     // -----------------------------------------------------
     // Provider selection
     //
-    // FebBox is currently the only provider.
-    // Adding another provider later only requires
-    // registering it here.
+    // FebBox + AniZone
     // -----------------------------------------------------
 
-/*const providerStreams =
-  await getFebboxStreams(
-    imdbId,
-    type,
-    season,
-    episode,
-    config
-  );  */
+    const [
+      febboxStreams,
+      aniZoneStreams
+    ] = await Promise.all([
+      getFebboxStreams(
+        imdbId,
+        type,
+        season,
+        episode,
+        config
+      ).catch(error => {
+        console.error(
+          "[STREAM] FebBox provider failed:",
+          error?.stack ||
+            error?.message ||
+            error
+        );
 
-  const [febboxStreams,aniZoneStreams] = await Promise.all([
-  getFebboxStreams(
-    imdbId,
-    type,
-    season,
-    episode,
-    config
-  ).catch(() => []),
-  getAniZoneStreams({
-    imdbId,
-    type,
-    season,
-    episode
-  }).catch(() => [])
-]);
+        return [];
+      }),
 
-// -----------------------------------------------------
-// Combine provider results
-// -----------------------------------------------------
+      getAniZoneStreams({
+        imdbId,
+        type,
+        season,
+        episode
+      }).catch(error => {
+        console.error(
+          "[STREAM] AniZone provider failed:",
+          error?.stack ||
+            error?.message ||
+            error
+        );
 
-const providerStreams = [
-  ...febboxStreams,
-  ...aniZoneStreams
-];
-    
-const streams =
-  dedupeStreams(
-    providerStreams
-  );
+        return [];
+      })
+    ]);
+
+    console.log(
+      "[STREAM] Provider results:",
+      {
+        febbox:
+          febboxStreams.length,
+
+        aniZone:
+          aniZoneStreams.length
+      }
+    );
+
+    // -----------------------------------------------------
+    // Combine provider results
+    // -----------------------------------------------------
+
+    const providerStreams = [
+      ...febboxStreams,
+      ...aniZoneStreams
+    ];
+
+    const streams =
+      dedupeStreams(
+        providerStreams
+      );
 
     // -----------------------------------------------------
     // Common CAM / Telecine filtering
@@ -1182,7 +1204,14 @@ const streams =
       }
     );
 
-  } catch {
+  } catch (error) {
+    console.error(
+      "[STREAM] Fatal error:",
+      error?.stack ||
+        error?.message ||
+        error
+    );
+
     return new Response(
       JSON.stringify({
         streams: []
