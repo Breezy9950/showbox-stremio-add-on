@@ -301,10 +301,26 @@ export async function resolveFlixCloud(
 );
 
   if (!embedResponse.ok) {
-    throw new Error(
-      `FlixCloud embed HTTP ${embedResponse.status}`
-    );
-  }
+  const body = await embedResponse.text();
+
+  console.error(
+    `[FlixCloud] Embed HTTP ${embedResponse.status}`
+  );
+
+  console.error(
+    `[FlixCloud] Response headers:`,
+    Object.fromEntries(embedResponse.headers.entries())
+  );
+
+  console.error(
+    `[FlixCloud] Response body:`,
+    body.substring(0, 1000)
+  );
+
+  throw new Error(
+    `FlixCloud embed HTTP ${embedResponse.status}`
+  );
+}
 
   const html =
     await embedResponse.text();
