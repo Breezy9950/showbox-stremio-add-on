@@ -7,6 +7,10 @@ import {
 } from "./providers/febbox.js";
 
 import {
+  getStreams as getAniKotoStreams
+} from "./providers/anikoto.js";
+
+import {
   getStore
 } from "@netlify/blobs";
 
@@ -1107,7 +1111,7 @@ export default async (
     // FETCH FEBBOX
     // =====================================================
 
-    const febboxStreams =
+        const febboxStreams =
       await getFebboxStreams({
         imdbId,
         type,
@@ -1125,16 +1129,42 @@ export default async (
         return [];
       });
 
+    const aniKotoStreams =
+      type === "series"
+        ? await getAniKotoStreams({
+            imdbId,
+            type,
+            season,
+            episode
+          }).catch(error => {
+            console.error(
+              "[STREAM] AniKoto provider failed:",
+              error?.stack ||
+                error?.message ||
+                error
+            );
+
+            return [];
+          })
+        : [];
+
     // -----------------------------------------------------
     // Ensure array
     // -----------------------------------------------------
 
-    const streams =
-      Array.isArray(
+    const streams = [
+      ...(Array.isArray(
         febboxStreams
       )
         ? febboxStreams
-        : [];
+        : []),
+
+      ...(Array.isArray(
+        aniKotoStreams
+      )
+        ? aniKotoStreams
+        : [])
+    ];
 
     // =====================================================
     // DEDUPE
