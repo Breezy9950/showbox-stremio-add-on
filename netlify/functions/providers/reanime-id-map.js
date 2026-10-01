@@ -1,18 +1,9 @@
-import { getStore } from "@netlify/blobs";
+import {
+  getStore
+} from "@netlify/blobs";
 
 // =========================================================
-// REANIME IMDb → AniList MAPPING CACHE
-// =========================================================
-//
-// Uses AniBridge v3 mappings.
-// The upstream dataset is updated daily.
-//
-// We download it at most once every 24 hours and store a
-// compact IMDb → AniList index in Netlify Blobs.
-//
-// If refreshing fails, an existing expired cache is still
-// usable. If no cache exists, ReAnime's original resolver
-// can be used as the fallback.
+// ANIBRIDGE IMDb → AniList MAPPING
 // =========================================================
 
 const MAPPING_STORE =
@@ -24,18 +15,36 @@ const MAPPING_KEY =
 const MAPPING_TTL_MS =
   24 * 60 * 60 * 1000;
 
+// AniBridge v3 mapping release.
+//
+// Keep this URL in one place so it can be changed easily
+// if AniBridge changes its release structure.
 const MAPPING_URL =
   "https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json";
 
+// =========================================================
+// STORE
+// =========================================================
+
 function getMappingStore() {
   return getStore({
-    name: MAPPING_STORE,
-    consistency: "strong"
+    name:
+      MAPPING_STORE,
+
+    consistency:
+      "strong"
   });
 }
 
 // =========================================================
-// Parse AniBridge descriptor
+// DESCRIPTOR PARSER
+//
+// Examples:
+//
+// imdb_movie:tt1234567
+// imdb_show:tt1234567:s1
+// anilist:12345
+// tmdb_show:12345:s2
 // =========================================================
 
 function parseDescriptor(
@@ -51,7 +60,9 @@ function parseDescriptor(
       /^([^:]+):([^:]+)(?::s(\d+))?$/
     );
 
-  if (!match) {
+  if (
+    !match
+  ) {
     return null;
   }
 
@@ -65,12 +76,20 @@ function parseDescriptor(
     season:
       match[3] === undefined
         ? null
-        : Number(match[3])
+        : Number(
+            match[3]
+          )
   };
 }
 
 // =========================================================
-// Parse episode range
+// RANGE PARSER
+//
+// Supported:
+//
+// 1
+// 1-12
+// 13-
 // =========================================================
 
 function parseRange(
@@ -86,7 +105,9 @@ function parseRange(
       /^(\d+)(?:-(\d*))?$/
     );
 
-  if (!match) {
+  if (
+    !match
+  ) {
     return null;
   }
 
@@ -96,8 +117,8 @@ function parseRange(
     );
 
   const end =
-    match[2] === "" ||
-    match[2] === undefined
+    match[2] === undefined ||
+    match[2] === ""
       ? Infinity
       : Number(
           match[2]
@@ -110,10 +131,17 @@ function parseRange(
 }
 
 // =========================================================
-// Parse target segment
+// TARGET RANGE PARSER
+//
+// AniBridge can describe multiple target ranges.
+//
+// Example:
+//
+// "1-12"
+// "1-12,13-24"
 // =========================================================
 
-function parseTargetSegment(
+function parseTargetRanges(
   value
 ) {
   let text =
@@ -124,12 +152,22 @@ function parseTargetSegment(
   let ratio =
     1;
 
+  // Some AniBridge mappings can contain a ratio suffix.
+  //
+  // Example:
+  //
+  // 1-12|0.5
+  //
+  // Keep it supported so the index does not lose
+  // information from the upstream mapping.
   const ratioMatch =
     text.match(
       /\|(-?\d+(?:\.\d+)?)$/
     );
 
-  if (ratioMatch) {
+  if (
+    ratioMatch
+  ) {
     ratio =
       Number(
         ratioMatch[1]
@@ -142,7 +180,7 @@ function parseTargetSegment(
       );
   }
 
-  const segments =
+  const ranges =
     text
       .split(",")
       .map(
@@ -154,17 +192,17 @@ function parseTargetSegment(
 
   return {
     ratio,
-    segments
+    ranges
   };
 }
 
 // =========================================================
-// Build episode mapping
+// BUILD RANGE MAPPING
 // =========================================================
 
 function buildEpisodeMapping(
   sourceRange,
-  targetValue
+  targetRange
 ) {
   const source =
     parseRange(
@@ -172,13 +210,13 @@ function buildEpisodeMapping(
     );
 
   const target =
-    parseTargetSegment(
-      targetValue
+    parseTargetRanges(
+      targetRange
     );
 
   if (
     !source ||
-    !target.segments.length
+    !target.ranges.length
   ) {
     return null;
   }
@@ -194,23 +232,36 @@ function buildEpisodeMapping(
       target.ratio,
 
     targets:
-      target.segments.map(
-        segment => ({
-          start:
-            segment.start,
-
-          end:
-            segment.end
-        })
-      )
+      target.ranges
   };
 }
 
 // =========================================================
-// Build compact IMDb index
+// BUILD COMPACT INDEX
+// =========================================================
+//
+// Instead of keeping the complete AniBridge database in
+// memory for every request, turn it into:
+//
+// {
+//   movies: {
+//      "tt123": "12345"
+//   },
+//
+//   shows: {
+//      "tt123|1": [
+//         {
+//           anilistId: "12345",
+//           ranges: [...]
+//         }
+//      ]
+//   }
+// }
+//
+// This is much smaller and faster to query.
 // =========================================================
 
-function makeIndex(
+function buildIndex(
   raw
 ) {
   const movies =
@@ -239,14 +290,15 @@ function makeIndex(
     if (
       !source ||
       !targets ||
-      typeof targets !== "object"
+      typeof targets !==
+        "object"
     ) {
       continue;
     }
 
-    // -----------------------------------------------------
-    // IMDb movie
-    // -----------------------------------------------------
+    // =====================================================
+    // MOVIE
+    // =====================================================
 
     if (
       source.provider ===
@@ -254,7 +306,9 @@ function makeIndex(
     ) {
       for (
         const targetDescriptor of
-        Object.keys(targets)
+        Object.keys(
+          targets
+        )
       ) {
         const target =
           parseDescriptor(
@@ -262,20 +316,19 @@ function makeIndex(
           );
 
         if (
-          target?.provider !==
-          "anilist"
+          !target ||
+          target.provider !==
+            "anilist"
         ) {
           continue;
         }
 
-        if (
-          !movies[source.id]
-        ) {
-          movies[source.id] =
-            String(
-              target.id
-            );
-        }
+        movies[
+          source.id
+        ] =
+          String(
+            target.id
+          );
 
         break;
       }
@@ -283,9 +336,9 @@ function makeIndex(
       continue;
     }
 
-    // -----------------------------------------------------
-    // IMDb series season
-    // -----------------------------------------------------
+    // =====================================================
+    // SERIES / SEASON
+    // =====================================================
 
     if (
       source.provider !==
@@ -315,19 +368,24 @@ function makeIndex(
         );
 
       if (
-        target?.provider !==
-        "anilist"
+        !target ||
+        target.provider !==
+          "anilist"
       ) {
         continue;
       }
 
-      const mappingRanges =
+      const mappings =
         [];
+
+      // ---------------------------------------------------
+      // AniBridge may have episode range information.
+      // ---------------------------------------------------
 
       if (
         ranges &&
-        typeof ranges === "object" &&
-        Object.keys(ranges).length
+        typeof ranges ===
+          "object"
       ) {
         for (
           const [
@@ -346,7 +404,7 @@ function makeIndex(
           if (
             mapping
           ) {
-            mappingRanges.push(
+            mappings.push(
               mapping
             );
           }
@@ -360,7 +418,7 @@ function makeIndex(
           ),
 
         ranges:
-          mappingRanges
+          mappings
       });
     }
 
@@ -379,7 +437,7 @@ function makeIndex(
 }
 
 // =========================================================
-// Convert source episode → AniList episode
+// SOURCE EPISODE → ANILIST EPISODE
 // =========================================================
 
 function findTargetEpisode(
@@ -400,7 +458,10 @@ function findTargetEpisode(
     return null;
   }
 
-  // No range means direct episode mapping.
+  // No range information.
+  //
+  // In this case the mapping is already an AniList
+  // season mapping, so preserve the requested episode.
   if (
     !mapping.ranges.length
   ) {
@@ -413,14 +474,17 @@ function findTargetEpisode(
   ) {
     if (
       sourceEpisode <
-        range.sourceStart ||
-      (
-        Number.isFinite(
-          range.sourceEnd
-        ) &&
-        sourceEpisode >
-          range.sourceEnd
-      )
+        range.sourceStart
+    ) {
+      continue;
+    }
+
+    if (
+      Number.isFinite(
+        range.sourceEnd
+      ) &&
+      sourceEpisode >
+        range.sourceEnd
     ) {
       continue;
     }
@@ -429,9 +493,9 @@ function findTargetEpisode(
       sourceEpisode -
       range.sourceStart;
 
-    // -----------------------------------------------------
-    // Normal 1:1 mapping
-    // -----------------------------------------------------
+    // =====================================================
+    // NORMAL 1:1
+    // =====================================================
 
     if (
       range.ratio === 1
@@ -469,9 +533,9 @@ function findTargetEpisode(
       return null;
     }
 
-    // -----------------------------------------------------
-    // One source episode → multiple target episodes
-    // -----------------------------------------------------
+    // =====================================================
+    // SOURCE → TARGET RATIO
+    // =====================================================
 
     if (
       range.ratio > 0
@@ -515,9 +579,9 @@ function findTargetEpisode(
       return null;
     }
 
-    // -----------------------------------------------------
-    // Multiple source episodes → one target episode
-    // -----------------------------------------------------
+    // =====================================================
+    // MULTIPLE SOURCE → ONE TARGET
+    // =====================================================
 
     const divisor =
       Math.abs(
@@ -559,127 +623,16 @@ function findTargetEpisode(
       remaining -=
         length;
     }
-
-    return null;
   }
 
   return null;
 }
 
 // =========================================================
-// Lookup IMDb ID
+// CACHE READ
 // =========================================================
 
-function resolveFromIndex(
-  index,
-  imdbId,
-  type,
-  season,
-  episode
-) {
-  if (
-    !index ||
-    !imdbId
-  ) {
-    return null;
-  }
-
-  const normalizedId =
-    String(
-      imdbId
-    ).trim();
-
-  // -----------------------------------------------------
-  // Movie
-  // -----------------------------------------------------
-
-  if (
-    type === "movie"
-  ) {
-    const anilistId =
-      index.movies?.[
-        normalizedId
-      ];
-
-    if (
-      !anilistId
-    ) {
-      return null;
-    }
-
-    return {
-      anilistId:
-        String(
-          anilistId
-        ),
-
-      episode:
-        1,
-
-      source:
-        "anibridge"
-    };
-  }
-
-  // -----------------------------------------------------
-  // Series
-  // -----------------------------------------------------
-
-  const key =
-    `${normalizedId}|${Number(
-      season
-    )}`;
-
-  const candidates =
-    index.shows?.[
-      key
-    ];
-
-  if (
-    !Array.isArray(
-      candidates
-    ) ||
-    !candidates.length
-  ) {
-    return null;
-  }
-
-  for (
-    const candidate of
-    candidates
-  ) {
-    const targetEpisode =
-      findTargetEpisode(
-        candidate,
-        episode
-      );
-
-    if (
-      targetEpisode
-    ) {
-      return {
-        anilistId:
-          String(
-            candidate.anilistId
-          ),
-
-        episode:
-          targetEpisode,
-
-        source:
-          "anibridge"
-      };
-    }
-  }
-
-  return null;
-}
-
-// =========================================================
-// Read valid cache
-// =========================================================
-
-async function readCachedIndex() {
+async function readFreshCache() {
   try {
     const store =
       getMappingStore();
@@ -699,6 +652,14 @@ async function readCachedIndex() {
     if (
       !cached ||
       typeof cached !==
+        "object"
+    ) {
+      return null;
+    }
+
+    if (
+      !cached.index ||
+      typeof cached.index !==
         "object"
     ) {
       return null;
@@ -725,25 +686,50 @@ async function readCachedIndex() {
       return null;
     }
 
-    if (
-      !cached.index ||
-      typeof cached.index !==
-        "object"
-    ) {
-      return null;
-    }
-
     return cached;
+
   } catch {
     return null;
   }
 }
 
 // =========================================================
-// Download + rebuild index
+// EXPIRED CACHE
+// =========================================================
+//
+// Used if AniBridge is temporarily unavailable.
 // =========================================================
 
-async function refreshIndex() {
+async function readAnyCache() {
+  try {
+    const store =
+      getMappingStore();
+
+    return await store.get(
+      MAPPING_KEY,
+      {
+        type:
+          "json",
+
+        consistency:
+          "strong"
+      }
+    );
+
+  } catch {
+    return null;
+  }
+}
+
+// =========================================================
+// REFRESH
+// =========================================================
+
+async function refreshMapping() {
+  console.log(
+    "[Reanime] Downloading AniBridge mapping..."
+  );
+
   const response =
     await fetch(
       MAPPING_URL,
@@ -762,7 +748,7 @@ async function refreshIndex() {
     !response.ok
   ) {
     throw new Error(
-      `AniBridge mapping download failed: HTTP ${response.status}`
+      `AniBridge returned HTTP ${response.status}`
     );
   }
 
@@ -770,7 +756,7 @@ async function refreshIndex() {
     await response.json();
 
   const index =
-    makeIndex(
+    buildIndex(
       raw
     );
 
@@ -785,11 +771,11 @@ async function refreshIndex() {
     ).length;
 
   if (
-    !movieCount &&
-    !showCount
+    movieCount === 0 &&
+    showCount === 0
   ) {
     throw new Error(
-      "AniBridge mapping contained no IMDb mappings"
+      "AniBridge mapping produced an empty index"
     );
   }
 
@@ -812,7 +798,7 @@ async function refreshIndex() {
   );
 
   console.log(
-    `[Reanime] AniBridge mapping refreshed: ${movieCount} movies, ${showCount} show-season mappings`
+    `[Reanime] AniBridge mapping refreshed: ${movieCount} movies, ${showCount} show seasons`
   );
 
   return cached;
@@ -840,10 +826,10 @@ export async function resolveImdbToAnilist({
   }
 
   let cached =
-    await readCachedIndex();
+    await readFreshCache();
 
   // -------------------------------------------------------
-  // Cache expired/missing → refresh
+  // Refresh every 24 hours.
   // -------------------------------------------------------
 
   if (
@@ -851,49 +837,138 @@ export async function resolveImdbToAnilist({
   ) {
     try {
       cached =
-        await refreshIndex();
+        await refreshMapping();
+
     } catch (
       error
     ) {
       console.error(
-        "[Reanime] AniBridge mapping refresh failed:",
+        "[Reanime] AniBridge refresh failed:",
         error?.message ||
           error
       );
 
       // ---------------------------------------------------
-      // Use expired cache if refresh failed.
+      // Keep using old cache if available.
       // ---------------------------------------------------
 
-      try {
-        const store =
-          getMappingStore();
-
-        cached =
-          await store.get(
-            MAPPING_KEY,
-            {
-              type:
-                "json",
-
-              consistency:
-                "strong"
-            }
-          );
-      } catch {
-        cached =
-          null;
-      }
+      cached =
+        await readAnyCache();
     }
   }
 
-  return resolveFromIndex(
-    cached?.index,
+  if (
+    !cached?.index
+  ) {
+    return null;
+  }
+
+  const normalizedId =
     String(
       imdbId
-    ),
-    type,
-    season,
-    episode
-  );
+    ).trim();
+
+  // =====================================================
+  // MOVIE
+  // =====================================================
+
+  if (
+    type === "movie"
+  ) {
+    const anilistId =
+      cached.index.movies?.[
+        normalizedId
+      ];
+
+    if (
+      !anilistId
+    ) {
+      return null;
+    }
+
+    return {
+      anilistId:
+        String(
+          anilistId
+        ),
+
+      episode:
+        1,
+
+      source:
+        "anibridge"
+    };
+  }
+
+  // =====================================================
+  // SERIES
+  // =====================================================
+
+  const seasonNumber =
+    Number(
+      season
+    );
+
+  const episodeNumber =
+    Number(
+      episode
+    );
+
+  if (
+    !Number.isFinite(
+      seasonNumber
+    ) ||
+    !Number.isFinite(
+      episodeNumber
+    )
+  ) {
+    return null;
+  }
+
+  const key =
+    `${normalizedId}|${seasonNumber}`;
+
+  const candidates =
+    cached.index.shows?.[
+      key
+    ];
+
+  if (
+    !Array.isArray(
+      candidates
+    )
+  ) {
+    return null;
+  }
+
+  for (
+    const candidate of
+    candidates
+  ) {
+    const targetEpisode =
+      findTargetEpisode(
+        candidate,
+        episodeNumber
+      );
+
+    if (
+      targetEpisode !==
+      null
+    ) {
+      return {
+        anilistId:
+          String(
+            candidate.anilistId
+          ),
+
+        episode:
+          targetEpisode,
+
+        source:
+          "anibridge"
+      };
+    }
+  }
+
+  return null;
 }
