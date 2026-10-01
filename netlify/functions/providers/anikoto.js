@@ -307,9 +307,12 @@ function getCandidateId(item){
     item?.series_id??
     item?.seriesId??
     item?.id??
-    item?.slug||
-    item?.url||
+    item?.slug??
+    item?.url??
     item?.link;
+
+  return cleanId(value);
+}
 
   return cleanId(value);
 }
