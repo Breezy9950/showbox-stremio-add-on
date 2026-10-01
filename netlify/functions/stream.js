@@ -163,7 +163,7 @@ async function cacheStreams(
 }
 
 // =========================================================
-// Base64URL
+// BASE64URL
 // =========================================================
 
 function decodeBase64Url(
@@ -196,9 +196,9 @@ function decodeBase64Url(
     );
 }
 
-// ---------------------------------------------------------
-// Legacy configuration parser
-// ---------------------------------------------------------
+// =========================================================
+// LEGACY CONFIGURATION
+// =========================================================
 
 function parseConfig(
   rawConfig
@@ -250,11 +250,6 @@ async function loadConfig(
       return storedConfig;
     }
   }
-
-  /*
-   * Preserve legacy Base64
-   * configuration support.
-   */
 
   return parseConfig(
     rawConfig
@@ -429,7 +424,9 @@ function normalizeQualityConfig(
 
   return {
     enabled,
+
     priority,
+
     configured:
       true
   };
@@ -448,15 +445,51 @@ function getStreamQuality(
     return "";
   }
 
-  const name =
+  const nameText =
+    String(
+      stream.name || ""
+    ).trim();
+
+  const nameQuality =
     getCanonicalQuality(
-      stream.name
+      nameText
     );
 
   if (
-    name
+    nameQuality
   ) {
-    return name;
+    return nameQuality;
+  }
+
+  if (
+    /\b(?:org|original)\b/i.test(
+      nameText
+    )
+  ) {
+    return "ORG";
+  }
+
+  if (
+    /\b(?:4k|2160p|2160)\b/i.test(
+      nameText
+    )
+  ) {
+    return "4K";
+  }
+
+  const nameResolution =
+    nameText.match(
+      /\b(1440p|1440|1080p|1080|720p|720|480p|480|360p|360)\b/i
+    );
+
+  if (
+    nameResolution
+  ) {
+    return (
+      getCanonicalQuality(
+        nameResolution[1]
+      ) || ""
+    );
   }
 
   const title =
@@ -464,32 +497,38 @@ function getStreamQuality(
       stream.title || ""
     );
 
-  const firstTechnicalLine =
-    title.split(
-      "\n"
-    )[1] || "";
+  if (
+    /\b(?:org|original)\b/i.test(
+      title
+    )
+  ) {
+    return "ORG";
+  }
 
-  /*
-   * Current provider title format:
-   *
-   * 4K • WEB-RIP • H.265
-   *
-   * Only the first section is the
-   * quality. The rest is technical
-   * metadata.
-   */
+  if (
+    /\b(?:4k|2160p|2160)\b/i.test(
+      title
+    )
+  ) {
+    return "4K";
+  }
 
-  const qualityPart =
-    firstTechnicalLine
-      .split("•")[0]
-      .trim();
+  const titleResolution =
+    title.match(
+      /\b(1440p|1440|1080p|1080|720p|720|480p|480|360p|360)\b/i
+    );
 
-  return (
-    getCanonicalQuality(
-      qualityPart
-    ) ||
-    ""
-  );
+  if (
+    titleResolution
+  ) {
+    return (
+      getCanonicalQuality(
+        titleResolution[1]
+      ) || ""
+    );
+  }
+
+  return "";
 }
 
 // ---------------------------------------------------------
@@ -520,8 +559,7 @@ function applyQualitySettings(
           );
 
         /*
-         * Unknown qualities remain
-         * available.
+         * Unknown qualities remain available.
          */
 
         if (
@@ -534,6 +572,19 @@ function applyQualitySettings(
           quality
         );
       }
+    );
+
+  const priorityMap =
+    new Map(
+      qualityConfig.priority.map(
+        (
+          quality,
+          index
+        ) => [
+          quality,
+          index
+        ]
+      )
     );
 
   filtered.sort(
@@ -552,15 +603,21 @@ function applyQualitySettings(
         );
 
       const ia =
-        qa
-          ? qualityConfig.priority.indexOf(
+        qa &&
+        priorityMap.has(
+          qa
+        )
+          ? priorityMap.get(
               qa
             )
           : Infinity;
 
       const ib =
-        qb
-          ? qualityConfig.priority.indexOf(
+        qb &&
+        priorityMap.has(
+          qb
+        )
+          ? priorityMap.get(
               qb
             )
           : Infinity;
@@ -607,7 +664,7 @@ function normalizeStreamFilterConfig(
 }
 
 // ---------------------------------------------------------
-// CAM / Telecine detection
+// CAM / TELECINE DETECTION
 // ---------------------------------------------------------
 
 function isCamOrTelecine(
@@ -660,13 +717,6 @@ function applyStreamFilters(
 
   return streams.filter(
     stream => {
-      /*
-       * The provider puts the original
-       * filename into the stream title.
-       *
-       * Keep this check defensive.
-       */
-
       const title =
         String(
           stream.title || ""
@@ -689,10 +739,6 @@ function applyStreamFilters(
 // =========================================================
 // FILE SIZE CONFIGURATION
 // =========================================================
-
-// ---------------------------------------------------------
-// Parse file size into GB
-// ---------------------------------------------------------
 
 function parseSizeGb(
   value
@@ -829,10 +875,6 @@ function applyFileSizeSettings(
         parseSizeGb(
           stream.size
         );
-
-      /*
-       * Unknown sizes are kept.
-       */
 
       if (
         sizeGb === null
@@ -999,7 +1041,7 @@ export default async (
     }
 
     // -----------------------------------------------------
-    // Load persistent config
+    // Load configuration
     // -----------------------------------------------------
 
     const config =
@@ -1061,62 +1103,75 @@ export default async (
       );
     }
 
-    // -----------------------------------------------------
-    // Provider selection
-    //
-    // FebBox is currently the only provider.
-    // Adding another provider later only requires
-    // registering it here.
-    // -----------------------------------------------------
+    // =====================================================
+    // FETCH FEBBOX
+    // =====================================================
 
-    const providerStreams =
+    const febboxStreams =
       await getFebboxStreams({
         imdbId,
         type,
         season,
         episode,
-        token,
-        config
+        token
+      }).catch(error => {
+        console.error(
+          "[STREAM] FebBox provider failed:",
+          error?.stack ||
+            error?.message ||
+            error
+        );
+
+        return [];
       });
 
     // -----------------------------------------------------
-    // Combine provider results
+    // Ensure array
     // -----------------------------------------------------
 
     const streams =
+      Array.isArray(
+        febboxStreams
+      )
+        ? febboxStreams
+        : [];
+
+    // =====================================================
+    // DEDUPE
+    // =====================================================
+
+    const uniqueStreams =
       dedupeStreams(
-        [
-          ...providerStreams
-        ]
+        streams
       );
 
-    // -----------------------------------------------------
-    // Common CAM / Telecine filtering
-    // -----------------------------------------------------
+    // =====================================================
+    // COMMON CAM FILTER
+    // =====================================================
 
     const filteredStreams =
       applyStreamFilters(
-        streams,
+        uniqueStreams,
         config
       );
 
-    // -----------------------------------------------------
-    // Common quality settings
-    // -----------------------------------------------------
+    // =====================================================
+    // COMMON QUALITY FILTER
+    // =====================================================
 
-    const qualityFilteredStreams =
+    const qualityStreams =
       applyQualitySettings(
         filteredStreams,
         config
       );
 
-    // -----------------------------------------------------
-    // Common file-size settings
-    // -----------------------------------------------------
+    // =====================================================
+    // COMMON FILE SIZE FILTER
+    // =====================================================
 
     const configuredStreams =
       applyFileSizeSettings(
-        qualityFilteredStreams,
+        qualityStreams,
         config
       );
 
@@ -1129,7 +1184,7 @@ export default async (
     }
 
     // -----------------------------------------------------
-    // Cache final provider-independent result
+    // Cache final result
     // -----------------------------------------------------
 
     await cacheStreams(
@@ -1160,7 +1215,14 @@ export default async (
       }
     );
 
-  } catch {
+  } catch (error) {
+    console.error(
+      "[STREAM] Fatal error:",
+      error?.stack ||
+        error?.message ||
+        error
+    );
+
     return new Response(
       JSON.stringify({
         streams: []
