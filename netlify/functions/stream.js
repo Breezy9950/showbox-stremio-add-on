@@ -7,6 +7,10 @@ import {
 } from "./providers/febbox.js";
 
 import {
+  getStreams as getReanimeStreams
+} from "./providers/reanime.js";
+
+import {
   getStore
 } from "@netlify/blobs";
 
@@ -1104,37 +1108,73 @@ export default async (
     }
 
     // =====================================================
-    // FETCH FEBBOX
-    // =====================================================
+// FETCH PROVIDERS
+// =====================================================
 
-    const febboxStreams =
-      await getFebboxStreams({
-        imdbId,
-        type,
-        season,
-        episode,
-        token
-      }).catch(error => {
-        console.error(
-          "[STREAM] FebBox provider failed:",
-          error?.stack ||
-            error?.message ||
-            error
-        );
+const [
+  febboxResult,
+  reanimeResult
+] = await Promise.all([
+  getFebboxStreams({
+    imdbId,
+    type,
+    season,
+    episode,
+    token
+  }).catch(error => {
+    console.error(
+      "[STREAM] FebBox provider failed:",
+      error?.stack ||
+        error?.message ||
+        error
+    );
 
-        return [];
-      });
+    return [];
+  }),
 
-    // -----------------------------------------------------
-    // Ensure array
-    // -----------------------------------------------------
+  getReanimeStreams({
+    imdbId,
+    type,
+    season,
+    episode
+  }).catch(error => {
+    console.error(
+      "[STREAM] ReAnime provider failed:",
+      error?.stack ||
+        error?.message ||
+        error
+    );
 
-    const streams =
-      Array.isArray(
-        febboxStreams
-      )
-        ? febboxStreams
-        : [];
+    return [];
+  })
+]);
+
+// -----------------------------------------------------
+// Ensure arrays
+// -----------------------------------------------------
+
+const febboxStreams =
+  Array.isArray(
+    febboxResult
+  )
+    ? febboxResult
+    : [];
+
+const reanimeStreams =
+  Array.isArray(
+    reanimeResult
+  )
+    ? reanimeResult
+    : [];
+
+// -----------------------------------------------------
+// Combine providers
+// -----------------------------------------------------
+
+const streams = [
+  ...febboxStreams,
+  ...reanimeStreams
+];
 
     // =====================================================
     // DEDUPE
