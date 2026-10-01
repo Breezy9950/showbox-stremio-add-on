@@ -7,10 +7,6 @@ import {
 } from "./providers/febbox.js";
 
 import {
-  getStreams as getReanimeStreams
-} from "./providers/reanime.js";
-
-import {
   getStore
 } from "@netlify/blobs";
 
@@ -167,7 +163,7 @@ async function cacheStreams(
 }
 
 // =========================================================
-// BASE64URL
+// Base64URL
 // =========================================================
 
 function decodeBase64Url(
@@ -200,9 +196,9 @@ function decodeBase64Url(
     );
 }
 
-// =========================================================
-// LEGACY CONFIGURATION
-// =========================================================
+// ---------------------------------------------------------
+// Legacy configuration parser
+// ---------------------------------------------------------
 
 function parseConfig(
   rawConfig
@@ -254,6 +250,11 @@ async function loadConfig(
       return storedConfig;
     }
   }
+
+  /*
+   * Preserve legacy Base64
+   * configuration support.
+   */
 
   return parseConfig(
     rawConfig
@@ -428,9 +429,7 @@ function normalizeQualityConfig(
 
   return {
     enabled,
-
     priority,
-
     configured:
       true
   };
@@ -449,51 +448,15 @@ function getStreamQuality(
     return "";
   }
 
-  const nameText =
-    String(
-      stream.name || ""
-    ).trim();
-
-  const nameQuality =
+  const name =
     getCanonicalQuality(
-      nameText
+      stream.name
     );
 
   if (
-    nameQuality
+    name
   ) {
-    return nameQuality;
-  }
-
-  if (
-    /\b(?:org|original)\b/i.test(
-      nameText
-    )
-  ) {
-    return "ORG";
-  }
-
-  if (
-    /\b(?:4k|2160p|2160)\b/i.test(
-      nameText
-    )
-  ) {
-    return "4K";
-  }
-
-  const nameResolution =
-    nameText.match(
-      /\b(1440p|1440|1080p|1080|720p|720|480p|480|360p|360)\b/i
-    );
-
-  if (
-    nameResolution
-  ) {
-    return (
-      getCanonicalQuality(
-        nameResolution[1]
-      ) || ""
-    );
+    return name;
   }
 
   const title =
@@ -501,38 +464,32 @@ function getStreamQuality(
       stream.title || ""
     );
 
-  if (
-    /\b(?:org|original)\b/i.test(
-      title
-    )
-  ) {
-    return "ORG";
-  }
+  const firstTechnicalLine =
+    title.split(
+      "\n"
+    )[1] || "";
 
-  if (
-    /\b(?:4k|2160p|2160)\b/i.test(
-      title
-    )
-  ) {
-    return "4K";
-  }
+  /*
+   * Current provider title format:
+   *
+   * 4K • WEB-RIP • H.265
+   *
+   * Only the first section is the
+   * quality. The rest is technical
+   * metadata.
+   */
 
-  const titleResolution =
-    title.match(
-      /\b(1440p|1440|1080p|1080|720p|720|480p|480|360p|360)\b/i
-    );
+  const qualityPart =
+    firstTechnicalLine
+      .split("•")[0]
+      .trim();
 
-  if (
-    titleResolution
-  ) {
-    return (
-      getCanonicalQuality(
-        titleResolution[1]
-      ) || ""
-    );
-  }
-
-  return "";
+  return (
+    getCanonicalQuality(
+      qualityPart
+    ) ||
+    ""
+  );
 }
 
 // ---------------------------------------------------------
@@ -563,7 +520,8 @@ function applyQualitySettings(
           );
 
         /*
-         * Unknown qualities remain available.
+         * Unknown qualities remain
+         * available.
          */
 
         if (
@@ -576,19 +534,6 @@ function applyQualitySettings(
           quality
         );
       }
-    );
-
-  const priorityMap =
-    new Map(
-      qualityConfig.priority.map(
-        (
-          quality,
-          index
-        ) => [
-          quality,
-          index
-        ]
-      )
     );
 
   filtered.sort(
@@ -607,21 +552,15 @@ function applyQualitySettings(
         );
 
       const ia =
-        qa &&
-        priorityMap.has(
-          qa
-        )
-          ? priorityMap.get(
+        qa
+          ? qualityConfig.priority.indexOf(
               qa
             )
           : Infinity;
 
       const ib =
-        qb &&
-        priorityMap.has(
-          qb
-        )
-          ? priorityMap.get(
+        qb
+          ? qualityConfig.priority.indexOf(
               qb
             )
           : Infinity;
@@ -668,7 +607,7 @@ function normalizeStreamFilterConfig(
 }
 
 // ---------------------------------------------------------
-// CAM / TELECINE DETECTION
+// CAM / Telecine detection
 // ---------------------------------------------------------
 
 function isCamOrTelecine(
@@ -721,6 +660,13 @@ function applyStreamFilters(
 
   return streams.filter(
     stream => {
+      /*
+       * The provider puts the original
+       * filename into the stream title.
+       *
+       * Keep this check defensive.
+       */
+
       const title =
         String(
           stream.title || ""
@@ -743,6 +689,10 @@ function applyStreamFilters(
 // =========================================================
 // FILE SIZE CONFIGURATION
 // =========================================================
+
+// ---------------------------------------------------------
+// Parse file size into GB
+// ---------------------------------------------------------
 
 function parseSizeGb(
   value
@@ -879,6 +829,10 @@ function applyFileSizeSettings(
         parseSizeGb(
           stream.size
         );
+
+      /*
+       * Unknown sizes are kept.
+       */
 
       if (
         sizeGb === null
@@ -1045,7 +999,7 @@ export default async (
     }
 
     // -----------------------------------------------------
-    // Load configuration
+    // Load persistent config
     // -----------------------------------------------------
 
     const config =
@@ -1107,111 +1061,62 @@ export default async (
       );
     }
 
-    // =====================================================
-// FETCH PROVIDERS
-// =====================================================
+    // -----------------------------------------------------
+    // Provider selection
+    //
+    // FebBox is currently the only provider.
+    // Adding another provider later only requires
+    // registering it here.
+    // -----------------------------------------------------
 
-const [
-  febboxResult,
-  reanimeResult
-] = await Promise.all([
-  getFebboxStreams({
-    imdbId,
-    type,
-    season,
-    episode,
-    token
-  }).catch(error => {
-    console.error(
-      "[STREAM] FebBox provider failed:",
-      error?.stack ||
-        error?.message ||
-        error
-    );
+    const providerStreams =
+      await getFebboxStreams({
+        imdbId,
+        type,
+        season,
+        episode,
+        token,
+        config
+      });
 
-    return [];
-  }),
+    // -----------------------------------------------------
+    // Combine provider results
+    // -----------------------------------------------------
 
-  getReanimeStreams({
-    imdbId,
-    type,
-    season,
-    episode
-  }).catch(error => {
-    console.error(
-      "[STREAM] ReAnime provider failed:",
-      error?.stack ||
-        error?.message ||
-        error
-    );
-
-    return [];
-  })
-]);
-
-// -----------------------------------------------------
-// Ensure arrays
-// -----------------------------------------------------
-
-const febboxStreams =
-  Array.isArray(
-    febboxResult
-  )
-    ? febboxResult
-    : [];
-
-const reanimeStreams =
-  Array.isArray(
-    reanimeResult
-  )
-    ? reanimeResult
-    : [];
-
-// -----------------------------------------------------
-// Combine providers
-// -----------------------------------------------------
-
-const streams = [
-  ...febboxStreams,
-  ...reanimeStreams
-];
-
-    // =====================================================
-    // DEDUPE
-    // =====================================================
-
-    const uniqueStreams =
+    const streams =
       dedupeStreams(
-        streams
+        [
+          ...providerStreams
+        ]
       );
 
-    // =====================================================
-    // COMMON CAM FILTER
-    // =====================================================
+    // -----------------------------------------------------
+    // Common CAM / Telecine filtering
+    // -----------------------------------------------------
 
     const filteredStreams =
       applyStreamFilters(
-        uniqueStreams,
+        streams,
         config
       );
 
-    // =====================================================
-    // COMMON QUALITY FILTER
-    // =====================================================
+    // -----------------------------------------------------
+    // Common quality settings
+    // -----------------------------------------------------
 
-    const qualityStreams =
+    const qualityFilteredStreams =
       applyQualitySettings(
         filteredStreams,
         config
       );
 
-    // =====================================================
-    // COMMON FILE SIZE FILTER
-    // =====================================================
+    // -----------------------------------------------------
+    // Common file-size settings
+    // -----------------------------------------------------
 
     const configuredStreams =
       applyFileSizeSettings(
-        qualityStreams,
+        qualityFilteredStreams,
         config
       );
 
@@ -1224,7 +1129,7 @@ const streams = [
     }
 
     // -----------------------------------------------------
-    // Cache final result
+    // Cache final provider-independent result
     // -----------------------------------------------------
 
     await cacheStreams(
@@ -1255,14 +1160,7 @@ const streams = [
       }
     );
 
-  } catch (error) {
-    console.error(
-      "[STREAM] Fatal error:",
-      error?.stack ||
-        error?.message ||
-        error
-    );
-
+  } catch {
     return new Response(
       JSON.stringify({
         streams: []
