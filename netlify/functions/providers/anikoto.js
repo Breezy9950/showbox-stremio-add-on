@@ -1361,11 +1361,15 @@ function buildStreamsFromSource(
       type:isHls?"m3u8":"mp4",
       hls:isHls,
       subtitles,
-      headers:{
-        Referer:`${MEGAPLAY_BASE}/`,
-        Origin:MEGAPLAY_BASE,
-        "User-Agent":USER_AGENT
-      }
+      behaviorHints:{
+  proxyHeaders:{
+    request:{
+      Referer:embedUrl,
+      Origin:MEGAPLAY_BASE,
+      "User-Agent":USER_AGENT
+    }
+  }
+}
     });
   }
 
