@@ -314,9 +314,6 @@ function getCandidateId(item){
   return cleanId(value);
 }
 
-  return cleanId(value);
-}
-
 function scoreSearchCandidate(
   item,
   targetTitle,
