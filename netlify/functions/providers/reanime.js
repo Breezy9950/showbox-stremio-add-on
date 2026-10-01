@@ -1,9 +1,8 @@
-import {
-  resolveImdbToAnilist
-} from "./reanime-id-map.js";
+import { resolveImdbToAnilist } from "./reanime-id-map.js";
+import { resolveFlixCloud } from "./flixcloud.js";
 
 // =========================================================
-// REANIME CONSTANTS
+// CONSTANTS
 // =========================================================
 
 const REANIME_DOMAINS = [
@@ -12,11 +11,7 @@ const REANIME_DOMAINS = [
   "https://reanime.wtf"
 ];
 
-const REANIME_BASE =
-  "https://reanime.to";
-
-const FLIXCLOUD_BASE =
-  "https://flixcloud.cc";
+const REANIME_BASE = REANIME_DOMAINS[0];
 
 const TMDB_API_KEY =
   "439c478a771f35c05022f9feabcca01c";
@@ -31,15 +26,14 @@ const CINEMETA_URL =
   "https://v3-cinemeta.strem.io/meta";
 
 const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+  "AppleWebKit/537.36 (KHTML, like Gecko) " +
+  "Chrome/120.0.0.0 Safari/537.36";
 
 const HEADERS = {
-  "User-Agent":
-    USER_AGENT,
-
+  "User-Agent": USER_AGENT,
   "Accept":
     "application/json, text/plain, */*",
-
   "Accept-Language":
     "en-US,en;q=0.9"
 };
@@ -48,35 +42,28 @@ const HEADERS = {
 // ACTIVE REANIME DOMAIN
 // =========================================================
 
-let activeBaseUrl =
-  REANIME_BASE;
+let activeBaseUrl = REANIME_BASE;
 
 // =========================================================
-// ABSOLUTIZE
+// URL HELPERS
 // =========================================================
 
 function absolutize(
   path,
   base = activeBaseUrl
 ) {
-  if (
-    !path
-  ) {
+  if (!path)
     return "";
-  }
 
   if (
-    path.startsWith(
-      "http"
-    )
+    path.startsWith("http://") ||
+    path.startsWith("https://")
   ) {
     return path;
   }
 
   const cleanPath =
-    path.startsWith(
-      "/"
-    )
+    path.startsWith("/")
       ? path
       : `/${path}`;
 
@@ -84,7 +71,7 @@ function absolutize(
 }
 
 // =========================================================
-// FETCH TEXT
+// HTTP
 // =========================================================
 
 async function fetchText(
@@ -92,28 +79,19 @@ async function fetchText(
   options = {}
 ) {
   const isAbsolute =
-    url.startsWith(
-      "http"
-    );
+    url.startsWith("http://") ||
+    url.startsWith("https://");
 
-  const urlsToTry =
-    isAbsolute
-      ? [url]
-      : REANIME_DOMAINS.map(
-          domain =>
-            absolutize(
-              url,
-              domain
-            )
-        );
+  const urlsToTry = isAbsolute
+    ? [url]
+    : REANIME_DOMAINS.map(
+        (domain) =>
+          absolutize(url, domain)
+      );
 
-  let lastError =
-    null;
+  let lastError = null;
 
-  for (
-    const tryUrl of
-    urlsToTry
-  ) {
+  for (const tryUrl of urlsToTry) {
     try {
       console.log(
         `[Reanime HTTP] GET ${tryUrl}`
@@ -127,31 +105,23 @@ async function fetchText(
 
             headers: {
               ...HEADERS,
-
-              ...(options.headers ||
-                {})
+              ...(options.headers || {})
             }
           }
         );
 
       console.log(
-        `[Reanime HTTP] ${response.status} ${tryUrl}`
+        `[Reanime HTTP] ${tryUrl} -> ${response.status}`
       );
 
-      if (
-        response.ok
-      ) {
-        if (
-          !isAbsolute
-        ) {
+      if (response.ok) {
+        if (!isAbsolute) {
           const match =
             tryUrl.match(
               /^(https?:\/\/[^/]+)/
             );
 
-          if (
-            match
-          ) {
+          if (match) {
             activeBaseUrl =
               match[1];
 
@@ -168,32 +138,23 @@ async function fetchText(
         new Error(
           `Reanime HTTP ${response.status}: ${tryUrl}`
         );
+    } catch (error) {
+      lastError = error;
 
-    } catch (
-      error
-    ) {
       console.error(
-        `[Reanime HTTP] Request failed: ${tryUrl}`,
-        error?.message ||
-          error
+        `[Reanime HTTP] ${tryUrl} failed:`,
+        error.message
       );
-
-      lastError =
-        error;
     }
   }
 
   throw (
     lastError ||
     new Error(
-      `Failed to fetch: ${url}`
+      `Failed to fetch ${url}`
     )
   );
 }
-
-// =========================================================
-// FETCH JSON
-// =========================================================
 
 async function fetchJson(
   url,
@@ -208,39 +169,22 @@ async function fetchJson(
         headers: {
           Accept:
             "application/json, text/plain, */*",
-
-          ...(options.headers ||
-            {})
+          ...(options.headers || {})
         }
       }
     );
 
   try {
-    return JSON.parse(
-      text
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(
+      `Invalid JSON from ${url}: ${error.message}`
     );
-  } catch (
-    error
-  ) {
-    console.error(
-      "[Reanime HTTP] JSON parse failed for:",
-      url
-    );
-
-    console.error(
-      "[Reanime HTTP] Response preview:",
-      text.substring(
-        0,
-        500
-      )
-    );
-
-    throw error;
   }
 }
 
 // =========================================================
-// TMDB INFO
+// TMDB
 // =========================================================
 
 async function getTmdbInfo(
@@ -253,17 +197,13 @@ async function getTmdbInfo(
       : "movie";
 
   const url =
-    `https://api.themoviedb.org/3/${endpoint}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=external_ids`;
-
-  console.log(
-    `[Reanime] TMDB lookup: ${tmdbId} (${mediaType})`
-  );
+    `https://api.themoviedb.org/3/${endpoint}/${tmdbId}` +
+    `?api_key=${TMDB_API_KEY}` +
+    `&append_to_response=external_ids`;
 
   try {
     const data =
-      await fetchJson(
-        url
-      );
+      await fetchJson(url);
 
     return {
       title:
@@ -275,101 +215,85 @@ async function getTmdbInfo(
 
       year:
         (
-          (
-            data.first_air_date ||
-            data.release_date ||
-            ""
-          ).match(
-            /\d{4}/
-          ) ||
-          [null]
-        )[0],
-
-      imdbId:
-        data.external_ids &&
-        data.external_ids.imdb_id
-    };
-
-  } catch (
-    error
-  ) {
-    console.error(
-      "[Reanime] TMDB lookup failed:",
-      error?.message ||
-        error
-    );
-
-    return {
-      title:
-        "",
-
-      year:
+          data.first_air_date ||
+          data.release_date ||
+          ""
+        ).match(/\d{4}/)?.[0] ||
         null,
 
       imdbId:
+        data.external_ids?.imdb_id ||
         null
+    };
+  } catch (error) {
+    console.error(
+      `[Reanime] TMDB lookup failed: ${error.message}`
+    );
+
+    return {
+      title: "",
+      year: null,
+      imdbId: null
     };
   }
 }
 
 // =========================================================
-// ANILIST INFO
+// ANILIST
 // =========================================================
 
 async function getAnilistInfo(
   alId
 ) {
   const query =
-    "query($id:Int){Media(id:$id){id title{english romaji native} startDate{year}}}";
-
-  console.log(
-    `[Reanime] AniList metadata lookup: ${alId}`
-  );
+    `
+    query($id:Int) {
+      Media(id:$id) {
+        id
+        title {
+          english
+          romaji
+          native
+        }
+        startDate {
+          year
+        }
+      }
+    }
+    `;
 
   try {
     const json =
       await fetchJson(
         ANILIST_URL,
         {
-          method:
-            "POST",
+          method: "POST",
 
           headers: {
             "Content-Type":
               "application/json"
           },
 
-          body:
-            JSON.stringify({
-              query,
-
-              variables: {
-                id:
-                  parseInt(
-                    alId,
-                    10
-                  )
-              }
-            })
+          body: JSON.stringify({
+            query,
+            variables: {
+              id:
+                parseInt(
+                  alId,
+                  10
+                )
+            }
+          })
         }
       );
 
     const media =
       json?.data?.Media;
 
-    if (
-      !media
-    ) {
-      console.log(
-        `[Reanime] AniList ${alId} returned no Media`
-      );
-
+    if (!media) {
       return {
-        title:
-          "",
-
-        year:
-          null
+        title: "",
+        year: null
       };
     }
 
@@ -384,172 +308,20 @@ async function getAnilistInfo(
         media.startDate?.year ||
         null
     };
-
-  } catch (
-    error
-  ) {
+  } catch (error) {
     console.error(
-      "[Reanime] AniList metadata failed:",
-      error?.message ||
-        error
+      `[Reanime] AniList lookup failed: ${error.message}`
     );
 
     return {
-      title:
-        "",
-
-      year:
-        null
+      title: "",
+      year: null
     };
   }
 }
 
 // =========================================================
-// CINEMETA INFO
-// =========================================================
-
-async function getCinemetaInfo(
-  imdbId,
-  mediaType,
-  season,
-  episode
-) {
-  const type =
-    mediaType === "movie"
-      ? "movie"
-      : "series";
-
-  const url =
-    `${CINEMETA_URL}/${type}/${imdbId}.json`;
-
-  console.log(
-    `[Reanime] Cinemeta lookup: ${url}`
-  );
-
-  try {
-    const data =
-      await fetchJson(
-        url
-      );
-
-    const meta =
-      data.meta;
-
-    if (
-      !meta
-    ) {
-      throw new Error(
-        "No Cinemeta metadata"
-      );
-    }
-
-    if (
-      mediaType === "movie"
-    ) {
-      return {
-        date:
-          meta.released
-            ? meta.released.split(
-                "T"
-              )[0]
-            : null,
-
-        title:
-          meta.name,
-
-        dayIndex:
-          1
-      };
-    }
-
-    const videos =
-      meta.videos ||
-      [];
-
-    const target =
-      videos.find(
-        video =>
-          video.season == season &&
-          video.episode == episode
-      );
-
-    if (
-      !target ||
-      !target.released
-    ) {
-      console.log(
-        `[Reanime] Cinemeta could not find S${season}E${episode}`
-      );
-
-      return {
-        date:
-          null,
-
-        title:
-          null,
-
-        dayIndex:
-          1
-      };
-    }
-
-    const targetDate =
-      target.released.split(
-        "T"
-      )[0];
-
-    const dayIndex =
-      videos.filter(
-        video =>
-          video.season == season &&
-          video.released &&
-          video.released.split(
-            "T"
-          )[0] ===
-            targetDate &&
-          parseInt(
-            video.episode
-          ) <
-            parseInt(
-              episode
-            )
-      ).length + 1;
-
-    return {
-      date:
-        targetDate,
-
-      title:
-        target.name ||
-        null,
-
-      dayIndex
-    };
-
-  } catch (
-    error
-  ) {
-    console.error(
-      "[Reanime] Cinemeta failed:",
-      error?.message ||
-        error
-    );
-
-    return {
-      date:
-        null,
-
-      title:
-        null,
-
-      dayIndex:
-        1
-    };
-  }
-}
-
-// =========================================================
-// ORIGINAL REANIME SYNC RESOLVER
+// CINEMETA / SYNC INFO
 // =========================================================
 
 async function getSyncInfo(
@@ -558,44 +330,122 @@ async function getSyncInfo(
   season,
   episode
 ) {
-  console.log(
-    `[Reanime] Original resolver: ${id} ${mediaType} S${season}E${episode}`
-  );
-
   const isImdb =
-    typeof id ===
-      "string" &&
-    id.startsWith(
-      "tt"
-    );
+    typeof id === "string" &&
+    id.startsWith("tt");
 
-  if (
-    isImdb
-  ) {
+  const getCinemetaInfo =
+    async (imdbId) => {
+      const type =
+        mediaType === "movie"
+          ? "movie"
+          : "series";
+
+      const url =
+        `${CINEMETA_URL}/${type}/${imdbId}.json`;
+
+      try {
+        const data =
+          await fetchJson(url);
+
+        const meta =
+          data.meta;
+
+        if (!meta) {
+          throw new Error(
+            "No Cinemeta metadata"
+          );
+        }
+
+        if (
+          mediaType === "movie"
+        ) {
+          return {
+            date:
+              meta.released
+                ? meta.released.split("T")[0]
+                : null,
+
+            title:
+              meta.name,
+
+            dayIndex: 1
+          };
+        }
+
+        const videos =
+          meta.videos || [];
+
+        const target =
+          videos.find(
+            (video) =>
+              video.season == season &&
+              video.episode == episode
+          );
+
+        if (
+          !target ||
+          !target.released
+        ) {
+          return {
+            date: null,
+            title: null,
+            dayIndex: 1
+          };
+        }
+
+        const targetDate =
+          target.released.split("T")[0];
+
+        const dayIndex =
+          videos.filter(
+            (video) =>
+              video.season == season &&
+              video.released &&
+              video.released.split("T")[0] ===
+                targetDate &&
+              parseInt(
+                video.episode,
+                10
+              ) <
+                parseInt(
+                  episode,
+                  10
+                )
+          ).length + 1;
+
+        return {
+          date: targetDate,
+          title:
+            target.name || null,
+          dayIndex
+        };
+      } catch (error) {
+        console.error(
+          `[Reanime] Cinemeta lookup failed: ${error.message}`
+        );
+
+        return {
+          date: null,
+          title: null,
+          dayIndex: 1
+        };
+      }
+    };
+
+  if (isImdb) {
     const info =
-      await getCinemetaInfo(
-        id,
-        mediaType,
-        season,
-        episode
-      );
+      await getCinemetaInfo(id);
 
-    if (
-      info.date
-    ) {
+    if (info.date) {
       return {
-        imdbId:
-          id,
-
+        imdbId: id,
         releaseDate:
           info.date,
-
         episodeTitle:
           info.title,
-
         dayIndex:
           info.dayIndex,
-
         episode
       };
     }
@@ -606,16 +456,17 @@ async function getSyncInfo(
   }
 
   const tmdbUrl =
-    `https://api.themoviedb.org/3/${mediaType === "movie" ? "movie" : "tv"}/${id}?api_key=${TMDB_API_KEY}&append_to_response=external_ids`;
+    `https://api.themoviedb.org/3/` +
+    `${mediaType === "movie" ? "movie" : "tv"}` +
+    `/${id}` +
+    `?api_key=${TMDB_API_KEY}` +
+    `&append_to_response=external_ids`;
 
   const details =
-    await fetchJson(
-      tmdbUrl
-    );
+    await fetchJson(tmdbUrl);
 
   let imdbId =
-    details.external_ids &&
-    details.external_ids.imdb_id ||
+    details.external_ids?.imdb_id ||
     details.imdb_id ||
     null;
 
@@ -624,37 +475,29 @@ async function getSyncInfo(
     details.title ||
     null;
 
-  if (
-    !imdbId
-  ) {
+  if (!imdbId) {
     try {
       const armData =
         await fetchJson(
           `${ARM_BASE}/themoviedb?id=${id}`
         );
 
-      imdbId =
-        Array.isArray(
-          armData
-        ) &&
+      if (
+        Array.isArray(armData) &&
         armData.length > 0
-          ? armData[0].imdb
-          : null;
-
-    } catch (
-      error
-    ) {
+      ) {
+        imdbId =
+          armData[0].imdb ||
+          null;
+      }
+    } catch (error) {
       console.error(
-        "[Reanime] ARM lookup failed:",
-        error?.message ||
-          error
+        `[Reanime] ARM lookup failed: ${error.message}`
       );
     }
   }
 
-  if (
-    !imdbId
-  ) {
+  if (!imdbId) {
     throw new Error(
       `No IMDb ID found for TMDB ${id}`
     );
@@ -662,10 +505,7 @@ async function getSyncInfo(
 
   const cMeta =
     await getCinemetaInfo(
-      imdbId,
-      mediaType,
-      season,
-      episode
+      imdbId
     );
 
   let finalDate =
@@ -679,9 +519,7 @@ async function getSyncInfo(
       details.release_date;
   }
 
-  if (
-    !finalDate
-  ) {
+  if (!finalDate) {
     throw new Error(
       `Could not find release date for ID ${imdbId}`
     );
@@ -689,27 +527,20 @@ async function getSyncInfo(
 
   return {
     imdbId,
-
-    tmdbId:
-      id,
-
+    tmdbId: id,
     releaseDate:
       finalDate,
-
     title,
-
     episodeTitle:
       cMeta.title,
-
     dayIndex:
       cMeta.dayIndex,
-
     episode
   };
 }
 
 // =========================================================
-// ORIGINAL ANILIST DATE RESOLVER
+// OLD DATE-BASED ANILIST RESOLVER
 // =========================================================
 
 async function resolveByDate(
@@ -719,17 +550,6 @@ async function resolveByDate(
   episodeTitle,
   dayIndex
 ) {
-  console.log(
-    "[Reanime] Original AniList date resolver:",
-    JSON.stringify({
-      releaseDateStr,
-      showTitle,
-      originalEpisode,
-      episodeTitle,
-      dayIndex
-    })
-  );
-
   if (
     !releaseDateStr ||
     !/^\d{4}-\d{2}-\d{2}/.test(
@@ -740,30 +560,59 @@ async function resolveByDate(
   }
 
   const query =
-    "query($search:String){Page(perPage:20){media(search:$search,type:ANIME){id type format title{romaji english native}startDate{year month day}endDate{year month day}episodes streamingEpisodes{title}}}}";
+    `
+    query($search:String) {
+      Page(perPage:20) {
+        media(
+          search:$search,
+          type:ANIME
+        ) {
+          id
+          type
+          format
+          title {
+            romaji
+            english
+            native
+          }
+          startDate {
+            year
+            month
+            day
+          }
+          endDate {
+            year
+            month
+            day
+          }
+          episodes
+          streamingEpisodes {
+            title
+          }
+        }
+      }
+    }
+    `;
 
   try {
     const json =
       await fetchJson(
         ANILIST_URL,
         {
-          method:
-            "POST",
+          method: "POST",
 
           headers: {
             "Content-Type":
               "application/json"
           },
 
-          body:
-            JSON.stringify({
-              query,
-
-              variables: {
-                search:
-                  showTitle
-              }
-            })
+          body: JSON.stringify({
+            query,
+            variables: {
+              search:
+                showTitle
+            }
+          })
         }
       );
 
@@ -771,13 +620,8 @@ async function resolveByDate(
       json?.data?.Page?.media ||
       [];
 
-    console.log(
-      `[Reanime] AniList date resolver candidates: ${candidates.length}`
-    );
-
     if (
-      candidates.length ===
-      0
+      candidates.length === 0
     ) {
       return null;
     }
@@ -788,8 +632,7 @@ async function resolveByDate(
       );
 
     for (
-      const anime of
-      candidates
+      const anime of candidates
     ) {
       const s =
         anime.startDate;
@@ -800,27 +643,16 @@ async function resolveByDate(
         s?.day
           ? `${s.year}-${String(
               s.month
-            ).padStart(
-              2,
-              "0"
-            )}-${String(
+            ).padStart(2, "0")}-${String(
               s.day
-            ).padStart(
-              2,
-              "0"
-            )}`
+            ).padStart(2, "0")}`
           : null;
 
-      if (
-        !startStr
-      ) {
+      if (!startStr)
         continue;
-      }
 
       const startDate =
-        new Date(
-          startStr
-        );
+        new Date(startStr);
 
       const diffDays =
         Math.ceil(
@@ -828,12 +660,7 @@ async function resolveByDate(
             targetDate.getTime() -
               startDate.getTime()
           ) /
-            (
-              1000 *
-              60 *
-              60 *
-              24
-            )
+            (1000 * 60 * 60 * 24)
         );
 
       let isMatch =
@@ -844,16 +671,13 @@ async function resolveByDate(
           "MOVIE" ||
         anime.format ===
           "SPECIAL" ||
-        anime.episodes ===
-          1
+        anime.episodes === 1
       ) {
         if (
           diffDays <= 2
         ) {
-          isMatch =
-            true;
+          isMatch = true;
         }
-
       } else {
         const startLimit =
           new Date(
@@ -876,10 +700,8 @@ async function resolveByDate(
             const endDate =
               new Date(
                 anime.endDate.year,
-                (
-                  anime.endDate.month ||
-                  12
-                ) - 1,
+                (anime.endDate.month ||
+                  12) - 1,
                 anime.endDate.day ||
                   31
               );
@@ -893,37 +715,29 @@ async function resolveByDate(
               targetDate <=
               endDate
             ) {
-              isMatch =
-                true;
+              isMatch = true;
             }
-
           } else {
-            isMatch =
-              true;
+            isMatch = true;
           }
         }
       }
 
-      if (
-        !isMatch
-      ) {
+      if (!isMatch)
         continue;
-      }
 
       const isTV =
         anime.format !==
           "MOVIE" &&
         anime.format !==
           "SPECIAL" &&
-        anime.episodes !==
-          1;
+        anime.episodes !== 1;
 
       let episodeNum =
         isTV &&
         originalEpisode
           ? originalEpisode
-          : dayIndex ||
-            1;
+          : dayIndex || 1;
 
       const episodes =
         anime.streamingEpisodes ||
@@ -976,10 +790,6 @@ async function resolveByDate(
         }
       }
 
-      console.log(
-        `[Reanime] Date resolver matched AniList ${anime.id} -> episode ${episodeNum}`
-      );
-
       return {
         alId:
           anime.id,
@@ -993,14 +803,9 @@ async function resolveByDate(
           anime.title?.native
       };
     }
-
-  } catch (
-    error
-  ) {
+  } catch (error) {
     console.error(
-      "[Reanime] AniList date resolver failed:",
-      error?.stack ||
-        error
+      `[Reanime] Date resolver failed: ${error.message}`
     );
   }
 
@@ -1008,7 +813,7 @@ async function resolveByDate(
 }
 
 // =========================================================
-// REANIME SEARCH
+// TITLE HELPERS
 // =========================================================
 
 function normalizeTitle(
@@ -1024,10 +829,6 @@ function normalizeTitle(
     )
     .trim();
 }
-
-// =========================================================
-// CANDIDATE SCORE
-// =========================================================
 
 function scoreCandidate(
   title,
@@ -1050,73 +851,47 @@ function scoreCandidate(
   }
 
   const a =
-    normalizeTitle(
-      title
-    );
+    normalizeTitle(title);
 
   const b =
-    normalizeTitle(
-      query
-    );
+    normalizeTitle(query);
 
-  if (
-    !a ||
-    !b
-  ) {
+  if (!a || !b)
     return 0;
-  }
 
-  let score =
-    0;
+  let score = 0;
 
-  if (
-    a === b
-  ) {
-    score +=
-      100;
-  }
+  if (a === b)
+    score += 100;
 
   if (
     a.includes(b) ||
     b.includes(a)
   ) {
-    score +=
-      50;
+    score += 50;
   }
 
   const words =
-    b.split(
-      /\s+/
-    ).filter(
-      Boolean
-    );
+    b.split(/\s+/)
+      .filter(Boolean);
 
   for (
-    const word of
-    words
+    const word of words
   ) {
     if (
-      a.includes(
-        word
-      )
+      a.includes(word)
     ) {
-      score +=
-        4;
+      score += 4;
     }
   }
 
   if (
     year &&
-    String(
-      title
-    ).includes(
-      String(
-        year
-      )
+    String(title).includes(
+      String(year)
     )
   ) {
-    score +=
-      10;
+    score += 10;
   }
 
   return score;
@@ -1130,43 +905,28 @@ function extractAnilistId(
   item
 ) {
   const direct =
-    item &&
-    (
-      item.anilist_id ||
-      item.anilistId
-    );
+    item?.anilist_id ||
+    item?.anilistId;
 
-  if (
-    direct
-  ) {
-    return String(
-      direct
-    );
-  }
+  if (direct)
+    return String(direct);
 
   const imageUrls = [
     item?.cover_image?.extra_large,
     item?.cover_image?.large,
     item?.cover_image?.medium,
     item?.banner_image
-  ].filter(
-    Boolean
-  );
+  ].filter(Boolean);
 
   for (
-    const url of
-    imageUrls
+    const url of imageUrls
   ) {
     const match =
-      String(
-        url
-      ).match(
+      String(url).match(
         /\/b?x?(\d+)-|\/(\d+)[-.]/
       );
 
-    if (
-      match
-    ) {
+    if (match) {
       return (
         match[1] ||
         match[2]
@@ -1178,7 +938,7 @@ function extractAnilistId(
 }
 
 // =========================================================
-// SEARCH REANIME
+// REANIME SEARCH FALLBACK
 // =========================================================
 
 async function searchReanimeAnime(
@@ -1186,10 +946,6 @@ async function searchReanimeAnime(
   year,
   targetAnilistId = null
 ) {
-  console.log(
-    `[Reanime] Searching ReAnime: "${query}" (${year || "no year"})`
-  );
-
   const endpoints = [
     `/api/v1/search?q=${encodeURIComponent(
       query
@@ -1200,18 +956,12 @@ async function searchReanimeAnime(
     )}`
   ];
 
-  const candidates =
-    [];
+  const candidates = [];
 
   for (
-    const endpoint of
-    endpoints
+    const endpoint of endpoints
   ) {
     try {
-      console.log(
-        `[Reanime] Search endpoint: ${endpoint}`
-      );
-
       const text =
         await fetchText(
           endpoint
@@ -1225,188 +975,150 @@ async function searchReanimeAnime(
           "["
         )
       ) {
-        console.log(
-          "[Reanime] Search response was not JSON"
-        );
-
         continue;
       }
 
       const json =
-        JSON.parse(
-          text
-        );
+        JSON.parse(text);
 
       const list =
         json.results ||
         json.data ||
         json.anime ||
         (
-          Array.isArray(
-            json
-          )
+          Array.isArray(json)
             ? json
             : null
         );
 
-      if (
-        !Array.isArray(
-          list
-        )
-      ) {
-        console.log(
-          "[Reanime] Search returned no usable list"
-        );
-
+      if (!Array.isArray(list))
         continue;
-      }
 
-      console.log(
-        `[Reanime] Search returned ${list.length} candidates`
-      );
+      for (
+        const item of list
+      ) {
+        const rawSlug =
+          item.anime_id ||
+          item.slug ||
+          item.id ||
+          item.url;
 
-      list.forEach(
-        item => {
-          const rawSlug =
-            item.anime_id ||
-            item.slug ||
-            item.id ||
-            item.url;
+        if (!rawSlug)
+          continue;
 
-          if (
-            !rawSlug
-          ) {
-            return;
-          }
-
-          const cleanSlug =
-            String(
-              rawSlug
-            ).replace(
+        const cleanSlug =
+          String(rawSlug)
+            .replace(
               /-[a-z0-9]{6}$/,
               ""
             );
 
-          const titles =
-            [];
+        const titles = [];
 
+        if (
+          typeof item.title ===
+            "object" &&
+          item.title
+        ) {
           if (
-            typeof item.title ===
-              "object" &&
-            item.title
+            item.title.english
           ) {
-            if (
+            titles.push(
               item.title.english
-            ) {
-              titles.push(
-                item.title.english
-              );
-            }
+            );
+          }
 
-            if (
+          if (
+            item.title.romaji
+          ) {
+            titles.push(
               item.title.romaji
-            ) {
-              titles.push(
-                item.title.romaji
-              );
-            }
+            );
+          }
 
-            if (
+          if (
+            item.title.native
+          ) {
+            titles.push(
               item.title.native
-            ) {
-              titles.push(
-                item.title.native
-              );
-            }
-
-          } else if (
+            );
+          }
+        } else if (
+          item.title
+        ) {
+          titles.push(
             item.title
-          ) {
-            titles.push(
-              item.title
-            );
-          }
-
-          if (
-            item.name
-          ) {
-            titles.push(
-              item.name
-            );
-          }
-
-          if (
-            titles.length ===
-            0
-          ) {
-            titles.push(
-              cleanSlug
-            );
-          }
-
-          const alId =
-            extractAnilistId(
-              item
-            );
-
-          let bestScore =
-            0;
-
-          for (
-            const title of
-            titles
-          ) {
-            const score =
-              scoreCandidate(
-                title,
-                query,
-                year,
-                targetAnilistId,
-                alId
-              );
-
-            if (
-              score >
-              bestScore
-            ) {
-              bestScore =
-                score;
-            }
-          }
-
-          candidates.push({
-            slug:
-              String(
-                rawSlug
-              ),
-
-            cleanSlug,
-
-            title:
-              titles[0],
-
-            anilistId:
-              alId,
-
-            score:
-              bestScore
-          });
+          );
         }
-      );
 
-    } catch (
-      error
-    ) {
+        if (item.name) {
+          titles.push(
+            item.name
+          );
+        }
+
+        if (
+          titles.length === 0
+        ) {
+          titles.push(
+            cleanSlug
+          );
+        }
+
+        const alId =
+          extractAnilistId(
+            item
+          );
+
+        let bestScore = 0;
+
+        for (
+          const title of titles
+        ) {
+          const score =
+            scoreCandidate(
+              title,
+              query,
+              year,
+              targetAnilistId,
+              alId
+            );
+
+          if (
+            score >
+            bestScore
+          ) {
+            bestScore =
+              score;
+          }
+        }
+
+        candidates.push({
+          slug:
+            String(rawSlug),
+
+          cleanSlug,
+
+          title:
+            titles[0],
+
+          anilistId:
+            alId,
+
+          score:
+            bestScore
+        });
+      }
+    } catch (error) {
       console.error(
-        "[Reanime] Search endpoint failed:",
-        error?.stack ||
-          error
+        `[Reanime] Search endpoint failed: ${endpoint}`,
+        error.message
       );
     }
 
     if (
       candidates.some(
-        candidate =>
+        (candidate) =>
           candidate.score >=
           1000
       )
@@ -1415,23 +1127,18 @@ async function searchReanimeAnime(
     }
 
     if (
-      candidates.length >
-        0 &&
+      candidates.length > 0 &&
       !targetAnilistId
     ) {
       break;
     }
   }
 
-  const unique =
-    [];
-
-  const seen =
-    new Set();
+  const unique = [];
+  const seen = new Set();
 
   for (
-    const candidate of
-    candidates
+    const candidate of candidates
   ) {
     if (
       !candidate.slug ||
@@ -1452,32 +1159,17 @@ async function searchReanimeAnime(
   }
 
   unique.sort(
-    (
-      a,
-      b
-    ) =>
-      b.score -
-      a.score
+    (a, b) =>
+      b.score - a.score
   );
 
-  const best =
-    unique.length >
-    0
-      ? unique[0]
-      : null;
-
-  console.log(
-    "[Reanime] Best search result:",
-    JSON.stringify(
-      best
-    )
-  );
-
-  return best;
+  return unique.length > 0
+    ? unique[0]
+    : null;
 }
 
 // =========================================================
-// FLIX EMBEDS
+// REANIME FLIX SERVERS
 // =========================================================
 
 async function getFlixEmbeds(
@@ -1487,24 +1179,13 @@ async function getFlixEmbeds(
   anilistId
 ) {
   const watchPath =
-    `/watch/${
-      slug ||
-      "anime"
-    }?ep=${
-      episodeNumber
-    }`;
+    `/watch/${slug || "anime"}?ep=${episodeNumber}`;
 
-  console.log(
-    `[Reanime] getFlixEmbeds: AniList=${anilistId}, episode=${episodeNumber}, language=${language}`
-  );
+  // -------------------------------------------------------
+  // Direct AniList -> FlixCloud lookup
+  // -------------------------------------------------------
 
-  // =======================================================
-  // DIRECT ANILIST LOOKUP
-  // =======================================================
-
-  if (
-    anilistId
-  ) {
+  if (anilistId) {
     try {
       const flixUrl =
         `/api/flix/${anilistId}/${episodeNumber}`;
@@ -1527,11 +1208,10 @@ async function getFlixEmbeds(
         );
 
       console.log(
-        "[Reanime] Flix API response:",
+        `[Reanime] Flix API response:`,
         JSON.stringify({
           success:
             json?.success,
-
           serverCount:
             Array.isArray(
               json?.servers
@@ -1546,21 +1226,21 @@ async function getFlixEmbeds(
         Array.isArray(
           json.servers
         ) &&
-        json.servers.length >
-          0
+        json.servers.length > 0
       ) {
         const filtered =
           language
             ? json.servers.filter(
-                server =>
+                (server) =>
                   server.dataType &&
-                  server.dataType.toLowerCase() ===
+                  server.dataType
+                    .toLowerCase() ===
                     language.toLowerCase()
               )
             : json.servers;
 
         console.log(
-          `[Reanime] ${language} servers after filter: ${filtered.length}`
+          `[Reanime] ${language || "all"} servers after filter: ${filtered.length}`
         );
 
         return {
@@ -1575,38 +1255,25 @@ async function getFlixEmbeds(
           embeds:
             filtered
               .map(
-                server =>
+                (server) =>
                   server.dataLink
               )
-              .filter(
-                Boolean
-              )
+              .filter(Boolean)
         };
       }
-
-    } catch (
-      error
-    ) {
+    } catch (error) {
       console.error(
-        `[Reanime] Direct Flix API failed for AniList ${anilistId}:`,
-        error?.stack ||
-          error
+        `[Reanime] Direct Flix API failed: ${error.message}`
       );
     }
   }
 
-  // =======================================================
-  // SLUG FALLBACK
-  // =======================================================
+  // -------------------------------------------------------
+  // Slug -> AniList ID fallback
+  // -------------------------------------------------------
 
-  if (
-    slug
-  ) {
+  if (slug) {
     try {
-      console.log(
-        `[Reanime] Trying slug API: ${slug}`
-      );
-
       const animeApiUrl =
         `/api/v1/anime/${slug}`;
 
@@ -1618,19 +1285,9 @@ async function getFlixEmbeds(
       const alId =
         animeData?.anilist_id;
 
-      console.log(
-        `[Reanime] Slug API AniList ID: ${alId || "none"}`
-      );
-
-      if (
-        alId
-      ) {
+      if (alId) {
         const flixUrl =
           `/api/flix/${alId}/${episodeNumber}`;
-
-        console.log(
-          `[Reanime] Calling Flix API via slug: ${flixUrl}`
-        );
 
         const json =
           await fetchJson(
@@ -1645,35 +1302,20 @@ async function getFlixEmbeds(
             }
           );
 
-        console.log(
-          "[Reanime] Slug Flix response:",
-          JSON.stringify({
-            success:
-              json?.success,
-
-            serverCount:
-              Array.isArray(
-                json?.servers
-              )
-                ? json.servers.length
-                : 0
-          })
-        );
-
         if (
           json.success &&
           Array.isArray(
             json.servers
           ) &&
-          json.servers.length >
-            0
+          json.servers.length > 0
         ) {
           const filtered =
             language
               ? json.servers.filter(
-                  server =>
+                  (server) =>
                     server.dataType &&
-                    server.dataType.toLowerCase() ===
+                    server.dataType
+                      .toLowerCase() ===
                       language.toLowerCase()
                 )
               : json.servers;
@@ -1690,35 +1332,24 @@ async function getFlixEmbeds(
             embeds:
               filtered
                 .map(
-                  server =>
+                  (server) =>
                     server.dataLink
                 )
-                .filter(
-                  Boolean
-                )
+                .filter(Boolean)
           };
         }
       }
-
-    } catch (
-      error
-    ) {
+    } catch (error) {
       console.error(
-        "[Reanime] Slug fallback failed:",
-        error?.stack ||
-          error
+        `[Reanime] Slug AniList fallback failed: ${error.message}`
       );
     }
 
-    // =====================================================
-    // HTML ANILIST FALLBACK
-    // =====================================================
+    // -----------------------------------------------------
+    // HTML fallback
+    // -----------------------------------------------------
 
     try {
-      console.log(
-        `[Reanime] Trying HTML AniList fallback: ${slug}`
-      );
-
       const html =
         await fetchText(
           `/anime/${slug}?_ep=${episodeNumber}`
@@ -1729,14 +1360,6 @@ async function getFlixEmbeds(
           /anilist_id:\s*(\d+)/
         );
 
-      console.log(
-        `[Reanime] HTML AniList ID: ${
-          anilistMatch
-            ? anilistMatch[1]
-            : "none"
-        }`
-      );
-
       if (
         anilistMatch
       ) {
@@ -1745,10 +1368,6 @@ async function getFlixEmbeds(
 
         const flixUrl =
           `/api/flix/${alId}/${episodeNumber}`;
-
-        console.log(
-          `[Reanime] Calling Flix API via HTML ID: ${flixUrl}`
-        );
 
         const json =
           await fetchJson(
@@ -1768,15 +1387,15 @@ async function getFlixEmbeds(
           Array.isArray(
             json.servers
           ) &&
-          json.servers.length >
-            0
+          json.servers.length > 0
         ) {
           const filtered =
             language
               ? json.servers.filter(
-                  server =>
+                  (server) =>
                     server.dataType &&
-                    server.dataType.toLowerCase() ===
+                    server.dataType
+                      .toLowerCase() ===
                       language.toLowerCase()
                 )
               : json.servers;
@@ -1793,30 +1412,19 @@ async function getFlixEmbeds(
             embeds:
               filtered
                 .map(
-                  server =>
+                  (server) =>
                     server.dataLink
                 )
-                .filter(
-                  Boolean
-                )
+                .filter(Boolean)
           };
         }
       }
-
-    } catch (
-      error
-    ) {
+    } catch (error) {
       console.error(
-        "[Reanime] HTML AniList fallback failed:",
-        error?.stack ||
-          error
+        `[Reanime] HTML AniList fallback failed: ${error.message}`
       );
     }
   }
-
-  console.log(
-    `[Reanime] No Flix servers found for AniList=${anilistId}, episode=${episodeNumber}, language=${language}`
-  );
 
   return {
     watchUrl:
@@ -1824,265 +1432,14 @@ async function getFlixEmbeds(
         watchPath
       ),
 
-    servers:
-      [],
+    servers: [],
 
-    embeds:
-      []
+    embeds: []
   };
 }
 
 // =========================================================
-// FLIXCLOUD DOWNLOAD
-// =========================================================
-
-async function extractFlixCloudDownload(
-  embedUrl
-) {
-  console.log(
-    "[Reanime] FlixCloud embed:",
-    embedUrl
-  );
-
-  try {
-    const match =
-      embedUrl.match(
-        /\/e\/([a-z0-9]+)/i
-      );
-
-    const aid =
-      match
-        ? match[1]
-        : null;
-
-    if (
-      !aid
-    ) {
-      console.error(
-        "[Reanime] Could not extract FlixCloud AID from:",
-        embedUrl
-      );
-
-      return null;
-    }
-
-    const dlHeaders = {
-      Accept:
-        "*/*",
-
-      Referer:
-        `${FLIXCLOUD_BASE}/`,
-
-      "User-Agent":
-        USER_AGENT
-    };
-
-    const dataUrl =
-      `${FLIXCLOUD_BASE}/d/${aid}/__data.json`;
-
-    console.log(
-      `[Reanime] Fetching FlixCloud data: ${dataUrl}`
-    );
-
-    const res =
-      await fetch(
-        dataUrl,
-        {
-          headers:
-            dlHeaders
-        }
-      );
-
-    console.log(
-      `[Reanime] FlixCloud HTTP ${res.status}`
-    );
-
-    if (
-      !res.ok
-    ) {
-      console.error(
-        `[Reanime] FlixCloud returned HTTP ${res.status}`
-      );
-
-      return null;
-    }
-
-    const dataBody =
-      await res.text();
-
-    console.log(
-      `[Reanime] FlixCloud response size: ${dataBody.length} bytes`
-    );
-
-    const fileIdMatch =
-      dataBody.match(
-        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
-      );
-
-    const tokenMatch =
-      dataBody.match(
-        /eyJ[\w-]+\.[\w-]+\.[\w-]+/
-      );
-
-    const baseMatch =
-      dataBody.match(
-        /https:\/\/[a-z0-9-]+\.flixcloud\.cc/i
-      );
-
-    const resolutionMatch =
-      dataBody.match(
-        /(\d{3,4}p)/
-      );
-
-    const sizeMatch =
-      dataBody.match(
-        /"(\d+(?:\.\d+)?\s*[KMG]B)"/i
-      );
-
-    const fileId =
-      fileIdMatch
-        ? fileIdMatch[0]
-        : null;
-
-    const token =
-      tokenMatch
-        ? tokenMatch[0]
-        : null;
-
-    const base =
-      baseMatch
-        ? baseMatch[0]
-        : FLIXCLOUD_BASE;
-
-    const resolution =
-      resolutionMatch
-        ? resolutionMatch[1]
-        : null;
-
-    const size =
-      sizeMatch
-        ? sizeMatch[1]
-        : "Unknown";
-
-    console.log(
-      "[Reanime] FlixCloud extraction:",
-      JSON.stringify({
-        aid,
-        hasFileId:
-          !!fileId,
-        hasToken:
-          !!token,
-        base,
-        resolution,
-        size
-      })
-    );
-
-    if (
-      !fileId ||
-      !token
-    ) {
-      console.error(
-        "[Reanime] Missing FlixCloud fileId or token"
-      );
-
-      return null;
-    }
-
-    let ready =
-      false;
-
-    try {
-      const progressUrl =
-        `${base}/download/${fileId}/progress?token=${token}`;
-
-      console.log(
-        `[Reanime] Checking FlixCloud progress: ${progressUrl}`
-      );
-
-      const progRes =
-        await fetch(
-          progressUrl,
-          {
-            headers:
-              dlHeaders
-          }
-        );
-
-      console.log(
-        `[Reanime] FlixCloud progress HTTP ${progRes.status}`
-      );
-
-      if (
-        progRes.ok
-      ) {
-        const text =
-          await progRes.text();
-
-        if (
-          text.includes(
-            '"status":"ready"'
-          ) ||
-          text.includes(
-            '"ready"'
-          )
-        ) {
-          ready =
-            true;
-        }
-      }
-
-    } catch (
-      error
-    ) {
-      console.error(
-        "[Reanime] FlixCloud progress failed:",
-        error?.message ||
-          error
-      );
-    }
-
-    const fileUrl =
-      `${base}/download/${fileId}?token=${token}`;
-
-    console.log(
-      "[Reanime] Direct download URL generated"
-    );
-
-    return {
-      url:
-        fileUrl,
-
-      quality:
-        resolution ||
-        "1080p",
-
-      size,
-
-      type:
-        "mkv",
-
-      headers:
-        dlHeaders,
-
-      ready
-    };
-
-  } catch (
-    error
-  ) {
-    console.error(
-      "[Reanime] FlixCloud extraction ERROR:",
-      error?.stack ||
-        error
-    );
-
-    return null;
-  }
-}
-
-// =========================================================
-// MAIN PROVIDER
+// MAIN
 // =========================================================
 
 export async function getStreams({
@@ -2092,11 +1449,7 @@ export async function getStreams({
   episode = null
 }) {
   console.log(
-    "[Reanime] ========================================"
-  );
-
-  console.log(
-    "[Reanime] REQUEST:",
+    `[Reanime] REQUEST:`,
     JSON.stringify({
       imdbId,
       type,
@@ -2110,126 +1463,107 @@ export async function getStreams({
       type !== "movie" &&
       type !== "series"
     ) {
-      console.error(
+      console.log(
         `[Reanime] Unsupported type: ${type}`
       );
 
       return [];
     }
 
-    // =====================================================
-    // INITIAL VALUES
-    // =====================================================
+    // -----------------------------------------------------
+    // Resolve media type
+    // -----------------------------------------------------
 
-    let alId =
-      null;
+    const mediaType =
+      type === "movie"
+        ? "movie"
+        : "tv";
+
+    let alId = null;
 
     let episodeNumber =
-      type === "series"
+      mediaType === "tv"
         ? Number(
             episode || 1
           )
         : 1;
 
-    let searchTitle =
-      "";
+    let searchTitle = "";
 
-    let searchYear =
-      null;
+    let searchYear = null;
 
-    console.log(
-      `[Reanime] Initial state: IMDb=${imdbId}, type=${type}, season=${season}, episode=${episodeNumber}`
-    );
-
-    // =====================================================
-    // 1. ANIBRIDGE
-    // =====================================================
-
-    try {
-      console.log(
-        "[Reanime] Starting AniBridge lookup..."
-      );
-
-      const mapping =
-        await resolveImdbToAnilist({
-          imdbId,
-
-          type,
-
-          season,
-
-          episode:
-            episodeNumber
-        });
-
-      console.log(
-        "[Reanime] AniBridge result:",
-        JSON.stringify(
-          mapping
-        )
-      );
-
-      if (
-        mapping?.anilistId
-      ) {
-        alId =
-          String(
-            mapping.anilistId
-          );
-
-        episodeNumber =
-          Number(
-            mapping.episode ||
-              episodeNumber
-          );
-
-        console.log(
-          `[Reanime] AniBridge SUCCESS: ${imdbId} -> AniList ${alId}, episode ${episodeNumber}`
-        );
-      } else {
-        console.log(
-          `[Reanime] AniBridge did not find ${imdbId}`
-        );
-      }
-
-    } catch (
-      error
-    ) {
-      console.error(
-        "[Reanime] AniBridge lookup failed:",
-        error?.stack ||
-          error
-      );
-    }
-
-    // =====================================================
-    // 2. ORIGINAL REANIME RESOLVER
-    // =====================================================
+    // -----------------------------------------------------
+    // AniBridge IMDb -> AniList
+    // -----------------------------------------------------
 
     if (
-      !alId
+      typeof imdbId ===
+        "string" &&
+      imdbId.startsWith("tt")
     ) {
-      console.log(
-        "[Reanime] Starting original resolver fallback..."
-      );
-
       try {
-        const syncInfo =
-          await getSyncInfo(
+        const mapped =
+          await resolveImdbToAnilist(
             imdbId,
-            type === "movie"
-              ? "movie"
-              : "tv",
+            mediaType,
             season,
             episodeNumber
           );
 
         console.log(
-          "[Reanime] Sync info:",
+          `[Reanime] AniBridge result:`,
           JSON.stringify(
-            syncInfo
+            mapped
           )
         );
+
+        if (
+          mapped?.anilistId
+        ) {
+          alId =
+            String(
+              mapped.anilistId
+            );
+
+          episodeNumber =
+            Number(
+              mapped.episode ||
+                episodeNumber ||
+                1
+            );
+
+          console.log(
+            `[Reanime] AniBridge SUCCESS: ${imdbId} -> AniList ${alId}, episode ${episodeNumber}`
+          );
+        } else {
+          console.log(
+            `[Reanime] AniBridge returned no mapping`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[Reanime] AniBridge failed: ${error.message}`
+        );
+      }
+    }
+
+    // -----------------------------------------------------
+    // Original resolver fallback
+    // -----------------------------------------------------
+
+    if (!alId) {
+      try {
+        console.log(
+          `[Reanime] Trying original date/title resolver`
+        );
+
+        const syncInfo =
+          await getSyncInfo(
+            imdbId,
+            mediaType,
+            season,
+            episodeNumber
+          );
 
         searchTitle =
           syncInfo.title ||
@@ -2254,16 +1588,8 @@ export async function getStreams({
             syncInfo.dayIndex
           );
 
-        console.log(
-          "[Reanime] Original resolver result:",
-          JSON.stringify(
-            syncResult
-          )
-        );
-
         if (
-          syncResult &&
-          syncResult.alId
+          syncResult?.alId
         ) {
           alId =
             String(
@@ -2271,55 +1597,41 @@ export async function getStreams({
             );
 
           episodeNumber =
-            syncResult.episode;
+            Number(
+              syncResult.episode ||
+                episodeNumber ||
+                1
+            );
 
           searchTitle =
             syncResult.title ||
             searchTitle;
 
           console.log(
-            `[Reanime] Original resolver SUCCESS: AniList=${alId}, episode=${episodeNumber}`
+            `[Reanime] Original resolver SUCCESS: AniList ${alId}, episode ${episodeNumber}`
           );
         }
-
-      } catch (
-        error
-      ) {
+      } catch (error) {
         console.error(
-          "[Reanime] Original resolver failed:",
-          error?.stack ||
-            error
+          `[Reanime] Original resolver failed: ${error.message}`
         );
       }
     }
 
-    // =====================================================
-    // 3. TMDB TITLE/YEAR FALLBACK
-    // =====================================================
+    // -----------------------------------------------------
+    // TMDB title/year fallback
+    // -----------------------------------------------------
 
     if (
       !searchTitle ||
       !searchYear
     ) {
-      console.log(
-        "[Reanime] Getting TMDB title/year fallback..."
-      );
-
       try {
         const tmdb =
           await getTmdbInfo(
             imdbId,
-            type === "movie"
-              ? "movie"
-              : "tv"
+            mediaType
           );
-
-        console.log(
-          "[Reanime] TMDB fallback:",
-          JSON.stringify(
-            tmdb
-          )
-        );
 
         if (
           !searchTitle
@@ -2335,19 +1647,26 @@ export async function getStreams({
             tmdb.year;
         }
 
-      } catch (
-        error
-      ) {
+        console.log(
+          `[Reanime] TMDB fallback:`,
+          JSON.stringify({
+            title:
+              searchTitle,
+            year:
+              searchYear,
+            imdbId:
+              tmdb.imdbId
+          })
+        );
+      } catch (error) {
         console.error(
-          "[Reanime] TMDB fallback failed:",
-          error?.stack ||
-            error
+          `[Reanime] TMDB fallback failed: ${error.message}`
         );
       }
     }
 
     console.log(
-      "[Reanime] Resolved state:",
+      `[Reanime] Resolved state:`,
       JSON.stringify({
         alId,
         episodeNumber,
@@ -2356,9 +1675,9 @@ export async function getStreams({
       })
     );
 
-    // =====================================================
-    // GET FLIX SERVERS
-    // =====================================================
+    // -----------------------------------------------------
+    // Get servers
+    // -----------------------------------------------------
 
     const serversByLang =
       {};
@@ -2366,80 +1685,55 @@ export async function getStreams({
     let watchUrl =
       "";
 
-    if (
-      alId
-    ) {
-      console.log(
-        `[Reanime] Fetching Flix servers for AniList ${alId}`
-      );
-
+    if (alId) {
       for (
-        const lang of [
+        const language of [
           "sub",
           "dub"
         ]
       ) {
         try {
-          const res =
+          const result =
             await getFlixEmbeds(
               null,
               episodeNumber,
-              lang,
+              language,
               alId
             );
 
-          console.log(
-            `[Reanime] ${lang} server result: ${res.servers?.length || 0}`
-          );
-
           if (
-            res.servers &&
-            res.servers.length >
-              0
+            result.servers &&
+            result.servers.length > 0
           ) {
             serversByLang[
-              lang
+              language
             ] =
-              res.servers;
+              result.servers;
 
             if (
-              res.watchUrl
+              result.watchUrl
             ) {
               watchUrl =
-                res.watchUrl;
+                result.watchUrl;
             }
           }
-
-        } catch (
-          error
-        ) {
+        } catch (error) {
           console.error(
-            `[Reanime] ${lang} server lookup failed:`,
-            error?.stack ||
-              error
+            `[Reanime] ${language} server lookup failed: ${error.message}`
           );
         }
       }
-    } else {
-      console.log(
-        "[Reanime] No AniList ID available, skipping direct Flix lookup"
-      );
     }
 
-    // =====================================================
-    // REANIME SEARCH FALLBACK
-    // =====================================================
+    // -----------------------------------------------------
+    // Search fallback
+    // -----------------------------------------------------
 
     if (
       Object.keys(
         serversByLang
-      ).length ===
-      0
+      ).length === 0
     ) {
-      console.log(
-        "[Reanime] No direct Flix servers. Starting ReAnime search fallback..."
-      );
-
       if (
         !searchTitle &&
         alId
@@ -2456,150 +1750,124 @@ export async function getStreams({
           alInfo.year;
       }
 
-      if (
-        searchTitle
-      ) {
-        const anime =
-          await searchReanimeAnime(
-            searchTitle,
-            searchYear,
-            alId
-          );
+      if (searchTitle) {
+        try {
+          const anime =
+            await searchReanimeAnime(
+              searchTitle,
+              searchYear,
+              alId
+            );
 
-        if (
-          anime
-        ) {
-          const slug =
-            anime.slug;
+          if (anime) {
+            console.log(
+              `[Reanime] Search fallback found: ${anime.title}`
+            );
 
-          const finalAlId =
-            alId ||
-            anime.anilistId;
+            const slug =
+              anime.slug;
 
-          console.log(
-            "[Reanime] Search selected:",
-            JSON.stringify({
-              slug,
-              anilistId:
-                finalAlId,
-              title:
-                anime.title,
-              score:
-                anime.score
-            })
-          );
+            const finalAlId =
+              alId ||
+              anime.anilistId;
 
-          for (
-            const lang of [
-              "sub",
-              "dub"
-            ]
-          ) {
-            try {
-              const res =
-                await getFlixEmbeds(
-                  slug,
-                  episodeNumber,
-                  lang,
-                  finalAlId
-                );
-
-              console.log(
-                `[Reanime] Search fallback ${lang}: ${res.servers?.length || 0} servers`
-              );
-
-              if (
-                res.servers &&
-                res.servers.length >
-                  0
-              ) {
-                serversByLang[
-                  lang
-                ] =
-                  res.servers;
+            for (
+              const language of [
+                "sub",
+                "dub"
+              ]
+            ) {
+              try {
+                const result =
+                  await getFlixEmbeds(
+                    slug,
+                    episodeNumber,
+                    language,
+                    finalAlId
+                  );
 
                 if (
-                  res.watchUrl
+                  result.servers &&
+                  result.servers.length >
+                    0
                 ) {
-                  watchUrl =
-                    res.watchUrl;
-                }
-              }
+                  serversByLang[
+                    language
+                  ] =
+                    result.servers;
 
-            } catch (
-              error
-            ) {
-              console.error(
-                `[Reanime] Search fallback ${lang} failed:`,
-                error?.stack ||
-                  error
-              );
+                  if (
+                    result.watchUrl
+                  ) {
+                    watchUrl =
+                      result.watchUrl;
+                  }
+                }
+              } catch (error) {
+                console.error(
+                  `[Reanime] Search fallback ${language} failed: ${error.message}`
+                );
+              }
             }
           }
-
-        } else {
-          console.log(
-            "[Reanime] ReAnime search returned no candidate"
+        } catch (error) {
+          console.error(
+            `[Reanime] Search fallback failed: ${error.message}`
           );
         }
-
-      } else {
-        console.log(
-          "[Reanime] No search title available"
-        );
       }
     }
-
-    // =====================================================
-    // NO SERVERS
-    // =====================================================
 
     if (
       Object.keys(
         serversByLang
-      ).length ===
-      0
+      ).length === 0
     ) {
-      console.error(
-        "[Reanime] NO SERVERS FOUND"
-      );
-
       console.log(
-        "[Reanime] Final debug state:",
-        JSON.stringify({
-          imdbId,
-          type,
-          season,
-          episode,
-          alId,
-          episodeNumber,
-          searchTitle,
-          searchYear
-        })
+        `[Reanime] No ReAnime servers found`
       );
 
       return [];
     }
 
+    // -----------------------------------------------------
+    // Log server information
+    // -----------------------------------------------------
+
     console.log(
-      "[Reanime] Server languages:",
+      `[Reanime] Server languages:`,
       Object.keys(
         serversByLang
       )
     );
 
-    // =====================================================
-    // BUILD STREAMS
-    // =====================================================
+    for (
+      const language of [
+        "sub",
+        "dub"
+      ]
+    ) {
+      console.log(
+        `[Reanime] ${language}: ${
+          (
+            serversByLang[
+              language
+            ] || []
+          ).length
+        } servers`
+      );
+    }
 
-    const streams =
-      [];
+    // -----------------------------------------------------
+    // Resolve FlixCloud
+    // -----------------------------------------------------
+
+    const streams = [];
 
     const seen =
       new Set();
 
-    const tasks =
-      [];
+    const tasks = [];
 
     for (
       const language of [
@@ -2611,10 +1879,6 @@ export async function getStreams({
         serversByLang[
           language
         ] || [];
-
-      console.log(
-        `[Reanime] ${language}: ${serverList.length} servers`
-      );
 
       for (
         let i = 0;
@@ -2628,15 +1892,8 @@ export async function getStreams({
         const dataLink =
           server.dataLink;
 
-        if (
-          !dataLink
-        ) {
-          console.log(
-            `[Reanime] Server ${i} has no dataLink`
-          );
-
+        if (!dataLink)
           continue;
-        }
 
         const serverName =
           server.serverName ||
@@ -2650,66 +1907,56 @@ export async function getStreams({
           "Anime";
 
         const streamTitle =
-          type === "movie"
+          mediaType === "movie"
             ? `${displayTitle} (${langUpper})`
             : `${displayTitle} - Episode ${episodeNumber} (${langUpper})`;
 
         tasks.push(
           (async () => {
             try {
-              const directDl =
-                await extractFlixCloudDownload(
+              console.log(
+                `[Reanime] FlixCloud embed: ${dataLink}`
+              );
+
+              const directStream =
+                await resolveFlixCloud(
                   dataLink
                 );
 
               if (
-                directDl &&
-                directDl.url
+                directStream?.url
               ) {
                 console.log(
-                  `[Reanime] Stream extracted: ${serverName} ${directDl.quality || "1080p"} ${language}`
+                  `[Reanime] FlixCloud resolved: ${langUpper} ${serverName}`
                 );
 
                 return {
                   name:
-                    `Reanime [${langUpper}] ${serverName} (${directDl.quality || "1080p"})`,
+                    `Reanime [${langUpper}] ${serverName}`,
 
                   title:
                     streamTitle,
 
                   url:
-                    directDl.url,
+                    directStream.url,
 
                   quality:
-                    directDl.quality ||
-                    "1080p",
-
-                  size:
-                    directDl.size ||
-                    "Unknown",
-
-                  headers:
-                    directDl.headers,
+                    "Auto",
 
                   provider:
                     "reanime",
 
                   type:
-                    "mkv"
+                    "m3u8"
                 };
               }
 
-              console.error(
-                `[Reanime] Failed to extract stream from ${serverName}`
+              console.log(
+                `[Reanime] FlixCloud returned no stream for ${serverName}`
               );
-
-            } catch (
-              error
-            ) {
+            } catch (error) {
               console.error(
-                `[Reanime] Individual stream extraction failed:`,
-                error?.stack ||
-                  error
+                `[Reanime] Failed to resolve ${serverName}: ${error.message}`
               );
             }
 
@@ -2725,12 +1972,10 @@ export async function getStreams({
       );
 
     for (
-      const result of
-      results
+      const result of results
     ) {
       if (
-        result &&
-        result.url &&
+        result?.url &&
         !seen.has(
           result.url
         )
@@ -2745,66 +1990,41 @@ export async function getStreams({
       }
     }
 
-    // =====================================================
-    // QUALITY SORT
-    // =====================================================
+    // -----------------------------------------------------
+    // Quality sorting
+    // -----------------------------------------------------
 
     const qualityRank = {
-      auto:
-        4000,
-
-      adaptive:
-        4000,
-
-      "2160p":
-        2160,
-
-      "4k":
-        2160,
-
-      "1080p":
-        1080,
-
-      "720p":
-        720,
-
-      "480p":
-        480,
-
-      "360p":
-        360,
-
-      unknown:
-        0
+      auto: 4000,
+      adaptive: 4000,
+      "2160p": 2160,
+      "4k": 2160,
+      "1080p": 1080,
+      "720p": 720,
+      "480p": 480,
+      "360p": 360,
+      unknown: 0
     };
 
     streams.sort(
-      (
-        a,
-        b
-      ) => {
+      (a, b) => {
         const qa =
           qualityRank[
             String(
               a.quality ||
-                ""
+                "unknown"
             ).toLowerCase()
-          ] ||
-          0;
+          ] || 0;
 
         const qb =
           qualityRank[
             String(
               b.quality ||
-                ""
+                "unknown"
             ).toLowerCase()
-          ] ||
-          0;
+          ] || 0;
 
-        return (
-          qb -
-          qa
-        );
+        return qb - qa;
       }
     );
 
@@ -2813,36 +2033,33 @@ export async function getStreams({
     );
 
     console.log(
-      "[Reanime] FINAL STREAMS:",
+      `[Reanime] Stream summary:`,
       JSON.stringify(
         streams.map(
-          stream => ({
+          (stream) => ({
             name:
               stream.name,
-
             quality:
               stream.quality,
-
-            size:
-              stream.size
+            type:
+              stream.type,
+            hasUrl:
+              Boolean(
+                stream.url
+              )
           })
         )
       )
     );
 
-    console.log(
-      "[Reanime] ========================================"
+    return streams;
+  } catch (error) {
+    console.error(
+      `[Reanime] Error: ${error.message}`
     );
 
-    return streams;
-
-  } catch (
-    error
-  ) {
     console.error(
-      "[Reanime] FATAL ERROR:",
-      error?.stack ||
-        error
+      error.stack
     );
 
     return [];
