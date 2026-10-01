@@ -58,33 +58,20 @@ function normalizeTitle(value){
 }
 
 function titleTokens(value){
-  return new Set(
-    normalizeTitle(value)
-      .split(" ")
-      .filter(Boolean)
-  );
+  return new Set(normalizeTitle(value).split(" ").filter(Boolean));
 }
 
 function tokenOverlap(a,b){
   const aa=titleTokens(a),bb=titleTokens(b);
   if(aa.size===0||bb.size===0)return 0;
-
   let common=0;
-
-  for(const token of aa){
-    if(bb.has(token))common++;
-  }
-
+  for(const token of aa)if(bb.has(token))common++;
   return common/Math.max(aa.size,bb.size);
 }
 
 function extractYear(value){
   if(!value)return null;
-
-  const match=String(value).match(
-    /\b(19|20)\d{2}\b/
-  );
-
+  const match=String(value).match(/\b(19|20)\d{2}\b/);
   return match?Number(match[0]):null;
 }
 
@@ -94,51 +81,26 @@ function extractYear(value){
 
 async function getCinemetaMetadata(imdbId,type){
   const cleanId=String(imdbId||"").split(":")[0].trim();
-
   log("Cinemeta: resolving",cleanId,"type=",type);
 
-  if(!/^tt\d+$/i.test(cleanId)){
-    throw new Error("Invalid IMDb ID");
-  }
+  if(!/^tt\d+$/i.test(cleanId))throw new Error("Invalid IMDb ID");
 
-  const metadataUrl=
-    `${CINEMETA_BASE}/meta/${type}/${cleanId}.json`;
+  const metadataUrl=`${CINEMETA_BASE}/meta/${type}/${cleanId}.json`;
+  const json=await fetchJson(metadataUrl);
 
-  const json=
-    await fetchJson(metadataUrl);
-
-  if(!json||!json.meta){
-    throw new Error("Cinemeta metadata not found");
-  }
+  if(!json||!json.meta)throw new Error("Cinemeta metadata not found");
 
   const meta=json.meta;
 
   const result={
     id:cleanId,
     title:meta.name||meta.title||"",
-    year:extractYear(
-      meta.year||
-      meta.releaseInfo||
-      meta.released
-    ),
-    originalTitle:
-      meta.originalName||
-      meta.originalTitle||
-      "",
-    description:
-      meta.description||
-      ""
+    year:extractYear(meta.year||meta.releaseInfo||meta.released),
+    originalTitle:meta.originalName||meta.originalTitle||"",
+    description:meta.description||""
   };
 
-  log(
-    "Cinemeta: title=",
-    result.title,
-    "year=",
-    result.year,
-    "original=",
-    result.originalTitle||"N/A"
-  );
-
+  log("Cinemeta: title=",result.title,"year=",result.year,"original=",result.originalTitle||"N/A");
   return result;
 }
 
@@ -147,9 +109,7 @@ async function getCinemetaMetadata(imdbId,type){
 // =========================================================
 
 function extractArray(json){
-  if(Array.isArray(json)){
-    return json;
-  }
+  if(Array.isArray(json))return json;
 
   const candidates=[
     json?.data,
@@ -160,329 +120,162 @@ function extractArray(json){
     json?.items
   ];
 
-  for(const value of candidates){
-    if(Array.isArray(value)){
-      return value;
-    }
-  }
-
+  for(const value of candidates)if(Array.isArray(value))return value;
   return [];
 }
 
 function getCandidateTitle(item){
-  if(typeof item?.title==="string"){
-    return item.title;
+  if(typeof item?.title==="string")return item.title;
+
+  if(item?.title&&typeof item.title==="object"){
+    return item.title.english||item.title.romaji||item.title.native||item.title.default||"";
   }
 
-  if(
-    item?.title &&
-    typeof item.title==="object"
-  ){
-    return (
-      item.title.english||
-      item.title.romaji||
-      item.title.native||
-      item.title.default||
-      ""
-    );
-  }
-
-  return (
-    item?.name||
-    item?.anime_name||
-    item?.title||
-    ""
-  );
+  return item?.name||item?.anime_name||item?.title||"";
 }
 
 function getCandidateYear(item){
-  return (
-    extractYear(item?.year)||
+  return extractYear(item?.year)||
     extractYear(item?.releaseDate)||
     extractYear(item?.release_date)||
     extractYear(item?.aired)||
-    extractYear(item?.date)
-  );
+    extractYear(item?.date);
 }
 
-function getCandidateSlug(item){
+// IMPORTANT:
+// AniKoto /recent-anime returns an actual series ID.
+// Prefer the ID fields over slug fields because /series/{id}
+// expects the AniKoto series ID, not the display slug.
+function getCandidateId(item){
   const value=
+    item?.anime_id??
+    item?.animeId??
+    item?.id??
+    item?.series_id??
+    item?.seriesId??
     item?.slug||
-    item?.anime_id||
-    item?.animeId||
-    item?.id||
     item?.url||
     item?.link;
 
-  if(!value){
-    return null;
-  }
+  if(value===null||value===undefined||value==="")return null;
 
   return String(value)
-    .replace(
-      /^https?:\/\/[^/]+\/watch\//i,
-      ""
-    )
-    .replace(
-      /^\/watch\//i,
-      ""
-    )
+    .replace(/^https?:\/\/[^/]+\/(?:watch|series)\//i,"")
+    .replace(/^\/(?:watch|series)\//i,"")
     .split("?")[0]
     .split("#")[0]
     .replace(/^\/+/,"")
     .replace(/\/+$/,"");
 }
 
-function scoreSearchCandidate(
-  item,
-  targetTitle,
-  targetYear
-){
-  const title=
-    getCandidateTitle(item);
+function scoreSearchCandidate(item,targetTitle,targetYear){
+  const title=getCandidateTitle(item);
+  if(!title)return -Infinity;
 
-  if(!title){
-    return -Infinity;
-  }
+  const target=normalizeTitle(targetTitle);
+  const candidate=normalizeTitle(title);
 
-  const target=
-    normalizeTitle(targetTitle);
-
-  const candidate=
-    normalizeTitle(title);
-
-  if(!target||!candidate){
-    return -Infinity;
-  }
+  if(!target||!candidate)return -Infinity;
 
   let score=0;
 
-  if(candidate===target){
-    score+=1000;
-  }
+  if(candidate===target)score+=1000;
 
-  if(
-    candidate.includes(target)||
-    target.includes(candidate)
-  ){
-    score+=350;
-  }
+  if(candidate.includes(target)||target.includes(candidate))score+=350;
 
-  score+=
-    tokenOverlap(
-      targetTitle,
-      title
-    )*300;
+  score+=tokenOverlap(targetTitle,title)*300;
 
-  const candidateYear=
-    getCandidateYear(item);
+  const candidateYear=getCandidateYear(item);
 
-  if(
-    targetYear &&
-    candidateYear
-  ){
-    if(
-      candidateYear===
-      targetYear
-    ){
-      score+=250;
-    }else if(
-      Math.abs(
-        candidateYear-targetYear
-      )===1
-    ){
-      score+=50;
-    }else{
-      score-=150;
-    }
+  if(targetYear&&candidateYear){
+    if(candidateYear===targetYear)score+=250;
+    else if(Math.abs(candidateYear-targetYear)===1)score+=50;
+    else score-=150;
   }
 
   return score;
 }
 
-async function searchAniKoto(
-  title,
-  year
-){
-  log(
-    "Search: title=",
-    title,
-    "year=",
-    year
-  );
+async function searchAniKoto(title,year){
+  log("Search: title=",title,"year=",year);
 
   let best=null;
-
-  // -------------------------------------------------------
-  // AniKoto officially exposes recent-anime with pagination.
-  // We search several catalog pages locally because the public
-  // API does not document a dedicated search endpoint.
-  // -------------------------------------------------------
 
   const MAX_PAGES=5;
   const PER_PAGE=100;
 
-  log(
-    "Search: using AniKoto /recent-anime",
-    `pages=${MAX_PAGES}`,
-    `per_page=${PER_PAGE}`
-  );
+  log("Search: using AniKoto /recent-anime",`pages=${MAX_PAGES}`,`per_page=${PER_PAGE}`);
 
-  for(
-    let page=1;
-    page<=MAX_PAGES;
-    page++
-  ){
-    const endpoint=
-      `${ANIKOTO_API}/recent-anime?page=${page}&per_page=${PER_PAGE}`;
+  for(let page=1;page<=MAX_PAGES;page++){
+    const endpoint=`${ANIKOTO_API}/recent-anime?page=${page}&per_page=${PER_PAGE}`;
 
     try{
-      log(
-        "Search catalog page:",
-        page,
-        endpoint
-      );
+      log("Search catalog page:",page,endpoint);
 
-      const json=
-        await fetchJson(endpoint);
+      const json=await fetchJson(endpoint);
+      const results=extractArray(json);
 
-      const results=
-        extractArray(json);
+      log("Search catalog results:",results.length,"page=",page);
 
-      log(
-        "Search catalog results:",
-        results.length,
-        "page=",
-        page
-      );
-
-      if(
-        results.length===0
-      ){
-        log(
-          "Search: empty catalog page, stopping"
-        );
+      if(results.length===0){
+        log("Search: empty catalog page, stopping");
         break;
       }
 
-      for(
-        const item of results
-      ){
-        const slug=
-          getCandidateSlug(item);
+      for(const item of results){
+        const id=getCandidateId(item);
+        const candidateTitle=getCandidateTitle(item);
+        const candidateYear=getCandidateYear(item);
 
-        const candidateTitle=
-          getCandidateTitle(item);
-
-        const candidateYear=
-          getCandidateYear(item);
-
-        if(!slug){
-          warn(
-            "Search candidate skipped: no ID",
-            candidateTitle
-          );
+        if(!id){
+          warn("Search candidate skipped: no ID",candidateTitle);
           continue;
         }
 
-        const score=
-          scoreSearchCandidate(
-            item,
-            title,
-            year
-          );
+        const score=scoreSearchCandidate(item,title,year);
 
-        log(
-          "Candidate:",
-          candidateTitle||"N/A",
-          "year=",
-          candidateYear||"N/A",
-          "id=",
-          slug,
-          "score=",
-          score
-        );
+        log("Candidate:",candidateTitle||"N/A","year=",candidateYear||"N/A","id=",id,"score=",score);
 
-        if(
-          !best||
-          score>best.score
-        ){
+        if(!best||score>best.score){
           best={
-            slug,
+            id,
             title:candidateTitle,
             year:candidateYear,
             score,
             raw:item
           };
 
-          log(
-            "★ New best candidate:",
-            best.title,
-            "score=",
-            best.score,
-            "id=",
-            best.slug
-          );
+          log("★ New best candidate:",best.title,"score=",best.score,"id=",best.id);
         }
 
-        if(
-          best &&
-          best.score>=1000
-        ){
-          log(
-            "Search: exact title match found"
-          );
+        if(best&&best.score>=1000){
+          log("Search: exact title match found");
           break;
         }
       }
 
-      if(
-        best &&
-        best.score>=1000
-      ){
-        break;
-      }
+      if(best&&best.score>=1000)break;
 
-      // Respect API pagination if supplied.
-      const pagination=
-        json?.pagination||
-        json?.data?.pagination;
+      const pagination=json?.pagination||json?.data?.pagination;
 
-      if(
-        pagination &&
-        pagination.hasNext===false
-      ){
-        log(
-          "Search: API reports no more pages"
-        );
+      if(pagination&&pagination.hasNext===false){
+        log("Search: API reports no more pages");
         break;
       }
 
     }catch(error){
-      warn(
-        "Search catalog page failed:",
-        page,
-        error?.message||
-          String(error)
-      );
+      warn("Search catalog page failed:",page,error?.message||String(error));
     }
   }
 
-  if(!best){
-    throw new Error(
-      "AniKoto catalog returned no matching anime"
-    );
-  }
+  if(!best)throw new Error("AniKoto catalog returned no matching anime");
 
-  log(
-    "Search FINAL:",
-    JSON.stringify({
-      slug:best.slug,
-      title:best.title,
-      year:best.year,
-      score:best.score
-    })
-  );
+  log("Search FINAL:",JSON.stringify({
+    id:best.id,
+    title:best.title,
+    year:best.year,
+    score:best.score
+  }));
 
   return best;
 }
@@ -499,20 +292,11 @@ function extractEpisodes(json){
     json?.episodeList
   ];
 
-  for(
-    const value of candidates
-  ){
-    if(Array.isArray(value)){
-      return value;
-    }
-  }
-
+  for(const value of candidates)if(Array.isArray(value))return value;
   return [];
 }
 
-function getEpisodeNumber(
-  episode
-){
+function getEpisodeNumber(episode){
   const value=
     episode?.number??
     episode?.episode??
@@ -520,100 +304,53 @@ function getEpisodeNumber(
     episode?.ep??
     episode?.num;
 
-  const number=
-    Number(value);
-
-  return Number.isFinite(number)
-    ? number
-    : null;
+  const number=Number(value);
+  return Number.isFinite(number)?number:null;
 }
 
-function getEpisodeEmbedId(
-  episode
-){
-  return (
-    episode?.episode_embed_id||
+function getEpisodeEmbedId(episode){
+  return episode?.episode_embed_id||
     episode?.episodeEmbedId||
     episode?.embed_id||
     episode?.embedId||
     episode?.id||
-    null
-  );
+    null;
 }
 
-function getEmbedUrl(
-  episode,
-  language
-){
+function getEmbedUrl(episode,language){
   const embed=
     episode?.embed_url||
     episode?.embedUrl||
     episode?.embeds||
     episode?.embed;
 
-  if(
-    typeof embed==="string"
-  ){
-    return embed;
-  }
+  if(typeof embed==="string")return embed;
 
-  if(
-    embed &&
-    typeof embed==="object"
-  ){
-    return (
-      embed[language]||
-      embed.sub||
-      embed.dub||
-      embed.default||
-      null
-    );
+  if(embed&&typeof embed==="object"){
+    return embed[language]||embed.sub||embed.dub||embed.default||null;
   }
 
   return null;
 }
 
-async function getAniKotoSeries(
-  slug
-){
-  const encoded=
-    encodeURIComponent(slug);
-
-  const endpoint=
-    `${ANIKOTO_API}/series/${encoded}`;
+async function getAniKotoSeries(id){
+  const encoded=encodeURIComponent(id);
+  const endpoint=`${ANIKOTO_API}/series/${encoded}`;
 
   let lastError=null;
 
-  log(
-    "Series: resolving ID=",
-    slug
-  );
+  log("Series: resolving ID=",id);
 
   try{
-    log(
-      "Series endpoint:",
-      endpoint
-    );
+    log("Series endpoint:",endpoint);
 
-    const json=
-      await fetchJson(endpoint);
+    const json=await fetchJson(endpoint);
+    const episodes=extractEpisodes(json);
 
-    const episodes=
-      extractEpisodes(json);
+    log("Series endpoint returned",episodes.length,"episodes");
 
-    log(
-      "Series endpoint returned",
-      episodes.length,
-      "episodes"
-    );
-
-    if(
-      episodes.length>0
-    ){
-      log(
-        "Series: SUCCESS via",
-        endpoint
-      );
+    if(episodes.length>0){
+      log("Series: SUCCESS via",endpoint);
 
       return {
         json,
@@ -621,103 +358,46 @@ async function getAniKotoSeries(
       };
     }
 
-    warn(
-      "Series endpoint returned no episodes"
-    );
-
+    warn("Series endpoint returned no episodes");
   }catch(error){
     lastError=error;
-
-    warn(
-      "Series endpoint failed:",
-      error?.message||
-        String(error)
-    );
+    warn("Series endpoint failed:",error?.message||String(error));
   }
 
-  throw (
-    lastError||
-    new Error(
-      "AniKoto series data unavailable"
-    )
-  );
+  throw lastError||new Error("AniKoto series data unavailable");
 }
 
 // =========================================================
 // EPISODE RESOLUTION
 // =========================================================
 
-function findEpisode(
-  episodes,
-  episodeNumber
-){
-  const target=
-    Number(episodeNumber);
+function findEpisode(episodes,episodeNumber){
+  const target=Number(episodeNumber);
 
-  log(
-    "Episode: looking for",
-    target,
-    "among",
-    episodes.length,
-    "episodes"
-  );
+  log("Episode: looking for",target,"among",episodes.length,"episodes");
 
-  if(
-    !Number.isFinite(target)
-  ){
-    return null;
-  }
+  if(!Number.isFinite(target))return null;
 
-  for(
-    const episode of episodes
-  ){
-    const number=
-      getEpisodeNumber(
-        episode
-      );
+  for(const episode of episodes){
+    const number=getEpisodeNumber(episode);
 
-    if(
-      number===target
-    ){
-      log(
-        "Episode: FOUND",
-        JSON.stringify({
-          number,
-          embedId:
-            getEpisodeEmbedId(
-              episode
-            ),
-          embedUrl:
-            getEmbedUrl(
-              episode,
-              "sub"
-            )
-              ? "yes"
-              : "no"
-        })
-      );
+    if(number===target){
+      log("Episode: FOUND",JSON.stringify({
+        number,
+        embedId:getEpisodeEmbedId(episode),
+        embedUrl:getEmbedUrl(episode,"sub")?"yes":"no"
+      }));
 
       return episode;
     }
   }
 
-  warn(
-    "Episode: NOT FOUND",
-    target
-  );
+  warn("Episode: NOT FOUND",target);
 
-  if(
-    episodes.length<=30
-  ){
+  if(episodes.length<=30){
     log(
       "Available episodes:",
-      episodes
-        .map(
-          getEpisodeNumber
-        )
-        .filter(
-          Number.isFinite
-        )
+      episodes.map(getEpisodeNumber).filter(Number.isFinite)
     );
   }
 
@@ -728,103 +408,50 @@ function findEpisode(
 // MEGAPLAY
 // =========================================================
 
-function buildMegaPlayCandidates(
-  episode,
-  episodeNumber,
-  language
-){
+function buildMegaPlayCandidates(episode,episodeNumber,language){
   const candidates=[];
 
-  const explicit=
-    getEmbedUrl(
-      episode,
-      language
-    );
+  const explicit=getEmbedUrl(episode,language);
 
   if(explicit){
-    log(
-      "MegaPlay:",
-      language,
-      "explicit embed found"
-    );
-
-    candidates.push(
-      explicit
-    );
+    log("MegaPlay:",language,"explicit embed found");
+    candidates.push(explicit);
   }
 
-  const embedId=
-    getEpisodeEmbedId(
-      episode
-    );
+  const embedId=getEpisodeEmbedId(episode);
 
   if(embedId){
-    const url=
-      `${MEGAPLAY_BASE}/stream/s-2/${encodeURIComponent(String(embedId))}/${language}`;
+    const url=`${MEGAPLAY_BASE}/stream/s-2/${encodeURIComponent(String(embedId))}/${language}`;
 
-    log(
-      "MegaPlay:",
-      language,
-      "episode ID candidate",
-      url
-    );
-
+    log("MegaPlay:",language,"episode ID candidate",url);
     candidates.push(url);
   }
 
-  const anilistId=
-    episode?.anilistId||
-    episode?.anilist_id;
+  const anilistId=episode?.anilistId||episode?.anilist_id;
 
   if(anilistId){
-    const url=
-      `${MEGAPLAY_BASE}/stream/ani/${encodeURIComponent(String(anilistId))}/${episodeNumber}/${language}`;
+    const url=`${MEGAPLAY_BASE}/stream/ani/${encodeURIComponent(String(anilistId))}/${episodeNumber}/${language}`;
 
-    log(
-      "MegaPlay:",
-      language,
-      "AniList candidate",
-      url
-    );
-
+    log("MegaPlay:",language,"AniList candidate",url);
     candidates.push(url);
   }
 
-  const malId=
-    episode?.malId||
-    episode?.mal_id;
+  const malId=episode?.malId||episode?.mal_id;
 
   if(malId){
-    const url=
-      `${MEGAPLAY_BASE}/stream/mal/${encodeURIComponent(String(malId))}/${episodeNumber}/${language}`;
+    const url=`${MEGAPLAY_BASE}/stream/mal/${encodeURIComponent(String(malId))}/${episodeNumber}/${language}`;
 
-    log(
-      "MegaPlay:",
-      language,
-      "MAL candidate",
-      url
-    );
-
+    log("MegaPlay:",language,"MAL candidate",url);
     candidates.push(url);
   }
 
-  const unique=[
-    ...new Set(candidates)
-  ];
+  const unique=[...new Set(candidates)];
 
-  log(
-    "MegaPlay:",
-    language,
-    "candidate count=",
-    unique.length
-  );
-
+  log("MegaPlay:",language,"candidate count=",unique.length);
   return unique;
 }
 
-function extractPlayerId(
-  html
-){
+function extractPlayerId(html){
   const patterns=[
     /\bdata-id=["'](\d+)["']/i,
     /\bdata-id\s*=\s*(\d+)/i,
@@ -832,115 +459,61 @@ function extractPlayerId(
     /data-id=["'](\d+)["'][^>]*id=["']megaplay-player["']/i
   ];
 
-  for(
-    const pattern of patterns
-  ){
-    const match=
-      html.match(pattern);
-
-    if(
-      match?.[1]
-    ){
-      return match[1];
-    }
+  for(const pattern of patterns){
+    const match=html.match(pattern);
+    if(match?.[1])return match[1];
   }
 
   return null;
 }
 
-async function resolveMegaPlaySource(
-  embedUrl
-){
-  log(
-    "MegaPlay: resolving embed",
-    embedUrl
+async function resolveMegaPlaySource(embedUrl){
+  log("MegaPlay: resolving embed",embedUrl);
+
+  const html=await fetchText(
+    embedUrl,
+    {
+      headers:{
+        "User-Agent":USER_AGENT,
+        "Accept":"text/html,application/xhtml+xml,application/json,text/plain,*/*",
+        "Referer":`${MEGAPLAY_BASE}/`
+      }
+    }
   );
 
-  const html=
-    await fetchText(
-      embedUrl,
-      {
-        headers:{
-          "User-Agent":
-            USER_AGENT,
-
-          "Accept":
-            "text/html,application/xhtml+xml,application/json,text/plain,*/*",
-
-          "Referer":
-            `${MEGAPLAY_BASE}/`
-        }
-      }
-    );
-
-  const playerId=
-    extractPlayerId(html);
+  const playerId=extractPlayerId(html);
 
   if(!playerId){
-    warn(
-      "MegaPlay: player ID NOT FOUND",
-      "html bytes=",
-      html.length
-    );
+    warn("MegaPlay: player ID NOT FOUND","html bytes=",html.length);
 
-    const markers=[
-      "data-id",
-      "megaplay-player",
-      "player",
-      "getSources"
-    ];
+    const markers=["data-id","megaplay-player","player","getSources"];
 
-    for(
-      const marker of markers
-    ){
-      log(
-        "MegaPlay marker",
-        marker,
-        "present=",
-        html.includes(marker)
-      );
+    for(const marker of markers){
+      log("MegaPlay marker",marker,"present=",html.includes(marker));
     }
 
-    throw new Error(
-      "MegaPlay player ID not found"
-    );
+    throw new Error("MegaPlay player ID not found");
   }
 
-  log(
-    "MegaPlay: player ID=",
-    playerId
-  );
+  log("MegaPlay: player ID=",playerId);
 
-  const sourceUrl=
-    `${MEGAPLAY_BASE}/stream/getSources?id=${encodeURIComponent(playerId)}`;
+  const sourceUrl=`${MEGAPLAY_BASE}/stream/getSources?id=${encodeURIComponent(playerId)}`;
 
-  log(
-    "MegaPlay: requesting sources"
-  );
+  log("MegaPlay: requesting sources");
 
-  const sourceJson=
-    await fetchJson(
-      sourceUrl,
-      {
-        headers:{
-          "User-Agent":
-            USER_AGENT,
-
-          "Accept":
-            "application/json,text/plain,*/*",
-
-          "Origin":
-            MEGAPLAY_BASE,
-
-          "Referer":
-            embedUrl
-        }
+  const sourceJson=await fetchJson(
+    sourceUrl,
+    {
+      headers:{
+        "User-Agent":USER_AGENT,
+        "Accept":"application/json,text/plain,*/*",
+        "Origin":MEGAPLAY_BASE,
+        "Referer":embedUrl
       }
-    );
-
-  log(
-    "MegaPlay: source response received"
+    }
   );
+
+  log("MegaPlay: source response received");
 
   return {
     sourceJson,
@@ -952,211 +525,78 @@ async function resolveMegaPlaySource(
 // SOURCE PARSING
 // =========================================================
 
-function collectSources(
-  value,
-  output=[]
-){
-  if(!value){
+function collectSources(value,output=[]){
+  if(!value)return output;
+
+  if(typeof value==="string"){
+    if(/^https?:\/\//i.test(value))output.push({url:value,quality:null});
     return output;
   }
 
-  if(
-    typeof value==="string"
-  ){
-    if(
-      /^https?:\/\//i.test(value)
-    ){
-      output.push({
-        url:value,
-        quality:null
-      });
-    }
-
+  if(Array.isArray(value)){
+    for(const item of value)collectSources(item,output);
     return output;
   }
 
-  if(
-    Array.isArray(value)
-  ){
-    for(
-      const item of value
-    ){
-      collectSources(
-        item,
-        output
-      );
-    }
+  if(typeof value!=="object")return output;
 
-    return output;
-  }
+  const url=value.file||value.url||value.src||value.source;
 
-  if(
-    typeof value!=="object"
-  ){
-    return output;
-  }
-
-  const url=
-    value.file||
-    value.url||
-    value.src||
-    value.source;
-
-  if(
-    typeof url==="string" &&
-    /^https?:\/\//i.test(url)
-  ){
+  if(typeof url==="string"&&/^https?:\/\//i.test(url)){
     output.push({
       url,
-      quality:
-        value.label||
-        value.quality||
-        value.resolution||
-        null
+      quality:value.label||value.quality||value.resolution||null
     });
   }
 
-  for(
-    const key of [
-      "sources",
-      "source",
-      "links",
-      "files"
-    ]
-  ){
-    if(value[key]){
-      collectSources(
-        value[key],
-        output
-      );
-    }
+  for(const key of ["sources","source","links","files"]){
+    if(value[key])collectSources(value[key],output);
   }
 
   return output;
 }
 
-function normalizeQuality(
-  value
-){
-  if(!value){
-    return "Auto";
-  }
+function normalizeQuality(value){
+  if(!value)return "Auto";
 
-  const text=
-    String(value)
-      .toLowerCase()
-      .replace(/\s+/g,"");
+  const text=String(value).toLowerCase().replace(/\s+/g,"");
 
-  if(
-    text.includes("2160")||
-    text.includes("4k")
-  ){
-    return "2160p";
-  }
-
-  if(
-    text.includes("1440")
-  ){
-    return "1440p";
-  }
-
-  if(
-    text.includes("1080")
-  ){
-    return "1080p";
-  }
-
-  if(
-    text.includes("720")
-  ){
-    return "720p";
-  }
-
-  if(
-    text.includes("480")
-  ){
-    return "480p";
-  }
-
-  if(
-    text.includes("360")
-  ){
-    return "360p";
-  }
+  if(text.includes("2160")||text.includes("4k"))return "2160p";
+  if(text.includes("1440"))return "1440p";
+  if(text.includes("1080"))return "1080p";
+  if(text.includes("720"))return "720p";
+  if(text.includes("480"))return "480p";
+  if(text.includes("360"))return "360p";
 
   return String(value);
 }
 
-function extractSubtitles(
-  json
-){
-  const tracks=
-    json?.tracks||
-    json?.captions||
-    json?.subtitles||
-    [];
+function extractSubtitles(json){
+  const tracks=json?.tracks||json?.captions||json?.subtitles||[];
 
-  if(
-    !Array.isArray(tracks)
-  ){
-    return [];
-  }
+  if(!Array.isArray(tracks))return [];
 
   const subtitles=[];
   const seen=new Set();
 
-  for(
-    const track of tracks
-  ){
-    if(
-      !track||
-      typeof track!=="object"
-    ){
-      continue;
-    }
+  for(const track of tracks){
+    if(!track||typeof track!=="object")continue;
 
-    const url=
-      track.file||
-      track.url||
-      track.src;
+    const url=track.file||track.url||track.src;
 
-    if(
-      !url||
-      !/^https?:\/\//i.test(url)
-    ){
-      continue;
-    }
+    if(!url||!/^https?:\/\//i.test(url))continue;
 
-    const kind=
-      String(
-        track.kind||
-        track.type||
-        "captions"
-      ).toLowerCase();
+    const kind=String(track.kind||track.type||"captions").toLowerCase();
 
-    if(
-      !kind.includes("caption")&&
-      !kind.includes("subtitle")&&
-      !kind.includes("sub")
-    ){
-      continue;
-    }
+    if(!kind.includes("caption")&&!kind.includes("subtitle")&&!kind.includes("sub"))continue;
 
-    if(
-      seen.has(url)
-    ){
-      continue;
-    }
+    if(seen.has(url))continue;
 
     seen.add(url);
 
     subtitles.push({
       url,
-      lang:
-        track.label||
-        track.srclang||
-        track.lang||
-        "English"
+      lang:track.label||track.srclang||track.lang||"English"
     });
   }
 
@@ -1167,139 +607,53 @@ function extractSubtitles(
 // STREAM BUILDING
 // =========================================================
 
-function buildStreamsFromSource(
-  sourceJson,
-  embedUrl,
-  title,
-  episodeNumber,
-  language
-){
-  const rawSources=
-    collectSources(
-      sourceJson
-    );
+function buildStreamsFromSource(sourceJson,embedUrl,title,episodeNumber,language){
+  const rawSources=collectSources(sourceJson);
+  const subtitles=extractSubtitles(sourceJson);
 
-  const subtitles=
-    extractSubtitles(
-      sourceJson
-    );
-
-  log(
-    "Source parser:",
-    rawSources.length,
-    "raw source(s)",
-    subtitles.length,
-    "subtitle track(s)"
-  );
+  log("Source parser:",rawSources.length,"raw source(s)",subtitles.length,"subtitle track(s)");
 
   const streams=[];
   const seen=new Set();
 
-  for(
-    const source of rawSources
-  ){
-    if(
-      !source?.url||
-      seen.has(source.url)
-    ){
-      continue;
-    }
+  for(const source of rawSources){
+    if(!source?.url||seen.has(source.url))continue;
 
     seen.add(source.url);
 
-    const isHls=
-      /\.m3u8(?:$|\?)/i.test(
-        source.url
-      );
+    const isHls=/\.m3u8(?:$|\?)/i.test(source.url);
+    const quality=normalizeQuality(source.quality);
 
-    const quality=
-      normalizeQuality(
-        source.quality
-      );
-
-    log(
-      "Native stream:",
-      language,
-      quality,
-      isHls?"HLS":"MP4",
-      source.url
-    );
+    log("Native stream:",language,quality,isHls?"HLS":"MP4",source.url);
 
     streams.push({
-      name:
-        `AniKoto ${language.toUpperCase()} ${quality}`,
-
-      title:
-        `${title} - Episode ${episodeNumber} (${language.toUpperCase()})`,
-
-      url:
-        source.url,
-
+      name:`AniKoto ${language.toUpperCase()} ${quality}`,
+      title:`${title} - Episode ${episodeNumber} (${language.toUpperCase()})`,
+      url:source.url,
       quality,
-
-      provider:
-        "anikoto",
-
-      type:
-        isHls
-          ? "m3u8"
-          : "mp4",
-
-      hls:
-        isHls,
-
+      provider:"anikoto",
+      type:isHls?"m3u8":"mp4",
+      hls:isHls,
       subtitles,
-
       headers:{
-        Referer:
-          `${MEGAPLAY_BASE}/`,
-
-        Origin:
-          MEGAPLAY_BASE,
-
-        "User-Agent":
-          USER_AGENT
+        Referer:`${MEGAPLAY_BASE}/`,
+        Origin:MEGAPLAY_BASE,
+        "User-Agent":USER_AGENT
       }
     });
   }
 
-  if(
-    embedUrl &&
-    !streams.some(
-      stream =>
-        stream.url===
-        embedUrl
-    )
-  ){
-    log(
-      "Adding embed fallback:",
-      language,
-      embedUrl
-    );
+  if(embedUrl&&!streams.some(stream=>stream.url===embedUrl)){
+    log("Adding embed fallback:",language,embedUrl);
 
     streams.push({
-      name:
-        `AniKoto ${language.toUpperCase()} Embed`,
-
-      title:
-        `${title} - Episode ${episodeNumber} (${language.toUpperCase()})`,
-
-      url:
-        embedUrl,
-
-      provider:
-        "anikoto",
-
-      quality:
-        "Auto",
-
-      type:
-        "embed",
-
-      behaviorHints:{
-        notWebReady:
-          true
-      }
+      name:`AniKoto ${language.toUpperCase()} Embed`,
+      title:`${title} - Episode ${episodeNumber} (${language.toUpperCase()})`,
+      url:embedUrl,
+      provider:"anikoto",
+      quality:"Auto",
+      type:"embed",
+      behaviorHints:{notWebReady:true}
     });
   }
 
@@ -1316,333 +670,157 @@ export async function getStreams({
   season=1,
   episode=1
 }={}){
-  const started=
-    Date.now();
+  const started=Date.now();
 
-  log(
-    "=================================================="
-  );
+  log("==================================================");
 
-  log(
-    "REQUEST START",
-    JSON.stringify({
-      imdbId,
-      type,
-      season,
-      episode
-    })
-  );
+  log("REQUEST START",JSON.stringify({
+    imdbId,
+    type,
+    season,
+    episode
+  }));
 
   try{
-    if(
-      type!=="series"
-    ){
-      log(
-        "SKIP: provider only handles series"
-      );
-
+    if(type!=="series"){
+      log("SKIP: provider only handles series");
       return [];
     }
 
-    const cleanImdbId=
-      String(
-        imdbId||""
-      )
-        .split(":")[0]
-        .trim();
+    const cleanImdbId=String(imdbId||"").split(":")[0].trim();
+    const seasonNumber=Number(season||1);
+    const episodeNumber=Number(episode||1);
 
-    const seasonNumber=
-      Number(
-        season||1
-      );
+    log("Normalized:",JSON.stringify({
+      imdbId:cleanImdbId,
+      season:seasonNumber,
+      episode:episodeNumber
+    }));
 
-    const episodeNumber=
-      Number(
-        episode||1
-      );
-
-    log(
-      "Normalized:",
-      JSON.stringify({
-        imdbId:
-          cleanImdbId,
-
-        season:
-          seasonNumber,
-
-        episode:
-          episodeNumber
-      })
-    );
-
-    if(
-      !/^tt\d+$/i.test(
-        cleanImdbId
-      )
-    ){
-      warn(
-        "SKIP: invalid IMDb ID",
-        cleanImdbId
-      );
-
+    if(!/^tt\d+$/i.test(cleanImdbId)){
+      warn("SKIP: invalid IMDb ID",cleanImdbId);
       return [];
     }
 
-    if(
-      !Number.isFinite(
-        seasonNumber
-      )||
-      !Number.isFinite(
-        episodeNumber
-      )
-    ){
-      warn(
-        "SKIP: invalid season/episode"
-      );
-
+    if(!Number.isFinite(seasonNumber)||!Number.isFinite(episodeNumber)){
+      warn("SKIP: invalid season/episode");
       return [];
     }
 
-    log(
-      "STEP 1/6: Cinemeta metadata"
-    );
+    log("STEP 1/6: Cinemeta metadata");
 
-    const metadata=
-      await getCinemetaMetadata(
-        cleanImdbId,
-        "series"
-      );
+    const metadata=await getCinemetaMetadata(cleanImdbId,"series");
 
-    if(
-      !metadata.title
-    ){
-      warn(
-        "STOP: Cinemeta returned no title"
-      );
-
+    if(!metadata.title){
+      warn("STOP: Cinemeta returned no title");
       return [];
     }
 
-    log(
-      "STEP 2/6: AniKoto search"
-    );
+    log("STEP 2/6: AniKoto search");
 
-    const match=
-      await searchAniKoto(
-        metadata.title,
-        metadata.year
-      );
+    const match=await searchAniKoto(metadata.title,metadata.year);
 
-    if(
-      !match?.slug
-    ){
-      warn(
-        "STOP: no AniKoto match"
-      );
-
+    if(!match?.id){
+      warn("STOP: no AniKoto match");
       return [];
     }
 
-    log(
-      "STEP 3/6: AniKoto series"
-    );
+    log("STEP 3/6: AniKoto series");
 
-    const series=
-      await getAniKotoSeries(
-        match.slug
-      );
+    const series=await getAniKotoSeries(match.id);
 
-    if(
-      !series?.episodes?.length
-    ){
-      warn(
-        "STOP: AniKoto returned no episodes"
-      );
-
+    if(!series?.episodes?.length){
+      warn("STOP: AniKoto returned no episodes");
       return [];
     }
 
-    log(
-      "STEP 4/6: Episode resolution"
-    );
+    log("STEP 4/6: Episode resolution");
 
-    const episodeData=
-      findEpisode(
-        series.episodes,
-        episodeNumber
-      );
+    const episodeData=findEpisode(series.episodes,episodeNumber);
 
-    if(
-      !episodeData
-    ){
-      warn(
-        "STOP: requested episode unavailable"
-      );
-
+    if(!episodeData){
+      warn("STOP: requested episode unavailable");
       return [];
     }
 
-    log(
-      "STEP 5/6: MegaPlay SUB/DUB resolution"
-    );
+    log("STEP 5/6: MegaPlay SUB/DUB resolution");
 
     const streams=[];
 
-    for(
-      const language of [
-        "sub",
-        "dub"
-      ]
-    ){
-      log(
-        "--------------------------------------------------"
-      );
+    for(const language of ["sub","dub"]){
+      log("--------------------------------------------------");
+      log("LANGUAGE:",language.toUpperCase());
 
-      log(
-        "LANGUAGE:",
-        language.toUpperCase()
+      const candidates=buildMegaPlayCandidates(
+        episodeData,
+        episodeNumber,
+        language
       );
-
-      const candidates=
-        buildMegaPlayCandidates(
-          episodeData,
-          episodeNumber,
-          language
-        );
 
       let nativeWorked=false;
 
-      for(
-        let i=0;
-        i<candidates.length;
-        i++
-      ){
-        const embedUrl=
-          candidates[i];
+      for(let i=0;i<candidates.length;i++){
+        const embedUrl=candidates[i];
 
-        log(
-          `Candidate ${i+1}/${candidates.length}:`,
-          embedUrl
-        );
+        log(`Candidate ${i+1}/${candidates.length}:`,embedUrl);
 
         try{
-          const resolved=
-            await resolveMegaPlaySource(
-              embedUrl
-            );
+          const resolved=await resolveMegaPlaySource(embedUrl);
 
-          const nativeStreams=
-            buildStreamsFromSource(
-              resolved.sourceJson,
-              embedUrl,
-              metadata.title,
-              episodeNumber,
-              language
-            );
-
-          log(
-            "Candidate result:",
-            nativeStreams.length,
-            "stream(s)"
+          const nativeStreams=buildStreamsFromSource(
+            resolved.sourceJson,
+            embedUrl,
+            metadata.title,
+            episodeNumber,
+            language
           );
 
-          if(
-            nativeStreams.length>0
-          ){
-            streams.push(
-              ...nativeStreams
-            );
+          log("Candidate result:",nativeStreams.length,"stream(s)");
 
+          if(nativeStreams.length>0){
+            streams.push(...nativeStreams);
             nativeWorked=true;
-
-            log(
-              "Native source SUCCESS for",
-              language.toUpperCase()
-            );
-
+            log("Native source SUCCESS for",language.toUpperCase());
             break;
           }
 
         }catch(error){
-          warn(
-            "Candidate FAILED:",
-            error?.message||
-              String(error)
-          );
+          warn("Candidate FAILED:",error?.message||String(error));
         }
       }
 
-      if(
-        !nativeWorked
-      ){
-        const fallback=
-          candidates[0];
+      if(!nativeWorked){
+        const fallback=candidates[0];
 
         if(fallback){
-          log(
-            "No native source for",
-            language.toUpperCase(),
-            "- retaining embed fallback"
-          );
+          log("No native source for",language.toUpperCase(),"- retaining embed fallback");
 
           streams.push({
-            name:
-              `AniKoto ${language.toUpperCase()} Embed`,
-
-            title:
-              `${metadata.title} - Episode ${episodeNumber} (${language.toUpperCase()})`,
-
-            url:
-              fallback,
-
-            provider:
-              "anikoto",
-
-            quality:
-              "Auto",
-
-            type:
-              "embed",
-
-            behaviorHints:{
-              notWebReady:
-                true
-            }
+            name:`AniKoto ${language.toUpperCase()} Embed`,
+            title:`${metadata.title} - Episode ${episodeNumber} (${language.toUpperCase()})`,
+            url:fallback,
+            provider:"anikoto",
+            quality:"Auto",
+            type:"embed",
+            behaviorHints:{notWebReady:true}
           });
 
         }else{
-          log(
-            "No usable MegaPlay candidate for",
-            language.toUpperCase()
-          );
+          log("No usable MegaPlay candidate for",language.toUpperCase());
         }
       }
     }
 
-    log(
-      "STEP 6/6: Deduplication + quality sorting"
-    );
+    log("STEP 6/6: Deduplication + quality sorting");
 
     const unique=[];
     const seen=new Set();
 
-    for(
-      const stream of streams
-    ){
-      if(
-        !stream?.url||
-        seen.has(stream.url)
-      ){
-        continue;
-      }
+    for(const stream of streams){
+      if(!stream?.url||seen.has(stream.url))continue;
 
-      seen.add(
-        stream.url
-      );
-
-      unique.push(
-        stream
-      );
+      seen.add(stream.url);
+      unique.push(stream);
     }
 
     const qualityRank={
@@ -1658,84 +836,33 @@ export async function getStreams({
 
     unique.sort(
       (a,b)=>
-        (
-          qualityRank[
-            String(
-              b.quality||
-              "Auto"
-            ).toLowerCase()
-          ]||0
-        )-
-        (
-          qualityRank[
-            String(
-              a.quality||
-              "Auto"
-            ).toLowerCase()
-          ]||0
-        )
+        (qualityRank[String(b.quality||"Auto").toLowerCase()]||0)-
+        (qualityRank[String(a.quality||"Auto").toLowerCase()]||0)
     );
 
-    log(
-      "FINAL streams:",
-      unique.length
-    );
+    log("FINAL streams:",unique.length);
 
-    for(
-      const stream of unique
-    ){
-      log(
-        "FINAL:",
-        JSON.stringify({
-          name:
-            stream.name,
-
-          quality:
-            stream.quality,
-
-          type:
-            stream.type,
-
-          url:
-            stream.url
-        })
-      );
+    for(const stream of unique){
+      log("FINAL:",JSON.stringify({
+        name:stream.name,
+        quality:stream.quality,
+        type:stream.type,
+        url:stream.url
+      }));
     }
 
-    log(
-      "REQUEST SUCCESS in",
-      `${Date.now()-started}ms`
-    );
-
-    log(
-      "=================================================="
-    );
+    log("REQUEST SUCCESS in",`${Date.now()-started}ms`);
+    log("==================================================");
 
     return unique;
 
   }catch(error){
-    errorLog(
-      "REQUEST FAILED:",
-      error?.message||
-        String(error)
-    );
+    errorLog("REQUEST FAILED:",error?.message||String(error));
 
-    if(
-      error?.stack
-    ){
-      errorLog(
-        error.stack
-      );
-    }
+    if(error?.stack)errorLog(error.stack);
 
-    log(
-      "REQUEST FAILED after",
-      `${Date.now()-started}ms`
-    );
-
-    log(
-      "=================================================="
-    );
+    log("REQUEST FAILED after",`${Date.now()-started}ms`);
+    log("==================================================");
 
     return [];
   }
