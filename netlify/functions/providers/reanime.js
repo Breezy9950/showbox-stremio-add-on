@@ -1503,12 +1503,12 @@ export async function getStreams({
     ) {
       try {
         const mapped =
-          await resolveImdbToAnilist(
-            imdbId,
-            mediaType,
-            season,
-            episodeNumber
-          );
+  await resolveImdbToAnilist({
+    imdbId,
+    type: mediaType,
+    season,
+    episode: episodeNumber
+  });
 
         console.log(
           `[Reanime] AniBridge result:`,
