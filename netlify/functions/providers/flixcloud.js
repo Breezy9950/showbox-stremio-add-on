@@ -289,16 +289,16 @@ export async function resolveFlixCloud(
   // Fetch embed page
   // -------------------------------------------------------
 
-  const embedResponse =
-    await fetch(
-      embedUrlWithVersion,
-      {
-        headers: {
-          ...FLIX_HEADERS,
-          "Accept": "text/html,application/xhtml+xml"
-        }
-      }
-    );
+  const embedResponse = await fetch(
+  embedUrlWithVersion,
+  {
+    headers: {
+      "User-Agent": USER_AGENT,
+      "Accept": "*/*",
+      "Referer": REANIME_REFERER
+    }
+  }
+);
 
   if (!embedResponse.ok) {
     throw new Error(
