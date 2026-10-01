@@ -15,10 +15,6 @@ const MAPPING_KEY =
 const MAPPING_TTL_MS =
   24 * 60 * 60 * 1000;
 
-// AniBridge v3 mapping release.
-//
-// Keep this URL in one place so it can be changed easily
-// if AniBridge changes its release structure.
 const MAPPING_URL =
   "https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json";
 
@@ -38,13 +34,6 @@ function getMappingStore() {
 
 // =========================================================
 // DESCRIPTOR PARSER
-//
-// Examples:
-//
-// imdb_movie:tt1234567
-// imdb_show:tt1234567:s1
-// anilist:12345
-// tmdb_show:12345:s2
 // =========================================================
 
 function parseDescriptor(
@@ -84,12 +73,6 @@ function parseDescriptor(
 
 // =========================================================
 // RANGE PARSER
-//
-// Supported:
-//
-// 1
-// 1-12
-// 13-
 // =========================================================
 
 function parseRange(
@@ -132,13 +115,6 @@ function parseRange(
 
 // =========================================================
 // TARGET RANGE PARSER
-//
-// AniBridge can describe multiple target ranges.
-//
-// Example:
-//
-// "1-12"
-// "1-12,13-24"
 // =========================================================
 
 function parseTargetRanges(
@@ -152,14 +128,6 @@ function parseTargetRanges(
   let ratio =
     1;
 
-  // Some AniBridge mappings can contain a ratio suffix.
-  //
-  // Example:
-  //
-  // 1-12|0.5
-  //
-  // Keep it supported so the index does not lose
-  // information from the upstream mapping.
   const ratioMatch =
     text.match(
       /\|(-?\d+(?:\.\d+)?)$/
@@ -239,31 +207,14 @@ function buildEpisodeMapping(
 // =========================================================
 // BUILD COMPACT INDEX
 // =========================================================
-//
-// Instead of keeping the complete AniBridge database in
-// memory for every request, turn it into:
-//
-// {
-//   movies: {
-//      "tt123": "12345"
-//   },
-//
-//   shows: {
-//      "tt123|1": [
-//         {
-//           anilistId: "12345",
-//           ranges: [...]
-//         }
-//      ]
-//   }
-// }
-//
-// This is much smaller and faster to query.
-// =========================================================
 
 function buildIndex(
   raw
 ) {
+  console.log(
+    "[Reanime Map] Building compact index..."
+  );
+
   const movies =
     Object.create(
       null
@@ -274,6 +225,12 @@ function buildIndex(
       null
     );
 
+  let sourceCount =
+    0;
+
+  let skippedCount =
+    0;
+
   for (
     const [
       sourceDescriptor,
@@ -282,6 +239,8 @@ function buildIndex(
       raw || {}
     )
   ) {
+    sourceCount++;
+
     const source =
       parseDescriptor(
         sourceDescriptor
@@ -293,6 +252,7 @@ function buildIndex(
       typeof targets !==
         "object"
     ) {
+      skippedCount++;
       continue;
     }
 
@@ -378,10 +338,6 @@ function buildIndex(
       const mappings =
         [];
 
-      // ---------------------------------------------------
-      // AniBridge may have episode range information.
-      // ---------------------------------------------------
-
       if (
         ranges &&
         typeof ranges ===
@@ -430,6 +386,10 @@ function buildIndex(
     }
   }
 
+  console.log(
+    `[Reanime Map] Index build complete. Sources=${sourceCount}, skipped=${skippedCount}`
+  );
+
   return {
     movies,
     shows
@@ -458,10 +418,6 @@ function findTargetEpisode(
     return null;
   }
 
-  // No range information.
-  //
-  // In this case the mapping is already an AniList
-  // season mapping, so preserve the requested episode.
   if (
     !mapping.ranges.length
   ) {
@@ -634,6 +590,10 @@ function findTargetEpisode(
 
 async function readFreshCache() {
   try {
+    console.log(
+      "[Reanime Map] Checking fresh cache..."
+    );
+
     const store =
       getMappingStore();
 
@@ -650,18 +610,26 @@ async function readFreshCache() {
       );
 
     if (
-      !cached ||
-      typeof cached !==
-        "object"
+      !cached
     ) {
+      console.log(
+        "[Reanime Map] No cache found"
+      );
+
       return null;
     }
 
+    console.log(
+      `[Reanime Map] Cache found. updatedAt=${cached.updatedAt}`
+    );
+
     if (
-      !cached.index ||
-      typeof cached.index !==
-        "object"
+      !cached.index
     ) {
+      console.log(
+        "[Reanime Map] Cache has no index"
+      );
+
       return null;
     }
 
@@ -675,20 +643,49 @@ async function readFreshCache() {
         updatedAt
       )
     ) {
+      console.log(
+        "[Reanime Map] Invalid cache timestamp"
+      );
+
       return null;
     }
 
-    if (
+    const age =
       Date.now() -
-        updatedAt >=
+      updatedAt;
+
+    console.log(
+      `[Reanime Map] Cache age: ${Math.round(
+        age / 1000 / 60
+      )} minutes`
+    );
+
+    if (
+      age >=
       MAPPING_TTL_MS
     ) {
+      console.log(
+        "[Reanime Map] Cache expired"
+      );
+
       return null;
     }
+
+    console.log(
+      "[Reanime Map] Using fresh cache"
+    );
 
     return cached;
 
-  } catch {
+  } catch (
+    error
+  ) {
+    console.error(
+      "[Reanime Map] Fresh cache ERROR:",
+      error?.stack ||
+        error
+    );
+
     return null;
   }
 }
@@ -696,27 +693,51 @@ async function readFreshCache() {
 // =========================================================
 // EXPIRED CACHE
 // =========================================================
-//
-// Used if AniBridge is temporarily unavailable.
-// =========================================================
 
 async function readAnyCache() {
   try {
+    console.log(
+      "[Reanime Map] Reading stale cache..."
+    );
+
     const store =
       getMappingStore();
 
-    return await store.get(
-      MAPPING_KEY,
-      {
-        type:
-          "json",
+    const cached =
+      await store.get(
+        MAPPING_KEY,
+        {
+          type:
+            "json",
 
-        consistency:
-          "strong"
-      }
+          consistency:
+            "strong"
+        }
+      );
+
+    if (
+      cached
+    ) {
+      console.log(
+        "[Reanime Map] Stale cache found"
+      );
+    } else {
+      console.log(
+        "[Reanime Map] No stale cache found"
+      );
+    }
+
+    return cached;
+
+  } catch (
+    error
+  ) {
+    console.error(
+      "[Reanime Map] Stale cache ERROR:",
+      error?.stack ||
+        error
     );
 
-  } catch {
     return null;
   }
 }
@@ -727,81 +748,155 @@ async function readAnyCache() {
 
 async function refreshMapping() {
   console.log(
-    "[Reanime] Downloading AniBridge mapping..."
-  );
-
-  const response =
-    await fetch(
-      MAPPING_URL,
-      {
-        headers: {
-          Accept:
-            "application/json",
-
-          "User-Agent":
-            "ShowBox-Stremio-Addon/1.0"
-        }
-      }
-    );
-
-  if (
-    !response.ok
-  ) {
-    throw new Error(
-      `AniBridge returned HTTP ${response.status}`
-    );
-  }
-
-  const raw =
-    await response.json();
-
-  const index =
-    buildIndex(
-      raw
-    );
-
-  const movieCount =
-    Object.keys(
-      index.movies
-    ).length;
-
-  const showCount =
-    Object.keys(
-      index.shows
-    ).length;
-
-  if (
-    movieCount === 0 &&
-    showCount === 0
-  ) {
-    throw new Error(
-      "AniBridge mapping produced an empty index"
-    );
-  }
-
-  const cached = {
-    updatedAt:
-      Date.now(),
-
-    source:
-      "anibridge-v3",
-
-    index
-  };
-
-  const store =
-    getMappingStore();
-
-  await store.setJSON(
-    MAPPING_KEY,
-    cached
+    "[Reanime Map] ========================================"
   );
 
   console.log(
-    `[Reanime] AniBridge mapping refreshed: ${movieCount} movies, ${showCount} show seasons`
+    "[Reanime Map] DOWNLOADING ANIBRIDGE MAPPING"
   );
 
-  return cached;
+  console.log(
+    "[Reanime Map] URL:",
+    MAPPING_URL
+  );
+
+  const start =
+    Date.now();
+
+  try {
+    const response =
+      await fetch(
+        MAPPING_URL,
+        {
+          headers: {
+            Accept:
+              "application/json",
+
+            "User-Agent":
+              "ShowBox-Stremio-Addon/1.0"
+          }
+        }
+      );
+
+    console.log(
+      `[Reanime Map] AniBridge HTTP ${response.status}`
+    );
+
+    console.log(
+      "[Reanime Map] Content-Type:",
+      response.headers.get(
+        "content-type"
+      )
+    );
+
+    if (
+      !response.ok
+    ) {
+      throw new Error(
+        `AniBridge returned HTTP ${response.status}`
+      );
+    }
+
+    const raw =
+      await response.json();
+
+    console.log(
+      "[Reanime Map] JSON downloaded successfully"
+    );
+
+    console.log(
+      "[Reanime Map] Top-level type:",
+      Array.isArray(
+        raw
+      )
+        ? "ARRAY"
+        : typeof raw
+    );
+
+    console.log(
+      "[Reanime Map] Top-level keys:",
+      raw &&
+      typeof raw ===
+        "object"
+        ? Object.keys(
+            raw
+          ).slice(
+            0,
+            10
+          )
+        : []
+    );
+
+    const index =
+      buildIndex(
+        raw
+      );
+
+    const movieCount =
+      Object.keys(
+        index.movies
+      ).length;
+
+    const showCount =
+      Object.keys(
+        index.shows
+      ).length;
+
+    console.log(
+      `[Reanime Map] Built index: ${movieCount} movies, ${showCount} show seasons`
+    );
+
+    if (
+      movieCount === 0 &&
+      showCount === 0
+    ) {
+      throw new Error(
+        "AniBridge mapping produced an EMPTY index. The JSON schema may not match our parser."
+      );
+    }
+
+    const cached = {
+      updatedAt:
+        Date.now(),
+
+      source:
+        "anibridge-v3",
+
+      index
+    };
+
+    const store =
+      getMappingStore();
+
+    await store.setJSON(
+      MAPPING_KEY,
+      cached
+    );
+
+    console.log(
+      `[Reanime Map] Cache saved successfully in ${
+        Date.now() -
+        start
+      }ms`
+    );
+
+    console.log(
+      "[Reanime Map] ========================================"
+    );
+
+    return cached;
+
+  } catch (
+    error
+  ) {
+    console.error(
+      "[Reanime Map] REFRESH ERROR:",
+      error?.stack ||
+        error
+    );
+
+    throw error;
+  }
 }
 
 // =========================================================
@@ -814,6 +909,20 @@ export async function resolveImdbToAnilist({
   season,
   episode
 }) {
+  console.log(
+    "[Reanime Map] ----------------------------------------"
+  );
+
+  console.log(
+    "[Reanime Map] LOOKUP:",
+    JSON.stringify({
+      imdbId,
+      type,
+      season,
+      episode
+    })
+  );
+
   if (
     !imdbId ||
     !/^tt\d+$/i.test(
@@ -822,19 +931,23 @@ export async function resolveImdbToAnilist({
       )
     )
   ) {
+    console.log(
+      "[Reanime Map] Invalid IMDb ID"
+    );
+
     return null;
   }
 
   let cached =
     await readFreshCache();
 
-  // -------------------------------------------------------
-  // Refresh every 24 hours.
-  // -------------------------------------------------------
-
   if (
     !cached
   ) {
+    console.log(
+      "[Reanime Map] No fresh cache -> refreshing"
+    );
+
     try {
       cached =
         await refreshMapping();
@@ -843,23 +956,39 @@ export async function resolveImdbToAnilist({
       error
     ) {
       console.error(
-        "[Reanime] AniBridge refresh failed:",
-        error?.message ||
+        "[Reanime Map] Refresh failed:",
+        error?.stack ||
           error
       );
 
-      // ---------------------------------------------------
-      // Keep using old cache if available.
-      // ---------------------------------------------------
+      console.log(
+        "[Reanime Map] Trying stale cache..."
+      );
 
       cached =
         await readAnyCache();
+
+      if (
+        cached
+      ) {
+        console.log(
+          "[Reanime Map] STALE CACHE FOUND"
+        );
+      } else {
+        console.log(
+          "[Reanime Map] NO STALE CACHE"
+        );
+      }
     }
   }
 
   if (
     !cached?.index
   ) {
+    console.log(
+      "[Reanime Map] No usable index"
+    );
+
     return null;
   }
 
@@ -879,6 +1008,13 @@ export async function resolveImdbToAnilist({
       cached.index.movies?.[
         normalizedId
       ];
+
+    console.log(
+      `[Reanime Map] Movie lookup ${normalizedId} -> ${
+        anilistId ||
+        "NOT FOUND"
+      }`
+    );
 
     if (
       !anilistId
@@ -914,6 +1050,10 @@ export async function resolveImdbToAnilist({
       episode
     );
 
+  console.log(
+    `[Reanime Map] Series lookup IMDb=${normalizedId} S${seasonNumber} E${episodeNumber}`
+  );
+
   if (
     !Number.isFinite(
       seasonNumber
@@ -922,6 +1062,10 @@ export async function resolveImdbToAnilist({
       episodeNumber
     )
   ) {
+    console.log(
+      "[Reanime Map] Invalid season/episode"
+    );
+
     return null;
   }
 
@@ -933,11 +1077,29 @@ export async function resolveImdbToAnilist({
       key
     ];
 
+  console.log(
+    `[Reanime Map] Index key: ${key}`
+  );
+
+  console.log(
+    `[Reanime Map] Candidates: ${
+      Array.isArray(
+        candidates
+      )
+        ? candidates.length
+        : 0
+    }`
+  );
+
   if (
     !Array.isArray(
       candidates
     )
   ) {
+    console.log(
+      "[Reanime Map] NO SEASON MAPPING"
+    );
+
     return null;
   }
 
@@ -945,16 +1107,31 @@ export async function resolveImdbToAnilist({
     const candidate of
     candidates
   ) {
+    console.log(
+      `[Reanime Map] Testing AniList ${candidate.anilistId}`
+    );
+
     const targetEpisode =
       findTargetEpisode(
         candidate,
         episodeNumber
       );
 
+    console.log(
+      `[Reanime Map] Episode ${episodeNumber} -> ${
+        targetEpisode ??
+        "NO MATCH"
+      }`
+    );
+
     if (
       targetEpisode !==
       null
     ) {
+      console.log(
+        `[Reanime Map] SUCCESS: ${normalizedId} S${seasonNumber}E${episodeNumber} -> AniList ${candidate.anilistId} E${targetEpisode}`
+      );
+
       return {
         anilistId:
           String(
@@ -969,6 +1146,10 @@ export async function resolveImdbToAnilist({
       };
     }
   }
+
+  console.log(
+    "[Reanime Map] No episode mapping matched"
+  );
 
   return null;
 }
