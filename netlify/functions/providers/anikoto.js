@@ -2014,73 +2014,75 @@ function extractPlayerId(html){
 }
 
 async function resolveMegaPlaySource(embedUrl){
-  if(!embedUrl){
-    throw new Error(
-      "MegaPlay embed URL missing"
-    );
-  }
+  const url=new URL(embedUrl);
+  if(url.hostname!=="megaplay.buzz")throw new Error("Unsupported MegaPlay host");
 
-  if(!isHost(embedUrl,"megaplay.buzz")){
-    throw new Error(
-      `Not a MegaPlay URL: ${hostnameOf(embedUrl)}`
-    );
-  }
-
-  const sourcePageUrl=embedUrl;
-
-  const html=
-    await fetchText(
-      sourcePageUrl,
-      {
-        headers:{
-          "User-Agent":USER_AGENT,
-          "Accept":
-            "text/html,application/json,text/plain,*/*",
-          "Referer":`${MEGAPLAY_BASE}/`,
-          "Origin":MEGAPLAY_BASE
-        }
-      }
-    );
-
-  const playerId=
-    extractPlayerId(html);
-
-  if(!playerId){
-    throw new Error(
-      "MegaPlay player data-id not found"
-    );
-  }
-
-  const sourceUrl=
-    `${MEGAPLAY_BASE}/stream/getSources?id=${encodeURIComponent(playerId)}`;
-
-  const sourceJson=
-    await fetchJson(
-      sourceUrl,
-      {
-        headers:{
-          "Accept":
-            "application/json,text/plain,*/*",
-          "Origin":MEGAPLAY_BASE,
-          "Referer":sourcePageUrl,
-          "User-Agent":USER_AGENT
-        }
-      }
-    );
-
-  const sources=
-    collectSources(sourceJson);
-
-  if(!sources.length){
-    throw new Error(
-      "MegaPlay source response contained no media URL"
-    );
-  }
-
-  return{
-    sourceJson,
-    embedUrl:sourcePageUrl
+  const headers={
+    ...DEFAULT_HEADERS,
+    Accept:"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    Referer:`${MEGAPLAY_BASE}/`,
+    Origin:MEGAPLAY_BASE
   };
+
+  const page=await fetchWithTimeout(embedUrl,{headers});
+  const html=await page.text();
+
+  console.log("[AniKoto] MegaPlay page status",page.status,"bytes",html.length,"url",page.url);
+
+  const dataId=extractPlayerId(html);
+
+  console.log("[AniKoto] MegaPlay data-id",dataId||"NOT_FOUND");
+
+  if(!dataId){
+    console.log("[AniKoto] MegaPlay page markers",
+      "megaplay-player="+html.includes("megaplay-player"),
+      "data-id="+html.includes("data-id"),
+      "cloudflare="+/cloudflare|challenge|cf-chl/i.test(html),
+      "error="+/access denied|forbidden|error/i.test(html)
+    );
+    throw new Error("MegaPlay player data-id not found");
+  }
+
+  const sourceUrl=`${MEGAPLAY_BASE}/stream/getSources?id=${encodeURIComponent(dataId)}`;
+
+  const sourceResponse=await fetchWithTimeout(sourceUrl,{
+    headers:{
+      ...DEFAULT_HEADERS,
+      Accept:"application/json,text/plain,*/*",
+      Referer:embedUrl,
+      Origin:MEGAPLAY_BASE
+    }
+  });
+
+  const sourceText=await sourceResponse.text();
+
+  console.log("[AniKoto] MegaPlay getSources status",sourceResponse.status,"bytes",sourceText.length);
+
+  let sourceJson;
+  try{
+    sourceJson=JSON.parse(sourceText);
+  }catch{
+    console.log("[AniKoto] MegaPlay getSources invalid JSON");
+    throw new Error("MegaPlay source response was not JSON");
+  }
+
+  const sources=sourceJson?.sources;
+  const file=typeof sources==="string"
+    ? sources
+    : sources?.file||sources?.url||sources?.src;
+
+  console.log(
+    "[AniKoto] MegaPlay source shape",
+    "sources="+typeof sources,
+    "file="+(!!file),
+    "tracks="+(Array.isArray(sourceJson?.tracks)?sourceJson.tracks.length:0)
+  );
+
+  if(!file){
+    throw new Error("MegaPlay source response contained no media URL");
+  }
+
+  return sourceJson;
 }
 
 // =========================================================
