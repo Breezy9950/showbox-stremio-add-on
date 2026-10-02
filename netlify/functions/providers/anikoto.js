@@ -687,7 +687,7 @@ async function resolveMegaPlaySource(embedUrl){
  catch{log("MegaPlay getSources","invalid JSON");throw new Error("MegaPlay source response was not JSON");}
  const sources=sourceJson?.sources;
  const file=typeof sources==="string"?sources:sources?.file||sources?.url||sources?.src;
- log("MegaPlay source shape",`sources=${typeof sources}`,`file=${!!file}`,`tracks=${Array.isArray(sourceJson?.tracks)?sourceJson.tracks.length:0}`);
+ log("MegaPlay source JSON",JSON.stringify(sourceJson));
  const collectedSources=collectSources(sourceJson);
  if(!file&&!collectedSources.length)throw new Error("MegaPlay source response contained no media URL");
  return{sourceJson,embedUrl:sourcePageUrl};
