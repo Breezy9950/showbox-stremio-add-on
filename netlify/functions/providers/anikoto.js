@@ -8,6 +8,8 @@ const ANIKOTO_API="https://anikotoapi.site";
 const ANIKOTO_RESOLVER_API="https://anikoto-api.onrender.com";
 const ANIKOTO_SITE="https://anikototv.to";
 const MEGAPLAY_BASE="https://megaplay.buzz";
+const ANIBRIDGE_API="https://anibridge.eliasbenb.dev/api/mappings";
+const ANIMAP_API="https://animap.id/api/map";
 const USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36";
 
 const DEFAULT_HEADERS={
@@ -116,6 +118,534 @@ async function getCinemetaMetadata(imdbId,type){
 }
 
 // =========================================================
+// SEASON HELPERS
+// =========================================================
+
+function extractSeasonNumber(value){
+  const text=String(value||"");
+
+  let match=text.match(/\bseason[\s._-]*(\d+)\b/i);
+  if(match)return Number(match[1]);
+
+  match=text.match(/\b(\d+)(?:st|nd|rd|th)[\s._-]+season\b/i);
+  if(match)return Number(match[1]);
+
+  match=text.match(/\bs(\d+)\b/i);
+  if(match)return Number(match[1]);
+
+  return null;
+}
+
+function removeSeasonSuffix(value){
+  return normalizeTitle(value)
+    .replace(/\bseason\s*\d+\b/gi," ")
+    .replace(/\bs\d+\b/gi," ")
+    .replace(/\b\d+(?:st|nd|rd|th)\s+season\b/gi," ")
+    .replace(/\s+/g," ")
+    .trim();
+}
+
+// =========================================================
+// ANIBRIDGE ID / EPISODE MAPPING
+// =========================================================
+
+function descriptorParts(value){
+  const text=String(value||"").trim();
+  if(!text)return null;
+
+  const parts=text.split(":");
+  if(parts.length<2)return null;
+
+  return{
+    provider:parts[0],
+    id:parts[1],
+    scope:parts.slice(2).join(":")||null
+  };
+}
+
+function parseRange(value){
+  const text=String(value||"").trim();
+  if(!text)return null;
+
+  const range=text.split("|")[0].trim();
+  const match=range.match(/^(\d+)(?:-(\d+))?$/);
+
+  if(!match)return null;
+
+  return{
+    start:Number(match[1]),
+    end:match[2]?Number(match[2]):null
+  };
+}
+
+function parseRatio(value){
+  const parts=String(value||"").split("|");
+
+  if(parts.length<2)return 1;
+
+  const ratio=Number(parts[parts.length-1]);
+
+  return Number.isFinite(ratio)&&ratio!==0?ratio:1;
+}
+
+function episodeInRange(episode,range){
+  const parsed=parseRange(range);
+  if(!parsed)return false;
+
+  return episode>=parsed.start&&(parsed.end===null||episode<=parsed.end);
+}
+
+function expandTargetRanges(targetRange){
+  const text=String(targetRange||"").trim();
+  if(!text)return[];
+
+  const rangeText=text.split("|")[0];
+
+  return rangeText
+    .split(",")
+    .map(value=>parseRange(value))
+    .filter(Boolean);
+}
+
+function mapEpisodeFromRange(sourceEpisode,sourceRange,targetRange){
+  const source=parseRange(sourceRange);
+  if(!source)return null;
+
+  if(!episodeInRange(sourceEpisode,sourceRange))return null;
+
+  const targetRanges=expandTargetRanges(targetRange);
+  if(!targetRanges.length)return null;
+
+  const ratio=parseRatio(targetRange);
+  const offset=sourceEpisode-source.start;
+
+  const flattened=[];
+
+  for(const range of targetRanges){
+    if(range.end===null){
+      flattened.push({
+        value:range.start,
+        openEnded:true
+      });
+    }else{
+      for(let episode=range.start;episode<=range.end;episode++){
+        flattened.push({
+          value:episode,
+          openEnded:false
+        });
+      }
+    }
+  }
+
+  if(!flattened.length)return null;
+
+  if(ratio===1){
+    const target=flattened[offset];
+
+    if(target)return target.value;
+
+    const last=flattened[flattened.length-1];
+
+    if(last?.openEnded){
+      return last.value+(offset-flattened.length+1);
+    }
+
+    return null;
+  }
+
+  if(ratio>1){
+    const index=Math.floor(offset*ratio);
+    const target=flattened[index];
+
+    if(target)return target.value;
+
+    const last=flattened[flattened.length-1];
+
+    if(last?.openEnded){
+      return last.value+Math.floor(offset*ratio);
+    }
+
+    return null;
+  }
+
+  const groupSize=Math.abs(ratio);
+  const index=Math.floor(offset/groupSize);
+  const target=flattened[index];
+
+  return target?.value??null;
+}
+
+function mappingProviderRank(provider){
+  const p=String(provider||"").toLowerCase();
+
+  if(p==="anilist")return 100;
+  if(p==="mal")return 95;
+  if(p==="anidb")return 90;
+  if(p==="kitsu")return 80;
+  if(p==="tvdb_show")return 70;
+  if(p==="tmdb_show")return 65;
+  if(p==="imdb_show")return 60;
+
+  return 10;
+}
+
+function addMappedId(result,node,targetEpisode=null){
+  if(!node?.provider||!node?.id)return;
+
+  const provider=String(node.provider).toLowerCase();
+
+  if(
+    provider==="anilist"||
+    provider==="mal"||
+    provider==="anidb"||
+    provider==="kitsu"||
+    provider==="tmdb_show"||
+    provider==="tvdb_show"||
+    provider==="imdb_show"
+  ){
+    const current=result[provider];
+
+    if(
+      !current||
+      (
+        targetEpisode!==null&&
+        current.episode===null
+      )
+    ){
+      result[provider]={
+        id:String(node.id),
+        scope:node.scope||null,
+        episode:targetEpisode,
+        score:mappingProviderRank(provider)
+      };
+    }
+  }
+}
+
+function parseAniBridgeDescriptorMap(sourceDescriptor,targetMap,sourceImdbId,season,episode,mapped){
+  const source=descriptorParts(sourceDescriptor);
+  if(!source)return;
+
+  const sourceProvider=String(source.provider||"").toLowerCase();
+  const sourceId=String(source.id||"").toLowerCase();
+
+  if(
+    sourceProvider!=="imdb_show"||
+    sourceId!==String(sourceImdbId).toLowerCase()
+  )return;
+
+  const sourceSeason=source.scope?
+    Number(String(source.scope).replace(/^s/i,"")):
+    null;
+
+  if(
+    Number.isFinite(sourceSeason)&&
+    sourceSeason!==Number(season)
+  )return;
+
+  if(!targetMap||typeof targetMap!=="object")return;
+
+  for(const [targetDescriptor,rangeMap] of Object.entries(targetMap)){
+    const target=descriptorParts(targetDescriptor);
+    if(!target)continue;
+
+    if(
+      !rangeMap||
+      typeof rangeMap!=="object"||
+      Array.isArray(rangeMap)
+    ){
+      addMappedId(mapped,target,null);
+      continue;
+    }
+
+    const ranges=Object.entries(rangeMap);
+
+    if(!ranges.length){
+      addMappedId(mapped,target,null);
+      continue;
+    }
+
+    for(const [sourceRange,targetRange] of ranges){
+      const sourceRangeParsed=parseRange(sourceRange);
+
+      if(!sourceRangeParsed)continue;
+      if(!episodeInRange(Number(episode),sourceRange))continue;
+
+      const targetEpisode=
+        mapEpisodeFromRange(
+          Number(episode),
+          sourceRange,
+          targetRange
+        );
+
+      addMappedId(
+        mapped,
+        target,
+        targetEpisode
+      );
+    }
+  }
+}
+
+function parseAniBridgeMappings(json,sourceImdbId,season,episode){
+  const mapped={
+    source:{
+      imdb:sourceImdbId,
+      season:Number(season),
+      episode:Number(episode)
+    }
+  };
+
+  if(!json||typeof json!=="object")return mapped;
+
+  if(!Array.isArray(json)){
+    for(const [sourceDescriptor,targetMap] of Object.entries(json)){
+      parseAniBridgeDescriptorMap(
+        sourceDescriptor,
+        targetMap,
+        sourceImdbId,
+        season,
+        episode,
+        mapped
+      );
+    }
+  }
+
+  const wrappedCandidates=[
+    json?.data,
+    json?.mappings,
+    json?.results
+  ];
+
+  for(const wrapped of wrappedCandidates){
+    if(!wrapped||wrapped===json)continue;
+
+    if(Array.isArray(wrapped)){
+      for(const item of wrapped){
+        if(!item||typeof item!=="object")continue;
+
+        const sourceDescriptor=
+          item?.source?.descriptor||
+          item?.source_descriptor||
+          item?.sourceDescriptor||
+          item?.source;
+
+        const targetMap=
+          item?.targets||
+          item?.target||
+          item?.mapping||
+          item?.mappings;
+
+        if(typeof sourceDescriptor==="string"){
+          parseAniBridgeDescriptorMap(
+            sourceDescriptor,
+            targetMap,
+            sourceImdbId,
+            season,
+            episode,
+            mapped
+          );
+        }
+      }
+    }else if(typeof wrapped==="object"){
+      for(const [sourceDescriptor,targetMap] of Object.entries(wrapped)){
+        parseAniBridgeDescriptorMap(
+          sourceDescriptor,
+          targetMap,
+          sourceImdbId,
+          season,
+          episode,
+          mapped
+        );
+      }
+    }
+  }
+
+  return mapped;
+}
+
+function collectProviderIdsFromMapping(mapped){
+  const ids=[];
+
+  for(const key of[
+    "anilist",
+    "mal",
+    "anidb",
+    "kitsu",
+    "tmdb_show",
+    "tvdb_show",
+    "imdb_show"
+  ]){
+    const value=mapped?.[key];
+
+    if(!value?.id)continue;
+
+    ids.push({
+      provider:key,
+      id:String(value.id),
+      scope:value.scope||null,
+      episode:value.episode??null,
+      score:value.score||0
+    });
+  }
+
+  return ids;
+}
+
+async function getAniBridgeMapping(imdbId,season,episode){
+  const clean=String(imdbId||"").split(":")[0].trim();
+
+  if(!/^tt\d+$/i.test(clean))return null;
+
+  const seasonNumber=Number(season);
+
+  const query=
+    `source.provider:imdb_show source.id:${clean} source.scope:s${seasonNumber}`;
+
+  try{
+    const json=
+      await fetchJson(
+        `${ANIBRIDGE_API}?q=${encodeURIComponent(query)}`
+      );
+
+    const mapped=
+      parseAniBridgeMappings(
+        json,
+        clean,
+        seasonNumber,
+        Number(episode)
+      );
+
+    const ids=
+      collectProviderIdsFromMapping(mapped);
+
+    if(ids.length){
+      log(
+        "AniBridge mapping",
+        ids.map(item=>{
+          const episodePart=
+            item.episode!==null?
+              `:E${item.episode}`:
+              "";
+          return`${item.provider}:${item.id}${episodePart}`;
+        }).join(",")
+      );
+
+      return mapped;
+    }
+  }catch(error){
+    warn(
+      "AniBridge lookup failed",
+      error?.message||String(error)
+    );
+  }
+
+  return null;
+}
+
+// =========================================================
+// ANIMAP FALLBACK MAPPING
+// =========================================================
+
+function parseAniMapEntry(entry){
+  if(!entry||typeof entry!=="object")return null;
+
+  const result={};
+
+  const imdbIds=
+    Array.isArray(entry.imdb_id)?
+      entry.imdb_id:
+      entry.imdb_id?
+        [entry.imdb_id]:
+        [];
+
+  const tmdbIds=
+    Array.isArray(entry.tmdb_id)?
+      entry.tmdb_id:
+      entry.tmdb_id?
+        [entry.tmdb_id]:
+        [];
+
+  const tvdbIds=
+    Array.isArray(entry.tvdb_id)?
+      entry.tvdb_id:
+      entry.tvdb_id?
+        [entry.tvdb_id]:
+        [];
+
+  if(imdbIds.length)result.imdb=imdbIds;
+  if(entry.anidb_id)result.anidb=Array.isArray(entry.anidb_id)?entry.anidb_id:[entry.anidb_id];
+  if(entry.anilist_id)result.anilist=Array.isArray(entry.anilist_id)?entry.anilist_id:[entry.anilist_id];
+  if(entry.mal_id)result.mal=Array.isArray(entry.mal_id)?entry.mal_id:[entry.mal_id];
+  if(entry.kitsu_id)result.kitsu=Array.isArray(entry.kitsu_id)?entry.kitsu_id:[entry.kitsu_id];
+  if(tvdbIds.length)result.tvdb=tvdbIds;
+  if(tmdbIds.length)result.tmdb=tmdbIds;
+
+  return result;
+}
+
+async function getAniMapMapping(imdbId){
+  const clean=String(imdbId||"").split(":")[0].trim();
+
+  if(!/^tt\d+$/i.test(clean))return null;
+
+  try{
+    const json=
+      await fetchJson(
+        `${ANIMAP_API}/imdb/${encodeURIComponent(clean)}`
+      );
+
+    const entry=
+      Array.isArray(json)?
+        json[0]:
+        json;
+
+    const mapped=
+      parseAniMapEntry(entry);
+
+    if(mapped){
+      log("AniMap mapping found");
+      return mapped;
+    }
+  }catch(error){
+    warn(
+      "AniMap lookup failed",
+      error?.message||String(error)
+    );
+  }
+
+  return null;
+}
+
+async function getCombinedAnimeMapping(imdbId,season,episode){
+  const aniBridge=
+    await getAniBridgeMapping(
+      imdbId,
+      season,
+      episode
+    );
+
+  if(aniBridge){
+    return{
+      source:"anibridge",
+      data:aniBridge
+    };
+  }
+
+  const aniMap=
+    await getAniMapMapping(imdbId);
+
+  if(aniMap){
+    return{
+      source:"animap",
+      data:aniMap
+    };
+  }
+
+  return null;
+}
+
+// =========================================================
 // ANIKOTO SEARCH
 // =========================================================
 
@@ -159,8 +689,12 @@ function getCandidateTitles(item){
 
   const add=value=>{
     if(typeof value!=="string")return;
+
     const text=value.trim();
-    if(text&&!titles.includes(text))titles.push(text);
+
+    if(text&&!titles.includes(text)){
+      titles.push(text);
+    }
   };
 
   add(item?.title);
@@ -210,30 +744,6 @@ function getCandidateId(item){
   return cleanId(value);
 }
 
-function extractSeasonNumber(value){
-  const text=String(value||"");
-
-  let match=text.match(/\bseason[\s._-]*(\d+)\b/i);
-  if(match)return Number(match[1]);
-
-  match=text.match(/\b(\d+)(?:st|nd|rd|th)[\s._-]+season\b/i);
-  if(match)return Number(match[1]);
-
-  match=text.match(/\bs(\d+)\b/i);
-  if(match)return Number(match[1]);
-
-  return null;
-}
-
-function removeSeasonSuffix(value){
-  return normalizeTitle(value)
-    .replace(/\bseason\s*\d+\b/gi," ")
-    .replace(/\bs\d+\b/gi," ")
-    .replace(/\b\d+(?:st|nd|rd|th)\s+season\b/gi," ")
-    .replace(/\s+/g," ")
-    .trim();
-}
-
 function titleMatchStrength(targetTitle,candidateTitle){
   const target=normalizeTitle(targetTitle);
   const candidate=normalizeTitle(candidateTitle);
@@ -255,6 +765,7 @@ function titleMatchStrength(targetTitle,candidateTitle){
   if(targetTokens.size===0||candidateTokens.size===0)return 0;
 
   let common=0;
+
   for(const token of targetTokens){
     if(candidateTokens.has(token))common++;
   }
@@ -278,9 +789,7 @@ function isValidTitleMatch(item,targetTitle){
   if(!titles.length)return false;
 
   for(const title of titles){
-    const strength=titleMatchStrength(targetTitle,title);
-
-    if(strength>=0.65)return true;
+    if(titleMatchStrength(targetTitle,title)>=0.65)return true;
   }
 
   return false;
@@ -314,8 +823,7 @@ function scoreSearchCandidate(item,targetTitle,targetYear,targetSeason){
   else if(removeSeasonSuffix(bestTitle)===removeSeasonSuffix(targetTitle))score+=1700;
   else score+=bestMatch*1000;
 
-  const overlap=tokenOverlap(targetTitle,bestTitle);
-  score+=overlap*300;
+  score+=tokenOverlap(targetTitle,bestTitle)*300;
 
   const candidateYear=getCandidateYear(item);
 
@@ -340,14 +848,170 @@ function scoreSearchCandidate(item,targetTitle,targetYear,targetSeason){
   return score;
 }
 
-async function searchAniKoto(title,year,season=1){
-  let best=null;
+function getCandidateExternalIds(item){
+  const ids=[];
 
+  const add=value=>{
+    if(value===null||value===undefined)return;
+
+    if(typeof value==="string"||typeof value==="number"){
+      const text=String(value).trim();
+      if(text)ids.push(text);
+      return;
+    }
+
+    if(Array.isArray(value)){
+      for(const entry of value)add(entry);
+      return;
+    }
+
+    if(typeof value==="object"){
+      for(const key of[
+        "id",
+        "value",
+        "anilist_id",
+        "anilistId",
+        "mal_id",
+        "malId",
+        "anidb_id",
+        "anidbId",
+        "kitsu_id",
+        "kitsuId",
+        "tmdb_id",
+        "tmdbId",
+        "tvdb_id",
+        "tvdbId",
+        "imdb_id",
+        "imdbId"
+      ]){
+        if(value[key]!==undefined)add(value[key]);
+      }
+    }
+  };
+
+  for(const value of[
+    item?.anilist_id,
+    item?.anilistId,
+    item?.mal_id,
+    item?.malId,
+    item?.anidb_id,
+    item?.anidbId,
+    item?.kitsu_id,
+    item?.kitsuId,
+    item?.tmdb_id,
+    item?.tmdbId,
+    item?.tvdb_id,
+    item?.tvdbId,
+    item?.imdb_id,
+    item?.imdbId
+  ]){
+    add(value);
+  }
+
+  for(const key of[
+    "ids",
+    "external_ids",
+    "externalIds",
+    "mapping",
+    "mappings",
+    "external"
+  ]){
+    const external=item?.[key];
+
+    if(external!==null&&external!==undefined){
+      add(external);
+    }
+  }
+
+  return ids;
+}
+
+function getMappingCandidates(mapping){
+  if(!mapping)return[];
+
+  const values=[];
+
+  for(const key of[
+    "anilist",
+    "mal",
+    "anidb",
+    "kitsu",
+    "tmdb_show",
+    "tvdb_show",
+    "imdb_show"
+  ]){
+    const value=mapping?.[key];
+
+    if(!value?.id)continue;
+
+    values.push({
+      provider:key,
+      id:String(value.id).trim(),
+      episode:
+        value.episode===null||
+        value.episode===undefined?
+          null:
+          Number(value.episode),
+      scope:value.scope||null,
+      score:value.score||0
+    });
+  }
+
+  return values;
+}
+
+function candidateIdMatchesMapping(item,mapping){
+  if(!mapping)return false;
+
+  const candidateIds=getCandidateExternalIds(item);
+
+  const mappedIds=
+    getMappingCandidates(mapping)
+      .map(value=>value.id)
+      .filter(Boolean);
+
+  if(!mappedIds.length)return false;
+
+  return candidateIds.some(
+    id=>mappedIds.includes(String(id).trim())
+  );
+}
+
+function getMappedEpisodeForCandidate(item,mapping){
+  if(!mapping)return null;
+
+  const candidateIds=getCandidateExternalIds(item);
+  const mappings=getMappingCandidates(mapping);
+
+  for(const mapped of mappings){
+    if(mapped.episode===null||!Number.isFinite(mapped.episode))continue;
+
+    if(
+      candidateIds.some(
+        id=>String(id).trim()===String(mapped.id).trim()
+      )
+    ){
+      return mapped.episode;
+    }
+  }
+
+  return null;
+}
+
+async function searchAniKotoCandidates(
+  title,
+  year,
+  season=1,
+  excludeId=null,
+  mapping=null
+){
+  const candidates=[];
   const MAX_PAGES=10;
   const PER_PAGE=100;
 
   for(let page=1;page<=MAX_PAGES;page++){
-    const endpoint=`${ANIKOTO_API}/recent-anime?page=${page}&per_page=${PER_PAGE}`;
+    const endpoint=
+      `${ANIKOTO_API}/recent-anime?page=${page}&per_page=${PER_PAGE}`;
 
     try{
       const json=await fetchJson(endpoint);
@@ -358,59 +1022,114 @@ async function searchAniKoto(title,year,season=1){
       for(const item of results){
         const id=getCandidateId(item);
 
-        if(!id)continue;
-
+        if(!id||String(id)===String(excludeId))continue;
         if(!isValidTitleMatch(item,title))continue;
 
-        const candidateTitle=getCandidateTitle(item);
-        const candidateYear=getCandidateYear(item);
-        const candidateSeason=extractSeasonNumber(candidateTitle);
-        const score=scoreSearchCandidate(
-          item,
-          title,
-          year,
-          season
-        );
+        const score=
+          scoreSearchCandidate(
+            item,
+            title,
+            year,
+            season
+          );
 
         if(!Number.isFinite(score))continue;
 
-        if(!best||score>best.score){
-          best={
-            id,
-            title:candidateTitle,
-            year:candidateYear,
-            season:candidateSeason,
-            score,
-            raw:item
-          };
-        }
+        const mapped=
+          mapping?
+            candidateIdMatchesMapping(item,mapping):
+            false;
+
+        const mappedEpisode=
+          mapped?
+            getMappedEpisodeForCandidate(item,mapping):
+            null;
+
+        candidates.push({
+          id,
+          title:getCandidateTitle(item),
+          year:getCandidateYear(item),
+          season:extractSeasonNumber(getCandidateTitle(item)),
+          score:score+(mapped?5000:0),
+          raw:item,
+          mapped,
+          mappedEpisode
+        });
       }
 
-      const pagination=json?.pagination||json?.data?.pagination;
+      const pagination=
+        json?.pagination||
+        json?.data?.pagination;
 
-      if(pagination&&pagination.hasNext===false)break;
+      if(
+        pagination&&
+        pagination.hasNext===false
+      )break;
 
     }catch(error){
       warn(
-        "Search page failed",
+        "Candidate search page failed",
         page,
         error?.message||String(error)
       );
     }
   }
 
-  if(!best){
+  candidates.sort((a,b)=>b.score-a.score);
+
+  const unique=[];
+  const seen=new Set();
+
+  for(const candidate of candidates){
+    const key=String(candidate.id);
+
+    if(seen.has(key))continue;
+
+    seen.add(key);
+    unique.push(candidate);
+
+    if(unique.length>=12)break;
+  }
+
+  return unique;
+}
+
+async function searchAniKoto(
+  title,
+  year,
+  season=1,
+  episode=1,
+  mapping=null
+){
+  const candidates=
+    await searchAniKotoCandidates(
+      title,
+      year,
+      season,
+      null,
+      mapping
+    );
+
+  if(!candidates.length){
     throw new Error("AniKoto title match not found");
   }
+
+  const best=candidates[0];
 
   log(
     "Search matched",
     best.id,
     "score=",
-    Math.round(best.score)
+    Math.round(best.score),
+    best.mappedEpisode!==null&&best.mappedEpisode!==undefined?
+      `mappedE=${best.mappedEpisode}`:
+      ""
   );
 
-  return best;
+  return{
+    ...best,
+    candidates
+  };
 }
 
 // =========================================================
@@ -602,7 +1321,6 @@ async function getAniKotoSeries(id){
         id:resolvedId
       };
     }
-
   }catch(error){
     lastError=error;
 
@@ -883,6 +1601,7 @@ function parseEpisodeRows(html){
 
   while((match=pattern.exec(html))){
     const block=match[1];
+
     const anchor=
       block.match(
         /<a\b([^>]*)>([\s\S]*?)<\/a>/i
@@ -1150,7 +1869,6 @@ async function getAniKotoWebsiteServers(
           cookie
         });
       }
-
     }catch(error){
       warn(
         "Server link failed",
@@ -1566,14 +2284,187 @@ export async function getStreams({
 
     if(!metadata.title)return[];
 
-    const match=
-      await searchAniKoto(
-        metadata.title,
-        metadata.year,
-        seasonNumber
+    // =====================================================
+    // ID / EPISODE MAPPING
+    // =====================================================
+
+    const mapping=
+      await getCombinedAnimeMapping(
+        cleanImdbId,
+        seasonNumber,
+        episodeNumber
       );
 
-    if(!match?.id)return[];
+    const mappingData=
+      mapping?.source==="anibridge"?
+        mapping.data:
+        null;
+
+    // =====================================================
+    // SEARCH CANDIDATES
+    // =====================================================
+
+    let candidates=[];
+
+    if(mappingData){
+      candidates=
+        await searchAniKotoCandidates(
+          metadata.title,
+          metadata.year,
+          seasonNumber,
+          null,
+          mappingData
+        );
+    }
+
+    if(!candidates.length){
+      const normal=
+        await searchAniKoto(
+          metadata.title,
+          metadata.year,
+          seasonNumber,
+          episodeNumber,
+          null
+        );
+
+      candidates=
+        normal?.candidates||
+        [normal];
+    }
+
+    // =====================================================
+    // VERIFY REQUESTED / MAPPED EPISODE
+    // =====================================================
+
+    let match=null;
+    let episodeData=null;
+    let resolvedEpisodeNumber=episodeNumber;
+
+    for(const candidate of candidates){
+      try{
+        const candidateSeries=
+          await getAniKotoSeries(
+            candidate.id
+          );
+
+        const candidateEpisodeNumber=
+          candidate.mappedEpisode!==null&&
+          candidate.mappedEpisode!==undefined&&
+          Number.isFinite(Number(candidate.mappedEpisode))?
+            Number(candidate.mappedEpisode):
+            episodeNumber;
+
+        let candidateEpisode=
+          findEpisode(
+            candidateSeries.episodes,
+            candidateEpisodeNumber
+          );
+
+        if(!candidateEpisode&&candidateEpisodeNumber!==episodeNumber){
+          candidateEpisode=
+            findEpisode(
+              candidateSeries.episodes,
+              episodeNumber
+            );
+        }
+
+        if(!candidateEpisode)continue;
+
+        match=candidate;
+        episodeData=candidateEpisode;
+
+        resolvedEpisodeNumber=
+          getEpisodeNumber(candidateEpisode)||
+          candidateEpisodeNumber;
+
+        log(
+          "Verified",
+          candidate.id,
+          `S${seasonNumber}E${episodeNumber}`,
+          resolvedEpisodeNumber!==episodeNumber?
+            `providerE${resolvedEpisodeNumber}`:
+            "",
+          candidate.mapped?
+            "mapped":
+            "title"
+        );
+
+        break;
+      }catch(error){
+        warn(
+          "Candidate verification failed",
+          candidate.id,
+          error?.message||String(error)
+        );
+      }
+    }
+
+    // =====================================================
+    // LAST FALLBACK
+    // =====================================================
+
+    if(!episodeData){
+      const alternate=
+        await searchAniKotoCandidates(
+          metadata.title,
+          metadata.year,
+          seasonNumber,
+          null,
+          null
+        );
+
+      for(const candidate of alternate){
+        if(
+          candidates.some(
+            existing=>String(existing.id)===String(candidate.id)
+          )
+        )continue;
+
+        try{
+          const candidateSeries=
+            await getAniKotoSeries(
+              candidate.id
+            );
+
+          const candidateEpisode=
+            findEpisode(
+              candidateSeries.episodes,
+              episodeNumber
+            );
+
+          if(!candidateEpisode)continue;
+
+          match=candidate;
+          episodeData=candidateEpisode;
+          resolvedEpisodeNumber=
+            getEpisodeNumber(candidateEpisode)||
+            episodeNumber;
+
+          log(
+            "Alternate verified",
+            candidate.id,
+            `S${seasonNumber}E${episodeNumber}`
+          );
+
+          break;
+        }catch(error){
+          warn(
+            "Alternate candidate failed",
+            candidate.id,
+            error?.message||String(error)
+          );
+        }
+      }
+    }
+
+    if(!episodeData||!match){
+      warn(
+        "Episode unavailable",
+        `S${seasonNumber}E${episodeNumber}`
+      );
+
+      return[];
+    }
 
     let slug=
       getCandidateSlug(match.raw)||
@@ -1589,33 +2480,19 @@ export async function getStreams({
     log(
       "Matched",
       match.id,
+      mapping?
+        `mapping=${mapping.source}`:
+        "mapping=none",
       "season=",
-      match.season||"base"
+      match.season||"base",
+      resolvedEpisodeNumber!==episodeNumber?
+        `episode=${resolvedEpisodeNumber}`:
+        ""
     );
-
-    const series=
-      await getAniKotoSeries(
-        match.id
-      );
-
-    const episodeData=
-      findEpisode(
-        series.episodes,
-        episodeNumber
-      );
-
-    if(!episodeData){
-      warn(
-        "Episode not found",
-        `S${seasonNumber}E${episodeNumber}`
-      );
-
-      return[];
-    }
 
     log(
       "Episode found",
-      episodeNumber
+      resolvedEpisodeNumber
     );
 
     const streams=[];
@@ -1628,10 +2505,9 @@ export async function getStreams({
           servers=
             await getAniKotoWebsiteServers(
               slug,
-              episodeNumber,
+              resolvedEpisodeNumber,
               language
             );
-
         }catch(error){
           warn(
             "Website discovery failed",
@@ -1708,7 +2584,6 @@ export async function getStreams({
               server.name
             );
           }
-
         }catch(error){
           warn(
             "Resolver failed",
@@ -1729,10 +2604,7 @@ export async function getStreams({
         /\/stream\/(?:s-2|ani|mal)\//i.test(stream.url)&&
         !/\.m3u8(?:$|\?)/i.test(stream.url)
       ){
-        warn(
-          "Rejected embed URL"
-        );
-
+        warn("Rejected embed URL");
         continue;
       }
 
