@@ -9,6 +9,7 @@ const ANIKOTO_RESOLVER_API="https://anikoto-api.onrender.com";
 const ANIKOTO_SITE="https://anikototv.to";
 const MEGAPLAY_BASE="https://megaplay.buzz";
 const USER_AGENT="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36";
+
 const DEFAULT_HEADERS={
   "User-Agent":USER_AGENT,
   "Accept":"application/json,text/plain,*/*",
@@ -19,17 +20,42 @@ function log(...args){console.log("[AniKoto]",...args);}
 function warn(...args){console.warn("[AniKoto]",...args);}
 function errorLog(...args){console.error("[AniKoto]",...args);}
 
+// =========================================================
+// HTTP
+// =========================================================
+
 async function fetchWithTimeout(url,options={},timeoutMs=UPSTREAM_TIMEOUT_MS){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
   const started=Date.now();
+
   log("HTTP →",url);
+
   try{
-    const response=await fetch(url,{redirect:"follow",...options,signal:controller.signal});
-    log("HTTP ←",response.status,response.statusText,`${Date.now()-started}ms`,new URL(url).hostname);
+    const response=await fetch(url,{
+      redirect:"follow",
+      ...options,
+      signal:controller.signal
+    });
+
+    log(
+      "HTTP ←",
+      response.status,
+      response.statusText,
+      `${Date.now()-started}ms`,
+      new URL(url).hostname
+    );
+
     return response;
   }catch(error){
-    warn("HTTP ✕",url,error?.name==="AbortError"?"TIMEOUT":error?.message||String(error));
+    warn(
+      "HTTP ✕",
+      url,
+      error?.name==="AbortError"
+        ?"TIMEOUT"
+        :error?.message||String(error)
+    );
+
     throw error;
   }finally{
     clearTimeout(timer);
@@ -39,26 +65,60 @@ async function fetchWithTimeout(url,options={},timeoutMs=UPSTREAM_TIMEOUT_MS){
 async function fetchJson(url,options={}){
   const response=await fetchWithTimeout(url,{
     ...options,
-    headers:{...DEFAULT_HEADERS,...(options.headers||{})}
+    headers:{
+      ...DEFAULT_HEADERS,
+      ...(options.headers||{})
+    }
   });
-  if(!response.ok)throw new Error(`HTTP ${response.status} from ${new URL(url).hostname}`);
+
+  if(!response.ok){
+    throw new Error(
+      `HTTP ${response.status} from ${new URL(url).hostname}`
+    );
+  }
+
   const text=await response.text();
-  log("JSON",new URL(url).hostname,"bytes=",text.length);
+
+  log(
+    "JSON",
+    new URL(url).hostname,
+    "bytes=",
+    text.length
+  );
+
   try{
     return JSON.parse(text);
   }catch(error){
-    throw new Error(`Invalid JSON from ${new URL(url).hostname}: ${error.message}`);
+    throw new Error(
+      `Invalid JSON from ${new URL(url).hostname}: ${error.message}`
+    );
   }
 }
 
 async function fetchText(url,options={}){
   const response=await fetchWithTimeout(url,{
     ...options,
-    headers:{...DEFAULT_HEADERS,...(options.headers||{})}
+    headers:{
+      ...DEFAULT_HEADERS,
+      ...(options.headers||{})
+    }
   });
-  if(!response.ok)throw new Error(`HTTP ${response.status} from ${new URL(url).hostname}`);
+
+  if(!response.ok){
+    throw new Error(
+      `HTTP ${response.status} from ${new URL(url).hostname}`
+    );
+  }
+
   const text=await response.text();
-  log("TEXT",new URL(url).hostname,"bytes=",text.length);
+
+  log(
+    "TEXT",
+    new URL(url).hostname,
+    "bytes=",
+    text.length
+  );
+
   return text;
 }
 
@@ -67,35 +127,96 @@ async function fetchText(url,options={}){
 // =========================================================
 
 function normalizeTitle(value){
-  return String(value||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ").replace(/['’]/g,"").replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim();
+  return String(value||"")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .toLowerCase()
+    .replace(/&/g," and ")
+    .replace(/['’]/g,"")
+    .replace(/[^a-z0-9]+/g," ")
+    .replace(/\s+/g," ")
+    .trim();
 }
 
 function titleTokens(value){
-  return new Set(normalizeTitle(value).split(" ").filter(Boolean));
+  return new Set(
+    normalizeTitle(value)
+      .split(" ")
+      .filter(Boolean)
+  );
 }
 
 function tokenOverlap(a,b){
   const aa=titleTokens(a);
   const bb=titleTokens(b);
+
   if(aa.size===0||bb.size===0)return 0;
+
   let common=0;
-  for(const token of aa)if(bb.has(token))common++;
+
+  for(const token of aa){
+    if(bb.has(token))common++;
+  }
+
   return common/Math.max(aa.size,bb.size);
 }
 
 function extractYear(value){
   if(!value)return null;
+
   const match=String(value).match(/\b(19|20)\d{2}\b/);
+
   return match?Number(match[0]):null;
 }
 
 function cleanId(value){
   if(value===null||value===undefined)return null;
-  return String(value).trim().replace(/^https?:\/\/[^/]+\/(?:watch|series|anime)\//i,"").replace(/^\/(?:watch|series|anime)\//i,"").split("?")[0].split("#")[0].replace(/^\/+/,"").replace(/\/+$/,"");
+
+  return String(value)
+    .trim()
+    .replace(
+      /^https?:\/\/[^/]+\/(?:watch|series|anime)\//i,
+      ""
+    )
+    .replace(
+      /^\/(?:watch|series|anime)\//i,
+      ""
+    )
+    .split("?")[0]
+    .split("#")[0]
+    .replace(/^\/+/,"")
+    .replace(/\/+$/,"");
 }
 
 function isNumericId(value){
-  return /^\d+$/.test(String(value||"").trim());
+  return /^\d+$/.test(
+    String(value||"").trim()
+  );
+}
+
+function originOf(url){
+  try{
+    return new URL(url).origin;
+  }catch{
+    return null;
+  }
+}
+
+function hostnameOf(url){
+  try{
+    return new URL(url).hostname.toLowerCase();
+  }catch{
+    return "";
+  }
+}
+
+function isHost(url,domain){
+  const hostname=hostnameOf(url);
+
+  return(
+    hostname===domain||
+    hostname.endsWith(`.${domain}`)
+  );
 }
 
 // =========================================================
@@ -103,21 +224,59 @@ function isNumericId(value){
 // =========================================================
 
 async function getCinemetaMetadata(imdbId,type){
-  const cleanImdbId=String(imdbId||"").split(":")[0].trim();
-  log("Cinemeta: resolving",cleanImdbId,"type=",type);
-  if(!/^tt\d+$/i.test(cleanImdbId))throw new Error("Invalid IMDb ID");
-  const metadataUrl=`${CINEMETA_BASE}/meta/${type}/${cleanImdbId}.json`;
+  const cleanImdbId=
+    String(imdbId||"")
+      .split(":")[0]
+      .trim();
+
+  log(
+    "Cinemeta: resolving",
+    cleanImdbId,
+    "type=",
+    type
+  );
+
+  if(!/^tt\d+$/i.test(cleanImdbId)){
+    throw new Error("Invalid IMDb ID");
+  }
+
+  const metadataUrl=
+    `${CINEMETA_BASE}/meta/${type}/${cleanImdbId}.json`;
+
   const json=await fetchJson(metadataUrl);
-  if(!json||!json.meta)throw new Error("Cinemeta metadata not found");
+
+  if(!json||!json.meta){
+    throw new Error(
+      "Cinemeta metadata not found"
+    );
+  }
+
   const meta=json.meta;
+
   const result={
     id:cleanImdbId,
     title:meta.name||meta.title||"",
-    year:extractYear(meta.year||meta.releaseInfo||meta.released),
-    originalTitle:meta.originalName||meta.originalTitle||"",
+    year:extractYear(
+      meta.year||
+      meta.releaseInfo||
+      meta.released
+    ),
+    originalTitle:
+      meta.originalName||
+      meta.originalTitle||
+      "",
     description:meta.description||""
   };
-  log("Cinemeta: title=",result.title,"year=",result.year,"original=",result.originalTitle||"N/A");
+
+  log(
+    "Cinemeta: title=",
+    result.title,
+    "year=",
+    result.year,
+    "original=",
+    result.originalTitle||"N/A"
+  );
+
   return result;
 }
 
@@ -127,6 +286,7 @@ async function getCinemetaMetadata(imdbId,type){
 
 function extractArray(json){
   if(Array.isArray(json))return json;
+
   const candidates=[
     json?.data,
     json?.results,
@@ -135,82 +295,253 @@ function extractArray(json){
     json?.anime,
     json?.items
   ];
-  for(const value of candidates)if(Array.isArray(value))return value;
+
+  for(const value of candidates){
+    if(Array.isArray(value)){
+      return value;
+    }
+  }
+
   return [];
 }
 
 function getCandidateTitle(item){
-  if(typeof item?.title==="string")return item.title;
-  if(item?.title&&typeof item.title==="object"){
-    return item.title.english||item.title.romaji||item.title.native||item.title.default||"";
+  if(typeof item?.title==="string"){
+    return item.title;
   }
-  return item?.name||item?.anime_name||item?.title||"";
+
+  if(item?.title&&typeof item.title==="object"){
+    return(
+      item.title.english||
+      item.title.romaji||
+      item.title.native||
+      item.title.default||
+      ""
+    );
+  }
+
+  return(
+    item?.name||
+    item?.anime_name||
+    item?.title||
+    ""
+  );
 }
 
 function getCandidateYear(item){
-  return extractYear(item?.year)||extractYear(item?.releaseDate)||extractYear(item?.release_date)||extractYear(item?.aired)||extractYear(item?.date);
+  return(
+    extractYear(item?.year)||
+    extractYear(item?.releaseDate)||
+    extractYear(item?.release_date)||
+    extractYear(item?.aired)||
+    extractYear(item?.date)
+  );
 }
 
 function getCandidateId(item){
-  const value=item?.anime_id??item?.animeId??item?.series_id??item?.seriesId??item?.id??item?.slug??item?.url??item?.link;
+  const value=
+    item?.anime_id??
+    item?.animeId??
+    item?.series_id??
+    item?.seriesId??
+    item?.id??
+    item?.slug??
+    item?.url??
+    item?.link;
+
   return cleanId(value);
 }
 
-function scoreSearchCandidate(item,targetTitle,targetYear){
+function scoreSearchCandidate(
+  item,
+  targetTitle,
+  targetYear
+){
   const title=getCandidateTitle(item);
-  if(!title)return -Infinity;
+
+  if(!title)return-Infinity;
+
   const target=normalizeTitle(targetTitle);
   const candidate=normalizeTitle(title);
-  if(!target||!candidate)return -Infinity;
+
+  if(!target||!candidate)return-Infinity;
+
   let score=0;
-  if(candidate===target)score+=1000;
-  if(candidate.includes(target)||target.includes(candidate))score+=350;
-  score+=tokenOverlap(targetTitle,title)*300;
-  const candidateYear=getCandidateYear(item);
-  if(targetYear&&candidateYear){
-    if(candidateYear===targetYear)score+=250;
-    else if(Math.abs(candidateYear-targetYear)===1)score+=50;
-    else score-=150;
+
+  if(candidate===target){
+    score+=1000;
   }
+
+  if(
+    candidate.includes(target)||
+    target.includes(candidate)
+  ){
+    score+=350;
+  }
+
+  score+=
+    tokenOverlap(
+      targetTitle,
+      title
+    )*300;
+
+  const candidateYear=
+    getCandidateYear(item);
+
+  if(targetYear&&candidateYear){
+    if(candidateYear===targetYear){
+      score+=250;
+    }else if(
+      Math.abs(candidateYear-targetYear)===1
+    ){
+      score+=50;
+    }else{
+      score-=150;
+    }
+  }
+
   return score;
 }
 
 async function searchAniKoto(title,year){
-  log("Search: title=",title,"year=",year);
+  log(
+    "Search: title=",
+    title,
+    "year=",
+    year
+  );
+
   let best=null;
+
   const MAX_PAGES=5;
   const PER_PAGE=100;
-  log("Search: using AniKoto /recent-anime",`pages=${MAX_PAGES}`,`per_page=${PER_PAGE}`);
-  for(let page=1;page<=MAX_PAGES;page++){
-    const endpoint=`${ANIKOTO_API}/recent-anime?page=${page}&per_page=${PER_PAGE}`;
+
+  for(
+    let page=1;
+    page<=MAX_PAGES;
+    page++
+  ){
+    const endpoint=
+      `${ANIKOTO_API}/recent-anime?page=${page}&per_page=${PER_PAGE}`;
+
     try{
-      log("Search catalog page:",page,endpoint);
-      const json=await fetchJson(endpoint);
-      const results=extractArray(json);
-      log("Search catalog results:",results.length,"page=",page);
-      if(results.length===0)break;
-      for(const item of results){
-        const id=getCandidateId(item);
-        const candidateTitle=getCandidateTitle(item);
-        const candidateYear=getCandidateYear(item);
-        if(!id)continue;
-        const score=scoreSearchCandidate(item,title,year);
-        log("Candidate:",candidateTitle||"N/A","year=",candidateYear||"N/A","id=",id,"score=",score);
-        if(!best||score>best.score){
-          best={id,title:candidateTitle,year:candidateYear,score,raw:item};
-          log("★ New best candidate:",best.title,"score=",best.score,"id=",best.id);
-        }
-        if(best.score>=1000)break;
+      log(
+        "Search catalog page:",
+        page,
+        endpoint
+      );
+
+      const json=
+        await fetchJson(endpoint);
+
+      const results=
+        extractArray(json);
+
+      log(
+        "Search catalog results:",
+        results.length,
+        "page=",
+        page
+      );
+
+      if(results.length===0){
+        break;
       }
-      if(best&&best.score>=1000)break;
-      const pagination=json?.pagination||json?.data?.pagination;
-      if(pagination&&pagination.hasNext===false)break;
+
+      for(const item of results){
+        const id=
+          getCandidateId(item);
+
+        const candidateTitle=
+          getCandidateTitle(item);
+
+        const candidateYear=
+          getCandidateYear(item);
+
+        if(!id)continue;
+
+        const score=
+          scoreSearchCandidate(
+            item,
+            title,
+            year
+          );
+
+        log(
+          "Candidate:",
+          candidateTitle||"N/A",
+          "year=",
+          candidateYear||"N/A",
+          "id=",
+          id,
+          "score=",
+          score
+        );
+
+        if(!best||score>best.score){
+          best={
+            id,
+            title:candidateTitle,
+            year:candidateYear,
+            score,
+            raw:item
+          };
+
+          log(
+            "★ New best candidate:",
+            best.title,
+            "score=",
+            best.score,
+            "id=",
+            best.id
+          );
+        }
+
+        if(best.score>=1000){
+          break;
+        }
+      }
+
+      if(best&&best.score>=1000){
+        break;
+      }
+
+      const pagination=
+        json?.pagination||
+        json?.data?.pagination;
+
+      if(
+        pagination&&
+        pagination.hasNext===false
+      ){
+        break;
+      }
+
     }catch(error){
-      warn("Search catalog page failed:",page,error?.message||String(error));
+      warn(
+        "Search catalog page failed:",
+        page,
+        error?.message||String(error)
+      );
     }
   }
-  if(!best)throw new Error("AniKoto catalog returned no matching anime");
-  log("Search FINAL:",JSON.stringify({id:best.id,title:best.title,year:best.year,score:best.score}));
+
+  if(!best){
+    throw new Error(
+      "AniKoto catalog returned no matching anime"
+    );
+  }
+
+  log(
+    "Search FINAL:",
+    JSON.stringify({
+      id:best.id,
+      title:best.title,
+      year:best.year,
+      score:best.score
+    })
+  );
+
   return best;
 }
 
@@ -219,9 +550,27 @@ async function searchAniKoto(title,year){
 // =========================================================
 
 function extractNumericId(value){
-  if(typeof value==="number"&&Number.isFinite(value))return String(value);
-  if(typeof value==="string"&&/^\d+$/.test(value.trim()))return value.trim();
-  if(!value||typeof value!=="object")return null;
+  if(
+    typeof value==="number"&&
+    Number.isFinite(value)
+  ){
+    return String(value);
+  }
+
+  if(
+    typeof value==="string"&&
+    /^\d+$/.test(value.trim())
+  ){
+    return value.trim();
+  }
+
+  if(
+    !value||
+    typeof value!=="object"
+  ){
+    return null;
+  }
+
   const candidates=[
     value.id,
     value.anime_id,
@@ -239,42 +588,104 @@ function extractNumericId(value){
     value.data?.data_id,
     value.data?.dataId
   ];
+
   for(const candidate of candidates){
-    const id=extractNumericId(candidate);
+    const id=
+      extractNumericId(candidate);
+
     if(id)return id;
   }
+
   return null;
 }
 
 async function resolveAniKotoId(id){
   const clean=cleanId(id);
-  if(!clean)throw new Error("Invalid AniKoto series ID");
-  if(isNumericId(clean))return clean;
-  log("Series ID is slug:",clean,"resolving numeric AniKoto ID");
-  const encoded=encodeURIComponent(clean);
-  try{
-    const directEndpoint=`${ANIKOTO_API}/series/${encoded}`;
-    const directJson=await fetchJson(directEndpoint);
-    const directAnime=directJson?.anime||directJson?.data?.anime||directJson?.data||directJson;
-    const directId=extractNumericId(directAnime)||extractNumericId(directJson);
-    if(directId)return directId;
-    const directEpisodes=extractEpisodes(directJson);
-    if(directEpisodes.length>0)return clean;
-  }catch(error){
-    log("ID resolver: direct slug lookup failed:",error?.message||String(error));
+
+  if(!clean){
+    throw new Error(
+      "Invalid AniKoto series ID"
+    );
   }
+
+  if(isNumericId(clean)){
+    return clean;
+  }
+
+  log(
+    "Series ID is slug:",
+    clean
+  );
+
+  const encoded=
+    encodeURIComponent(clean);
+
   try{
-    const resolverEndpoint=`${ANIKOTO_RESOLVER_API}/page?name=${encoded}`;
-    const json=await fetchJson(resolverEndpoint);
-    const numericId=extractNumericId(json);
+    const directEndpoint=
+      `${ANIKOTO_API}/series/${encoded}`;
+
+    const directJson=
+      await fetchJson(directEndpoint);
+
+    const directAnime=
+      directJson?.anime||
+      directJson?.data?.anime||
+      directJson?.data||
+      directJson;
+
+    const directId=
+      extractNumericId(directAnime)||
+      extractNumericId(directJson);
+
+    if(directId){
+      return directId;
+    }
+
+    const directEpisodes=
+      extractEpisodes(directJson);
+
+    if(directEpisodes.length>0){
+      return clean;
+    }
+
+  }catch(error){
+    log(
+      "ID resolver: direct slug lookup failed:",
+      error?.message||String(error)
+    );
+  }
+
+  try{
+    const resolverEndpoint=
+      `${ANIKOTO_RESOLVER_API}/page?name=${encoded}`;
+
+    const json=
+      await fetchJson(resolverEndpoint);
+
+    const numericId=
+      extractNumericId(json);
+
     if(numericId){
-      log("ID resolver: SUCCESS",clean,"→",numericId);
+      log(
+        "ID resolver: SUCCESS",
+        clean,
+        "→",
+        numericId
+      );
+
       return numericId;
     }
+
   }catch(error){
-    warn("ID resolver failed:",error?.message||String(error));
+    warn(
+      "ID resolver failed:",
+      error?.message||String(error)
+    );
   }
-  throw new Error(`Unable to resolve AniKoto slug to numeric ID: ${clean}`);
+
+  throw new Error(
+    `Unable to resolve AniKoto slug to numeric ID: ${clean}`
+  );
 }
 
 // =========================================================
@@ -290,55 +701,155 @@ function extractEpisodes(json){
     json?.data?.episodeList,
     json?.episodeList
   ];
-  for(const value of candidates)if(Array.isArray(value))return value;
+
+  for(const value of candidates){
+    if(Array.isArray(value)){
+      return value;
+    }
+  }
+
   return [];
 }
 
 function getEpisodeNumber(episode){
-  const value=episode?.number??episode?.episode??episode?.episodeNumber??episode?.episode_number??episode?.ep??episode?.num;
+  const value=
+    episode?.number??
+    episode?.episode??
+    episode?.episodeNumber??
+    episode?.episode_number??
+    episode?.ep??
+    episode?.num;
+
   const number=Number(value);
-  return Number.isFinite(number)?number:null;
+
+  return Number.isFinite(number)
+    ?number
+    :null;
 }
 
 function getEpisodeEmbedId(episode){
-  const value=episode?.episode_embed_id||episode?.episodeEmbedId||episode?.embed_id||episode?.embedId||episode?.data_id||episode?.dataId||episode?.id||null;
-  return value===null||value===undefined||value===""?null:String(value);
+  const value=
+    episode?.episode_embed_id||
+    episode?.episodeEmbedId||
+    episode?.embed_id||
+    episode?.embedId||
+    episode?.data_id||
+    episode?.dataId||
+    episode?.id||
+    null;
+
+  return(
+    value===null||
+    value===undefined||
+    value===""
+  )
+    ?null
+    :String(value);
 }
 
 function getEmbedUrl(episode,language){
-  const embed=episode?.embed_url||episode?.embedUrl||episode?.embeds||episode?.embed;
-  if(typeof embed==="string")return embed;
-  if(embed&&typeof embed==="object"){
-    return embed[language]||embed[language==="sub"?"subtitle":"dub"]||embed.sub||embed.dub||embed.default||null;
+  const embed=
+    episode?.embed_url||
+    episode?.embedUrl||
+    episode?.embeds||
+    episode?.embed;
+
+  if(typeof embed==="string"){
+    return embed;
   }
+
+  if(embed&&typeof embed==="object"){
+    return(
+      embed[language]||
+      embed[
+        language==="sub"
+          ?"subtitle"
+          :"dub"
+      ]||
+      embed.sub||
+      embed.dub||
+      embed.default||
+      null
+    );
+  }
+
   return null;
 }
 
 async function getAniKotoSeries(id){
-  const resolvedId=await resolveAniKotoId(id);
-  const encoded=encodeURIComponent(resolvedId);
-  const endpoint=`${ANIKOTO_API}/series/${encoded}`;
+  const resolvedId=
+    await resolveAniKotoId(id);
+
+  const encoded=
+    encodeURIComponent(resolvedId);
+
+  const endpoint=
+    `${ANIKOTO_API}/series/${encoded}`;
+
   let lastError=null;
-  log("Series: resolved ID=",resolvedId);
+
+  log(
+    "Series: resolved ID=",
+    resolvedId
+  );
+
   try{
-    const json=await fetchJson(endpoint);
-    const episodes=extractEpisodes(json);
-    log("Series endpoint returned",episodes.length,"episodes");
-    if(episodes.length>0)return{json,episodes,id:resolvedId};
+    const json=
+      await fetchJson(endpoint);
+
+    const episodes=
+      extractEpisodes(json);
+
+    log(
+      "Series endpoint returned",
+      episodes.length,
+      "episodes"
+    );
+
+    if(episodes.length>0){
+      return{
+        json,
+        episodes,
+        id:resolvedId
+      };
+    }
+
   }catch(error){
     lastError=error;
-    warn("Series endpoint failed:",error?.message||String(error));
+
+    warn(
+      "Series endpoint failed:",
+      error?.message||String(error)
+    );
   }
-  throw(lastError||new Error("AniKoto series data unavailable"));
+
+  throw(
+    lastError||
+    new Error(
+      "AniKoto series data unavailable"
+    )
+  );
 }
 
-function findEpisode(episodes,episodeNumber){
+function findEpisode(
+  episodes,
+  episodeNumber
+){
   const target=Number(episodeNumber);
-  if(!Number.isFinite(target))return null;
-  for(const episode of episodes){
-    const number=getEpisodeNumber(episode);
-    if(number===target)return episode;
+
+  if(!Number.isFinite(target)){
+    return null;
   }
+
+  for(const episode of episodes){
+    const number=
+      getEpisodeNumber(episode);
+
+    if(number===target){
+      return episode;
+    }
+  }
+
   return null;
 }
 
@@ -348,58 +859,174 @@ function findEpisode(episodes,episodeNumber){
 
 function collectSources(value,output=[]){
   if(!value)return output;
+
   if(typeof value==="string"){
-    if(/^https?:\/\//i.test(value))output.push({url:value,quality:null});
+    if(/^https?:\/\//i.test(value)){
+      output.push({
+        url:value,
+        quality:null
+      });
+    }
+
     return output;
   }
+
   if(Array.isArray(value)){
-    for(const item of value)collectSources(item,output);
+    for(const item of value){
+      collectSources(item,output);
+    }
+
     return output;
   }
-  if(typeof value!=="object")return output;
-  const url=value.file||value.url||value.src||value.source||value.link;
-  if(typeof url==="string"&&/^https?:\/\//i.test(url)){
+
+  if(typeof value!=="object"){
+    return output;
+  }
+
+  const url=
+    value.file||
+    value.url||
+    value.src||
+    value.source||
+    value.link;
+
+  if(
+    typeof url==="string"&&
+    /^https?:\/\//i.test(url)
+  ){
     output.push({
       url,
-      quality:value.label||value.quality||value.resolution||value.name||null
+      quality:
+        value.label||
+        value.quality||
+        value.resolution||
+        value.name||
+        null
     });
   }
-  for(const key of ["sources","source","links","files"]){
-    if(value[key])collectSources(value[key],output);
+
+  for(
+    const key of[
+      "sources",
+      "source",
+      "links",
+      "files"
+    ]
+  ){
+    if(value[key]){
+      collectSources(
+        value[key],
+        output
+      );
+    }
   }
+
   return output;
 }
 
 function normalizeQuality(value){
   if(!value)return"Auto";
-  const text=String(value).toLowerCase().replace(/\s+/g,"");
-  if(text.includes("2160")||text.includes("4k"))return"2160p";
-  if(text.includes("1440"))return"1440p";
-  if(text.includes("1080"))return"1080p";
-  if(text.includes("720"))return"720p";
-  if(text.includes("480"))return"480p";
-  if(text.includes("360"))return"360p";
+
+  const text=
+    String(value)
+      .toLowerCase()
+      .replace(/\s+/g,"");
+
+  if(
+    text.includes("2160")||
+    text.includes("4k")
+  ){
+    return"2160p";
+  }
+
+  if(text.includes("1440")){
+    return"1440p";
+  }
+
+  if(text.includes("1080")){
+    return"1080p";
+  }
+
+  if(text.includes("720")){
+    return"720p";
+  }
+
+  if(text.includes("480")){
+    return"480p";
+  }
+
+  if(text.includes("360")){
+    return"360p";
+  }
+
   return String(value);
 }
 
 function extractSubtitles(json){
-  const tracks=json?.tracks||json?.captions||json?.subtitles||[];
-  if(!Array.isArray(tracks))return[];
+  const tracks=
+    json?.tracks||
+    json?.captions||
+    json?.subtitles||
+    [];
+
+  if(!Array.isArray(tracks)){
+    return[];
+  }
+
   const subtitles=[];
   const seen=new Set();
+
   for(const track of tracks){
-    if(!track||typeof track!=="object")continue;
-    const url=track.file||track.url||track.src;
-    if(!url||!/^https?:\/\//i.test(url))continue;
-    const kind=String(track.kind||track.type||"captions").toLowerCase();
-    if(!kind.includes("caption")&&!kind.includes("subtitle")&&!kind.includes("sub"))continue;
-    if(seen.has(url))continue;
+    if(
+      !track||
+      typeof track!=="object"
+    ){
+      continue;
+    }
+
+    const url=
+      track.file||
+      track.url||
+      track.src;
+
+    if(
+      !url||
+      !/^https?:\/\//i.test(url)
+    ){
+      continue;
+    }
+
+    const kind=
+      String(
+        track.kind||
+        track.type||
+        "captions"
+      ).toLowerCase();
+
+    if(
+      !kind.includes("caption")&&
+      !kind.includes("subtitle")&&
+      !kind.includes("sub")
+    ){
+      continue;
+    }
+
+    if(seen.has(url)){
+      continue;
+    }
+
     seen.add(url);
+
     subtitles.push({
       url,
-      lang:track.label||track.srclang||track.lang||"English"
+      lang:
+        track.label||
+        track.srclang||
+        track.lang||
+        "English"
     });
   }
+
   return subtitles;
 }
 
@@ -408,31 +1035,78 @@ function extractSubtitles(json){
 // =========================================================
 
 function getCandidateSlug(item){
-  const value=item?.slug||item?.anime_slug||item?.animeSlug||item?.watchSlug||item?.url||item?.link||item?.episodeUrl;
+  const value=
+    item?.slug||
+    item?.anime_slug||
+    item?.animeSlug||
+    item?.watchSlug||
+    item?.url||
+    item?.link||
+    item?.episodeUrl;
+
   if(!value)return null;
+
   const text=String(value).trim();
-  const match=text.match(/\/watch\/([^/?#]+)/i);
-  return cleanId(match?.[1]||text);
+
+  const match=
+    text.match(
+      /\/watch\/([^/?#]+)/i
+    );
+
+  return cleanId(
+    match?.[1]||
+    text
+  );
 }
 
 function cookieHeader(response){
-  const values=typeof response.headers.getSetCookie==="function"?response.headers.getSetCookie():[];
-  if(values.length)return values.map(value=>value.split(";",1)[0]).join("; ");
-  const value=response.headers.get("set-cookie");
-  return value?value.split(/,(?=[^;]+=[^;]+)/).map(item=>item.split(";",1)[0]).join("; "):"";
+  const values=
+    typeof response.headers.getSetCookie==="function"
+      ?response.headers.getSetCookie()
+      :[];
+
+  if(values.length){
+    return values
+      .map(value=>value.split(";",1)[0])
+      .join("; ");
+  }
+
+  const value=
+    response.headers.get("set-cookie");
+
+  return value
+    ?value
+        .split(/,(?=[^;]+=[^;]+)/)
+        .map(
+          item=>item.split(";",1)[0]
+        )
+        .join("; ")
+    :"";
 }
 
-async function fetchSiteText(url,cookie="",referer=ANIKOTO_SITE+"/"){
-  const response=await fetchWithTimeout(url,{
-    headers:{
-      ...DEFAULT_HEADERS,
-      "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Referer":referer,
-      "Origin":ANIKOTO_SITE,
-      ...(cookie?{Cookie:cookie}:{})
-    }
-  });
-  if(!response.ok)throw new Error(`HTTP ${response.status} from ${new URL(url).hostname}`);
+async function fetchSiteText(
+  url,
+  cookie="",
+  referer=ANIKOTO_SITE+"/"
+){
+  const response=
+    await fetchWithTimeout(url,{
+      headers:{
+        ...DEFAULT_HEADERS,
+        "Accept":
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer":referer,
+        "Origin":ANIKOTO_SITE,
+        ...(cookie?{Cookie:cookie}:{})
+      }
+    });
+
+  if(!response.ok){
+    throw new Error(
+      `HTTP ${response.status} from ${new URL(url).hostname}`
+    );
+  }
+
   return{
     url:response.url,
     text:await response.text(),
@@ -442,11 +1116,27 @@ async function fetchSiteText(url,cookie="",referer=ANIKOTO_SITE+"/"){
 
 function mergeCookies(...values){
   const map=new Map();
-  for(const value of values.flatMap(value=>String(value||"").split(/;\s*/))){
+
+  for(
+    const value of values.flatMap(
+      value=>String(value||"").split(/;\s*/)
+    )
+  ){
     const index=value.indexOf("=");
-    if(index>0)map.set(value.slice(0,index),value.slice(index+1));
+
+    if(index>0){
+      map.set(
+        value.slice(0,index),
+        value.slice(index+1)
+      );
+    }
   }
-  return[...map].map(([key,value])=>`${key}=${value}`).join("; ");
+
+  return[...map]
+    .map(
+      ([key,value])=>`${key}=${value}`
+    )
+    .join("; ");
 }
 
 function parseWatchVideoId(html){
@@ -455,153 +1145,389 @@ function parseWatchVideoId(html){
     /data-anime-id=["'](\d+)["']/i,
     /anime\/getinfo["'`\s:/]+(\d+)/i
   ];
+
   for(const pattern of patterns){
     const match=html.match(pattern);
-    if(match?.[1])return match[1];
+
+    if(match?.[1]){
+      return match[1];
+    }
   }
+
   return null;
 }
 
 function parseEpisodeRows(html){
   const rows=[];
-  const pattern=/<li\b[^>]*data-html=["']true["'][^>]*>([\s\S]*?)<\/li>/gi;
+
+  const pattern=
+    /<li\b[^>]*data-html=["']true["'][^>]*>([\s\S]*?)<\/li>/gi;
+
   let match;
+
   while((match=pattern.exec(html))){
     const block=match[1];
-    const anchor=block.match(/<a\b([^>]*)>([\s\S]*?)<\/a>/i);
+
+    const anchor=
+      block.match(
+        /<a\b([^>]*)>([\s\S]*?)<\/a>/i
+      );
+
     if(!anchor)continue;
+
     const attrs=anchor[1];
+
     const getAttr=name=>{
-      const re=new RegExp(`\\b${name}\\s*=\\s*(["'])(.*?)\\1`,"i");
+      const re=
+        new RegExp(
+          `\\b${name}\\s*=\\s*(["'])(.*?)\\1`,
+          "i"
+        );
+
       return attrs.match(re)?.[2]||null;
     };
+
     rows.push({
-      number:Number(getAttr("data-num")||getAttr("data-episode")||getAttr("data-ep")||rows.length+1),
-      ids:getAttr("data-ids")||getAttr("data-id"),
+      number:Number(
+        getAttr("data-num")||
+        getAttr("data-episode")||
+        getAttr("data-ep")||
+        rows.length+1
+      ),
+      ids:
+        getAttr("data-ids")||
+        getAttr("data-id"),
       malId:getAttr("data-mal"),
-      timestamp:getAttr("data-timestamp")
+      timestamp:
+        getAttr("data-timestamp")
     });
   }
+
   return rows;
 }
 
 function stripHtml(value){
-  return String(value||"").replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/\s+/g," ").trim();
+  return String(value||"")
+    .replace(/<[^>]*>/g," ")
+    .replace(/&nbsp;/gi," ")
+    .replace(/\s+/g," ")
+    .trim();
 }
 
 function parseServerRows(html){
   const servers=[];
   const seen=new Set();
-  const typeBlocks=/<div\b([^>]*class=["'][^"']*\btype\b[^"']*["'][^>]*)>([\s\S]*?)<\/div>/gi;
+
+  const typeBlocks=
+    /<div\b([^>]*class=["'][^"']*\btype\b[^"']*["'][^>]*)>([\s\S]*?)<\/div>/gi;
+
   let blockMatch;
+
   while((blockMatch=typeBlocks.exec(html))){
     const attrs=blockMatch[1];
     const block=blockMatch[2];
-    const type=(attrs.match(/\bdata-type=["']([^"']+)["']/i)?.[1]||"sub").toLowerCase();
-    const liPattern=/<li\b([^>]*)>([\s\S]*?)<\/li>/gi;
+
+    const type=
+      (
+        attrs.match(
+          /\bdata-type=["']([^"']+)["']/i
+        )?.[1]||
+        "sub"
+      ).toLowerCase();
+
+    const liPattern=
+      /<li\b([^>]*)>([\s\S]*?)<\/li>/gi;
+
     let liMatch;
+
     while((liMatch=liPattern.exec(block))){
       const liAttrs=liMatch[1];
-      const linkId=liAttrs.match(/\bdata-link-id=["']([^"']+)["']/i)?.[1]||liAttrs.match(/\bdata-id=["']([^"']+)["']/i)?.[1];
+
+      const linkId=
+        liAttrs.match(
+          /\bdata-link-id=["']([^"']+)["']/i
+        )?.[1]||
+        liAttrs.match(
+          /\bdata-id=["']([^"']+)["']/i
+        )?.[1];
+
       if(!linkId)continue;
-      const name=stripHtml(liMatch[2])||"Server";
-      const key=`${type}:${linkId}`;
+
+      const name=
+        stripHtml(liMatch[2])||
+        "Server";
+
+      const key=
+        `${type}:${linkId}`;
+
       if(seen.has(key))continue;
+
       seen.add(key);
-      servers.push({type,name,linkId});
+
+      servers.push({
+        type,
+        name,
+        linkId
+      });
     }
   }
-  if(servers.length)return servers;
-  const generic=/<li\b([^>]*)>([\s\S]*?)<\/li>/gi;
+
+  if(servers.length){
+    return servers;
+  }
+
+  const generic=
+    /<li\b([^>]*)>([\s\S]*?)<\/li>/gi;
+
   let match;
+
   while((match=generic.exec(html))){
-    const linkId=match[1].match(/\bdata-link-id=["']([^"']+)["']/i)?.[1];
+    const linkId=
+      match[1].match(
+        /\bdata-link-id=["']([^"']+)["']/i
+      )?.[1];
+
     if(!linkId)continue;
-    const type=(match[1].match(/\bdata-type=["']([^"']+)["']/i)?.[1]||"sub").toLowerCase();
-    const name=stripHtml(match[2])||"Server";
-    const key=`${type}:${linkId}`;
+
+    const type=
+      (
+        match[1].match(
+          /\bdata-type=["']([^"']+)["']/i
+        )?.[1]||
+        "sub"
+      ).toLowerCase();
+
+    const name=
+      stripHtml(match[2])||
+      "Server";
+
+    const key=
+      `${type}:${linkId}`;
+
     if(!seen.has(key)){
       seen.add(key);
-      servers.push({type,name,linkId});
+
+      servers.push({
+        type,
+        name,
+        linkId
+      });
     }
   }
+
   return servers;
 }
 
-async function getAniKotoWebsiteServers(slug,episodeNumber,language){
-  if(!slug)throw new Error("AniKoto slug unavailable");
-  const watchUrl=`${ANIKOTO_SITE}/watch/${encodeURIComponent(slug)}/ep-${episodeNumber}`;
-  log("Website: opening",watchUrl);
-  const page=await fetchSiteText(watchUrl);
-  let cookie=mergeCookies(page.cookie,"country_code=US");
-  const videoId=parseWatchVideoId(page.text);
-  if(!videoId)throw new Error("AniKoto watch-page video ID not found");
-  const siteOrigin=new URL(page.url).origin;
-  const episodeUrl=`${siteOrigin}/ajax/episode/list/${videoId}?vrf=`;
-  const episodeResponse=await fetchSiteText(episodeUrl,cookie,siteOrigin+"/");
-  cookie=mergeCookies(cookie,episodeResponse.cookie);
-  const episodes=parseEpisodeRows(episodeResponse.text);
-  const target=episodes.find(item=>item.number===Number(episodeNumber));
-  if(!target?.ids)throw new Error(`AniKoto website episode ${episodeNumber} data ID not found`);
-  const serverUrl=`${siteOrigin}/ajax/server/list?servers=${encodeURIComponent(target.ids)}`;
-  const serverResponse=await fetchSiteText(serverUrl,cookie,siteOrigin+"/");
-  cookie=mergeCookies(cookie,serverResponse.cookie);
-  const servers=parseServerRows(serverResponse.text).filter(server=>server.type===String(language).toLowerCase());
-  log("Website servers:",servers.length,language.toUpperCase());
+async function getAniKotoWebsiteServers(
+  slug,
+  episodeNumber,
+  language
+){
+  if(!slug){
+    throw new Error(
+      "AniKoto slug unavailable"
+    );
+  }
+
+  const watchUrl=
+    `${ANIKOTO_SITE}/watch/${encodeURIComponent(slug)}/ep-${episodeNumber}`;
+
+  log(
+    "Website: opening",
+    watchUrl
+  );
+
+  const page=
+    await fetchSiteText(watchUrl);
+
+  let cookie=
+    mergeCookies(
+      page.cookie,
+      "country_code=US"
+    );
+
+  const videoId=
+    parseWatchVideoId(page.text);
+
+  if(!videoId){
+    throw new Error(
+      "AniKoto watch-page video ID not found"
+    );
+  }
+
+  const siteOrigin=
+    new URL(page.url).origin;
+
+  const episodeUrl=
+    `${siteOrigin}/ajax/episode/list/${videoId}?vrf=`;
+
+  const episodeResponse=
+    await fetchSiteText(
+      episodeUrl,
+      cookie,
+      siteOrigin+"/"
+    );
+
+  cookie=
+    mergeCookies(
+      cookie,
+      episodeResponse.cookie
+    );
+
+  const episodes=
+    parseEpisodeRows(
+      episodeResponse.text
+    );
+
+  const target=
+    episodes.find(
+      item=>
+        item.number===
+        Number(episodeNumber)
+    );
+
+  if(!target?.ids){
+    throw new Error(
+      `AniKoto website episode ${episodeNumber} data ID not found`
+    );
+  }
+
+  const serverUrl=
+    `${siteOrigin}/ajax/server/list?servers=${encodeURIComponent(target.ids)}`;
+
+  const serverResponse=
+    await fetchSiteText(
+      serverUrl,
+      cookie,
+      siteOrigin+"/"
+    );
+
+  cookie=
+    mergeCookies(
+      cookie,
+      serverResponse.cookie
+    );
+
+  const servers=
+    parseServerRows(
+      serverResponse.text
+    ).filter(
+      server=>
+        server.type===
+        String(language).toLowerCase()
+    );
+
+  log(
+    "Website servers:",
+    servers.length,
+    language.toUpperCase()
+  );
+
   const resolved=[];
+
   for(const server of servers){
     try{
-      const endpoint=`${siteOrigin}/ajax/server?get=${encodeURIComponent(server.linkId)}`;
-      const response=await fetchJson(endpoint,{
-        headers:{
-          Cookie:cookie,
-          Referer:watchUrl,
-          "X-Requested-With":"XMLHttpRequest"
-        }
-      });
-      const embed=response?.result?.url||response?.url||response?.data?.url;
+      const endpoint=
+        `${siteOrigin}/ajax/server?get=${encodeURIComponent(server.linkId)}`;
+
+      const response=
+        await fetchJson(
+          endpoint,
+          {
+            headers:{
+              Cookie:cookie,
+              Referer:watchUrl,
+              "X-Requested-With":
+                "XMLHttpRequest"
+            }
+          }
+        );
+
+      const embed=
+        response?.result?.url||
+        response?.url||
+        response?.data?.url;
+
       if(embed){
         resolved.push({
           ...server,
           embedUrl:embed,
-          malId:target.malId,
-          timestamp:target.timestamp,
+          malId:
+            target.malId,
+          timestamp:
+            target.timestamp,
           watchUrl,
           cookie
         });
       }
+
     }catch(error){
-      warn("Server link failed",server.name,error?.message||String(error));
+      warn(
+        "Server link failed",
+        server.name,
+        error?.message||String(error)
+      );
     }
   }
+
   return resolved;
 }
 
 // =========================================================
-// PROVIDER RESOLUTION
+// STREMIO STREAM OBJECT
 // =========================================================
 
-function originOf(url){
-  try{return new URL(url).origin;}catch{return null;}
-}
+function streamObject(
+  url,
+  title,
+  episodeNumber,
+  language,
+  provider,
+  quality="Auto",
+  referer=null,
+  subtitles=[]
+){
+  const isHls=
+    /\.m3u8(?:$|\?)/i.test(url);
 
-function streamObject(url,title,episodeNumber,language,provider,quality="Auto",referer=null,subtitles=[]){
-  const isHls=/\.m3u8(?:$|\?)/i.test(url);
-  const origin=originOf(referer||url);
+  const origin=
+    originOf(
+      referer||
+      url
+    );
+
   return{
-    name:`AniKoto ${language.toUpperCase()} ${provider} ${quality}`,
-    title:`${title} - Episode ${episodeNumber} (${language.toUpperCase()})`,
+    name:
+      `AniKoto ${language.toUpperCase()} ${provider} ${quality}`,
+
+    title:
+      `${title} - Episode ${episodeNumber} (${language.toUpperCase()})`,
+
     url,
+
     quality,
-    provider:`anikoto-${provider}`,
-    type:isHls?"m3u8":"mp4",
+
+    provider:
+      `anikoto-${provider}`,
+
+    type:
+      isHls
+        ?"m3u8"
+        :"mp4",
+
     hls:isHls,
+
     subtitles,
+
     behaviorHints:{
       proxyHeaders:{
         request:{
-          ...(referer?{Referer:referer}:{}),
-          ...(origin?{Origin:origin}:{}),
+          ...(referer
+            ?{Referer:referer}
+            :{}),
+          ...(origin
+            ?{Origin:origin}
+            :{}),
           "User-Agent":USER_AGENT
         }
       }
@@ -609,27 +1535,66 @@ function streamObject(url,title,episodeNumber,language,provider,quality="Auto",r
   };
 }
 
-function streamsFromResolved(sourceJson,title,episodeNumber,language,provider,referer){
-  const sources=collectSources(sourceJson);
-  const subtitles=extractSubtitles(sourceJson);
+// =========================================================
+// RESOLVED SOURCES → STREAMS
+// =========================================================
+
+function streamsFromResolved(
+  sourceJson,
+  title,
+  episodeNumber,
+  language,
+  provider,
+  referer
+){
+  const sources=
+    collectSources(sourceJson);
+
+  const subtitles=
+    extractSubtitles(sourceJson);
+
   const streams=[];
   const seen=new Set();
+
   for(const source of sources){
-    if(!source?.url||seen.has(source.url))continue;
+    if(
+      !source?.url||
+      seen.has(source.url)
+    ){
+      continue;
+    }
+
     seen.add(source.url);
-    streams.push(streamObject(
-      source.url,
-      title,
-      episodeNumber,
-      language,
-      provider,
-      normalizeQuality(source.quality),
-      referer,
-      subtitles
-    ));
+
+    streams.push(
+      streamObject(
+        source.url,
+        title,
+        episodeNumber,
+        language,
+        provider,
+        normalizeQuality(
+          source.quality
+        ),
+        referer,
+        subtitles
+      )
+    );
   }
+
+  log(
+    "Parsed native sources:",
+    streams.length,
+    "provider=",
+    provider
+  );
+
   return streams;
 }
+
+// =========================================================
+// MEGAPLAY
+// =========================================================
 
 function extractPlayerId(html){
   const patterns=[
@@ -638,189 +1603,340 @@ function extractPlayerId(html){
     /id=["']megaplay-player["'][^>]*data-id=["'](\d+)["']/i,
     /data-id=["'](\d+)["'][^>]*id=["']megaplay-player["']/i
   ];
+
   for(const pattern of patterns){
-    const match=html.match(pattern);
-    if(match?.[1])return match[1];
+    const match=
+      html.match(pattern);
+
+    if(match?.[1]){
+      return match[1];
+    }
   }
+
   return null;
 }
 
-async function resolveMegaPlaySource(embedUrl){
-  const html=await fetchText(embedUrl,{
-    headers:{
-      Referer:`${MEGAPLAY_BASE}/`,
-      Origin:MEGAPLAY_BASE,
-      "User-Agent":USER_AGENT,
-      Accept:"text/html,application/xhtml+xml,application/json,text/plain,*/*"
-    }
-  });
-  const playerId=extractPlayerId(html);
-  if(!playerId)throw new Error("MegaPlay player ID not found");
-  const endpoints=[
-    `${MEGAPLAY_BASE}/stream/getSourcesNew?id=${encodeURIComponent(playerId)}`,
-    `${MEGAPLAY_BASE}/stream/getSources?id=${encodeURIComponent(playerId)}`
+async function resolveMegaPlaySource(
+  embedUrl
+){
+  if(!embedUrl){
+    throw new Error(
+      "MegaPlay embed URL missing"
+    );
+  }
+
+  if(
+    !isHost(
+      embedUrl,
+      "megaplay.buzz"
+    )
+  ){
+    throw new Error(
+      `Not a MegaPlay URL: ${hostnameOf(embedUrl)}`
+    );
+  }
+
+  log(
+    "MegaPlay: resolving embed",
+    embedUrl
+  );
+
+  const html=
+    await fetchText(
+      embedUrl,
+      {
+        headers:{
+          "User-Agent":
+            USER_AGENT,
+          "Accept":
+            "text/html,application/xhtml+xml,application/json,text/plain,*/*",
+          "Referer":
+            `${MEGAPLAY_BASE}/`,
+          "Origin":
+            MEGAPLAY_BASE
+        }
+      }
+    );
+
+  const playerId=
+    extractPlayerId(html);
+
+  if(!playerId){
+    warn(
+      "MegaPlay: player ID not found",
+      "html bytes=",
+      html.length
+    );
+
+    throw new Error(
+      "MegaPlay player ID not found"
+    );
+  }
+
+  log(
+    "MegaPlay: player ID=",
+    playerId
+  );
+
+  const sourceUrl=
+    `${MEGAPLAY_BASE}/stream/getSources?id=${encodeURIComponent(playerId)}`;
+
+  log(
+    "MegaPlay: requesting native source metadata"
+  );
+
+  const sourceJson=
+    await fetchJson(
+      sourceUrl,
+      {
+        headers:{
+          "Accept":
+            "application/json,text/plain,*/*",
+          "Origin":
+            MEGAPLAY_BASE,
+          "Referer":
+            embedUrl,
+          "User-Agent":
+            USER_AGENT
+        }
+      }
+    );
+
+  const sources=
+    collectSources(
+      sourceJson
+    );
+
+  if(!sources.length){
+    throw new Error(
+      "MegaPlay source response contained no media URL"
+    );
+  }
+
+  log(
+    "MegaPlay: native sources=",
+    sources.length,
+    "hasTracks=",
+    Array.isArray(sourceJson?.tracks)
+  );
+
+  return{
+    sourceJson,
+    embedUrl
+  };
+}
+
+// =========================================================
+// VIDTUBE
+// =========================================================
+
+function extractVidTubeId(html){
+  const patterns=[
+    /\bdata-id=["'](\d+)["']/i,
+    /\bdata-id\s*=\s*(\d+)/i,
+    /\bdata-ep-id=["'](\d+)["']/i,
+    /\bdata-episode-id=["'](\d+)["']/i
   ];
-  let lastError=null;
-  for(const url of endpoints){
-    try{
-      const json=await fetchJson(url,{
+
+  for(const pattern of patterns){
+    const match=
+      html.match(pattern);
+
+    if(match?.[1]){
+      return match[1];
+    }
+  }
+
+  return null;
+}
+
+function extractVidTubeType(
+  html
+){
+  return(
+    html.match(
+      /\bdata-type=["']([^"']+)["']/i
+    )?.[1]||
+    html.match(
+      /\btype\s*:\s*["']([^"']+)["']/i
+    )?.[1]||
+    "sub"
+  );
+}
+
+async function resolveVidTubeSource(
+  embedUrl
+){
+  const origin=
+    originOf(embedUrl);
+
+  if(!origin){
+    throw new Error(
+      "Invalid VidTube embed URL"
+    );
+  }
+
+  if(
+    !isHost(
+      embedUrl,
+      "vidtube.site"
+    )
+  ){
+    throw new Error(
+      `Not a VidTube URL: ${hostnameOf(embedUrl)}`
+    );
+  }
+
+  const html=
+    await fetchText(
+      embedUrl,
+      {
         headers:{
-          Origin:MEGAPLAY_BASE,
-          Referer:embedUrl,
-          "User-Agent":USER_AGENT
+          "User-Agent":
+            USER_AGENT,
+          "Accept":
+            "text/html,application/xhtml+xml,application/json,text/plain,*/*",
+          "Referer":
+            `${origin}/`,
+          "Origin":
+            origin
         }
-      });
-      if(json&&(json.sources||json.source||json.data||json.enc))return{sourceJson:json,embedUrl};
-    }catch(error){
-      lastError=error;
-    }
-  }
-  throw(lastError||new Error("MegaPlay source endpoint returned no sources"));
-}
-
-async function resolveVidPlaySource(embedUrl){
-  const origin=originOf(embedUrl);
-  const html=await fetchText(embedUrl,{
-    headers:{
-      Referer:origin?`${origin}/`:undefined,
-      Origin:origin||undefined,
-      "User-Agent":USER_AGENT,
-      Accept:"text/html,application/xhtml+xml,text/plain,*/*"
-    }
-  });
-  const id=html.match(/data-id=["'](\d+)["']/i)?.[1]||html.match(/data-ep-id=["'](\d+)["']/i)?.[1];
-  const type=html.match(/\btype\s*:\s*["']([^"']+)["']/i)?.[1]||html.match(/data-type=["']([^"']+)["']/i)?.[1]||"sub";
-  if(!id)throw new Error("VidPlay data ID not found");
-  const base="https://vidtube.site";
-  const sourceUrl=`${base}/stream/getSourcesNew?id=${encodeURIComponent(id)}&type=${encodeURIComponent(type)}`;
-  try{
-    const json=await fetchJson(sourceUrl,{
-      headers:{
-        Referer:`${base}/`,
-        Origin:base,
-        "User-Agent":USER_AGENT
       }
-    });
-    if(json?.sources||json?.source||json?.data)return{sourceJson:json,embedUrl};
-  }catch(error){
-    const domain2=html.match(/domain2_url\s*:\s*["']([^"']+)["']/i)?.[1];
-    const epId=html.match(/data-ep-id=["'](\d+)["']/i)?.[1];
-    if(domain2&&epId){
-      const json=await fetchJson(
-        `${domain2.replace(/\/$/,"")}/save_data.php?id=${encodeURIComponent(`${epId}-${type}`)}`,
-        {headers:{Referer:embedUrl,"User-Agent":USER_AGENT}}
-      );
-      return{sourceJson:json?.data||json,embedUrl};
-    }
-    throw error;
-  }
-  throw new Error("VidPlay returned no sources");
-}
+    );
 
-async function resolveKiwiSource(server){
-  if(!server?.malId||!server?.timestamp)throw new Error("Kiwi mapping IDs unavailable");
-  const url=`https://mapper.nekostream.site/api/mal/${encodeURIComponent(server.malId)}/${encodeURIComponent(server.number||server.episodeNumber||server.episode||1)}/${encodeURIComponent(server.timestamp)}`;
-  const response=await fetchJson(url,{
-    headers:{
-      Referer:server.watchUrl||ANIKOTO_SITE+"/",
-      Origin:ANIKOTO_SITE,
-      "User-Agent":USER_AGENT
-    }
-  });
-  const entries=Array.isArray(response)?response:Object.values(response||{});
-  for(const entry of entries){
-    if(!entry||typeof entry!=="object")continue;
-    for(const key of Object.keys(entry)){
-      if(!/stream/i.test(key))continue;
-      const audio=entry[key];
-      if(!audio||typeof audio!=="object")continue;
-      const code=audio.sub?.url||audio.dub?.url||audio.url;
-      if(!code)continue;
-      const siteOrigin=server.watchUrl?new URL(server.watchUrl).origin:ANIKOTO_SITE;
-      const sourceEndpoint=`${siteOrigin}/ajax/server?get=${encodeURIComponent(code)}`;
-      const result=await fetchJson(sourceEndpoint,{
+  const id=
+    extractVidTubeId(html);
+
+  if(!id){
+    throw new Error(
+      "VidTube player ID not found"
+    );
+  }
+
+  const type=
+    extractVidTubeType(html);
+
+  const sourceUrl=
+    `${origin}/stream/getSources?id=${encodeURIComponent(id)}&type=${encodeURIComponent(type)}`;
+
+  log(
+    "VidTube: requesting source metadata",
+    sourceUrl
+  );
+
+  const sourceJson=
+    await fetchJson(
+      sourceUrl,
+      {
         headers:{
-          Referer:server.watchUrl||ANIKOTO_SITE+"/",
-          Cookie:server.cookie||"",
-          "X-Requested-With":"XMLHttpRequest",
-          "User-Agent":USER_AGENT
+          "Accept":
+            "application/json,text/plain,*/*",
+          "Origin":
+            origin,
+          "Referer":
+            embedUrl,
+          "User-Agent":
+            USER_AGENT
         }
-      });
-      let stream=result?.result?.url||result?.url;
-      if(!stream)continue;
-      if(stream.includes("#")){
-        const encoded=stream.split("#").pop();
-        try{stream=Buffer.from(encoded,"base64").toString("utf8");}catch{}
       }
-      if(/^https?:\/\//i.test(stream)){
-        return{
-          url:stream,
-          referer:"https://kwik.cx2.mewcdn.online/"
-        };
-      }
-    }
+    );
+
+  const sources=
+    collectSources(
+      sourceJson
+    );
+
+  if(!sources.length){
+    throw new Error(
+      "VidTube source response contained no media URL"
+    );
   }
-  throw new Error("Kiwi stream not found");
+
+  return{
+    sourceJson,
+    embedUrl
+  };
 }
 
-async function resolveServer(server,title,episodeNumber,language){
-  const embedUrl=server.embedUrl;
-  const name=String(server.name||"Server");
-  const lower=`${name} ${embedUrl}`.toLowerCase();
+// =========================================================
+// SERVER RESOLUTION
+// =========================================================
 
-  if(/megaplay|vidstream|hd/.test(lower)){
-    const resolved=await resolveMegaPlaySource(embedUrl);
-    return streamsFromResolved(resolved.sourceJson,title,episodeNumber,language,name,embedUrl);
+async function resolveServer(
+  server,
+  title,
+  episodeNumber,
+  language
+){
+  const embedUrl=
+    server?.embedUrl;
+
+  if(!embedUrl){
+    throw new Error(
+      "Server has no embed URL"
+    );
   }
 
-  if(/vidplay|vidtube/.test(lower)){
-    const resolved=await resolveVidPlaySource(embedUrl);
-    return streamsFromResolved(resolved.sourceJson,title,episodeNumber,language,name,embedUrl);
-  }
+  const hostname=
+    hostnameOf(embedUrl);
 
-  if(/kiwi|kwik/.test(lower)){
-    const resolved=await resolveKiwiSource({...server,number:episodeNumber});
-    return[
-      streamObject(
-        resolved.url,
-        title,
-        episodeNumber,
-        language,
-        name,
-        "Auto",
-        resolved.referer,
-        []
-      )
-    ];
-  }
+  log(
+    "Resolving server:",
+    server.name,
+    hostname
+  );
 
-  if(/vidcloud|vidwish/.test(lower)){
-    try{
-      const resolved=await resolveMegaPlaySource(embedUrl);
-      return streamsFromResolved(
-        resolved.sourceJson,
-        title,
-        episodeNumber,
-        language,
-        name,
+  // MegaPlay
+  if(
+    isHost(
+      embedUrl,
+      "megaplay.buzz"
+    )
+  ){
+    const resolved=
+      await resolveMegaPlaySource(
         embedUrl
       );
-    }catch{}
+
+    return streamsFromResolved(
+      resolved.sourceJson,
+      title,
+      episodeNumber,
+      language,
+      server.name||
+        "MegaPlay",
+      embedUrl
+    );
   }
 
-  return[];
-}
+  // VidTube
+  if(
+    isHost(
+      embedUrl,
+      "vidtube.site"
+    )
+  ){
+    const resolved=
+      await resolveVidTubeSource(
+        embedUrl
+      );
 
-function embedFallback(server,title,episodeNumber,language){
-  return{
-    name:`AniKoto ${language.toUpperCase()} ${server.name} Embed`,
-    title:`${title} - Episode ${episodeNumber} (${language.toUpperCase()})`,
-    url:server.embedUrl,
-    provider:`anikoto-${server.name}`,
-    quality:"Auto",
-    type:"embed",
-    behaviorHints:{notWebReady:true}
-  };
+    return streamsFromResolved(
+      resolved.sourceJson,
+      title,
+      episodeNumber,
+      language,
+      server.name||
+        "VidTube",
+      embedUrl
+    );
+  }
+
+  // Unsupported embed.
+  // NEVER return the embed page as a Stremio media URL.
+  throw new Error(
+    `Unsupported native server: ${hostname||"unknown"}`
+  );
 }
 
 // =========================================================
@@ -834,14 +1950,32 @@ export async function getStreams({
   episode=1
 }={}){
   const started=Date.now();
-  log("REQUEST START",JSON.stringify({imdbId,type,season,episode}));
+
+  log(
+    "REQUEST START",
+    JSON.stringify({
+      imdbId,
+      type,
+      season,
+      episode
+    })
+  );
 
   try{
-    if(type!=="series")return[];
+    if(type!=="series"){
+      return[];
+    }
 
-    const cleanImdbId=String(imdbId||"").split(":")[0].trim();
-    const seasonNumber=Number(season||1);
-    const episodeNumber=Number(episode||1);
+    const cleanImdbId=
+      String(imdbId||"")
+        .split(":")[0]
+        .trim();
+
+    const seasonNumber=
+      Number(season||1);
+
+    const episodeNumber=
+      Number(episode||1);
 
     if(
       !/^tt\d+$/i.test(cleanImdbId)||
@@ -851,94 +1985,227 @@ export async function getStreams({
       return[];
     }
 
-    const metadata=await getCinemetaMetadata(cleanImdbId,"series");
-    if(!metadata.title)return[];
+    const metadata=
+      await getCinemetaMetadata(
+        cleanImdbId,
+        "series"
+      );
 
-    const match=await searchAniKoto(metadata.title,metadata.year);
-    if(!match?.id)return[];
+    if(!metadata.title){
+      return[];
+    }
 
-    let slug=getCandidateSlug(match.raw)||getCandidateSlug(match);
-    if(!slug&&!isNumericId(match.id))slug=cleanId(match.id);
+    log(
+      "AniKoto matching:",
+      metadata.title,
+      metadata.year
+    );
 
-    const series=await getAniKotoSeries(match.id);
-    const episodeData=findEpisode(series.episodes,episodeNumber);
+    const match=
+      await searchAniKoto(
+        metadata.title,
+        metadata.year
+      );
 
-    if(!episodeData)return[];
+    if(!match?.id){
+      return[];
+    }
+
+    let slug=
+      getCandidateSlug(
+        match.raw
+      )||
+      getCandidateSlug(
+        match
+      );
+
+    if(
+      !slug&&
+      !isNumericId(match.id)
+    ){
+      slug=
+        cleanId(match.id);
+    }
+
+    log(
+      "AniKoto matched:",
+      match.title,
+      "id=",
+      match.id,
+      "slug=",
+      slug||"N/A"
+    );
+
+    const series=
+      await getAniKotoSeries(
+        match.id
+      );
+
+    const episodeData=
+      findEpisode(
+        series.episodes,
+        episodeNumber
+      );
+
+    if(!episodeData){
+      warn(
+        "Episode not found:",
+        episodeNumber
+      );
+
+      return[];
+    }
+
+    log(
+      "Episode found:",
+      episodeNumber,
+      "embedId=",
+      getEpisodeEmbedId(
+        episodeData
+      )
+    );
 
     const streams=[];
 
-    for(const language of["sub","dub"]){
+    for(
+      const language of[
+        "sub",
+        "dub"
+      ]
+    ){
       let servers=[];
 
-      try{
-        servers=await getAniKotoWebsiteServers(
-          slug,
-          episodeNumber,
-          language
-        );
-      }catch(error){
-        warn(
-          "Website server discovery failed",
-          language,
-          error?.message||String(error)
-        );
+      // First use the actual AniKoto website
+      // server list so we can expose all servers.
+      if(slug){
+        try{
+          servers=
+            await getAniKotoWebsiteServers(
+              slug,
+              episodeNumber,
+              language
+            );
+        }catch(error){
+          warn(
+            "Website server discovery failed",
+            language,
+            error?.message||
+              String(error)
+          );
+        }
       }
 
+      // API embed fallback.
+      // This is ONLY an embed candidate.
+      // It is never returned directly to Stremio.
       if(!servers.length){
-        const embed=getEmbedUrl(episodeData,language);
+        const embed=
+          getEmbedUrl(
+            episodeData,
+            language
+          );
 
         if(embed){
           servers=[{
             type:language,
-            name:"MegaPlay",
+            name:
+              isHost(
+                embed,
+                "megaplay.buzz"
+              )
+                ?"MegaPlay"
+                :"AniKoto",
             embedUrl:embed,
-            malId:episodeData?.malId||episodeData?.mal_id,
-            timestamp:episodeData?.timestamp,
+            malId:
+              episodeData?.malId||
+              episodeData?.mal_id,
+            timestamp:
+              episodeData?.timestamp,
             watchUrl:null,
             cookie:""
           }];
         }
       }
 
+      log(
+        "Language:",
+        language,
+        "servers:",
+        servers.length
+      );
+
       for(const server of servers){
         try{
-          const resolved=await resolveServer(
-            server,
-            metadata.title,
-            episodeNumber,
-            language
-          );
-
-          if(resolved.length){
-            streams.push(...resolved);
-            continue;
-          }
-        }catch(error){
-          warn(
-            "Server resolver failed",
-            server.name,
-            error?.message||String(error)
-          );
-        }
-
-        if(server.embedUrl){
-          streams.push(
-            embedFallback(
+          const resolved=
+            await resolveServer(
               server,
               metadata.title,
               episodeNumber,
               language
-            )
+            );
+
+          if(resolved.length){
+            streams.push(
+              ...resolved
+            );
+
+            log(
+              "Server resolved:",
+              server.name,
+              "streams=",
+              resolved.length
+            );
+          }else{
+            warn(
+              "Server returned no native streams:",
+              server.name
+            );
+          }
+
+        }catch(error){
+          warn(
+            "Server resolver failed",
+            server.name,
+            error?.message||
+              String(error)
           );
         }
       }
     }
 
+    // =====================================================
+    // UNIQUE STREAMS
+    // =====================================================
+
     const unique=[];
     const seen=new Set();
 
     for(const stream of streams){
-      if(!stream?.url||seen.has(stream.url))continue;
+      if(
+        !stream?.url||
+        seen.has(stream.url)
+      ){
+        continue;
+      }
+
+      // Never expose an AniKoto/MegaPlay/VidTube
+      // HTML embed as a media stream.
+      if(
+        /\/stream\/(?:s-2|ani|mal)\//i.test(
+          stream.url
+        )&&
+        !/\.m3u8(?:$|\?)/i.test(
+          stream.url
+        )
+      ){
+        warn(
+          "Rejected embed URL:",
+          stream.url
+        );
+
+        continue;
+      }
+
       seen.add(stream.url);
       unique.push(stream);
     }
@@ -956,8 +2223,22 @@ export async function getStreams({
 
     unique.sort(
       (a,b)=>
-        (qualityRank[String(b.quality||"Auto").toLowerCase()]||0)-
-        (qualityRank[String(a.quality||"Auto").toLowerCase()]||0)
+        (
+          qualityRank[
+            String(
+              b.quality||
+              "Auto"
+            ).toLowerCase()
+          ]||0
+        )-
+        (
+          qualityRank[
+            String(
+              a.quality||
+              "Auto"
+            ).toLowerCase()
+          ]||0
+        )
     );
 
     log(
@@ -966,15 +2247,32 @@ export async function getStreams({
       `in ${Date.now()-started}ms`
     );
 
+    for(const stream of unique){
+      log(
+        "STREAM:",
+        stream.provider,
+        stream.quality,
+        stream.type,
+        stream.hls
+          ?"HLS"
+          :"DIRECT"
+      );
+    }
+
     return unique;
 
   }catch(error){
     errorLog(
       "REQUEST FAILED:",
-      error?.message||String(error)
+      error?.message||
+        String(error)
     );
 
-    if(error?.stack)errorLog(error.stack);
+    if(error?.stack){
+      errorLog(
+        error.stack
+      );
+    }
 
     return[];
   }
