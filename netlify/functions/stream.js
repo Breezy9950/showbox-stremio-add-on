@@ -6,161 +6,6 @@ import {
   getStreams as getFebboxStreams
 } from "./providers/febbox.js";
 
-import {
-  getStore
-} from "@netlify/blobs";
-
-// =========================================================
-// STREAM CACHE
-// =========================================================
-
-const STREAM_CACHE_STORE =
-  "showbox-stream-cache";
-
-const STREAM_CACHE_TTL_MS =
-  2 * 60 * 1000;
-
-// ---------------------------------------------------------
-// Cache store
-// ---------------------------------------------------------
-
-function getStreamCacheStore() {
-  return getStore({
-    name:
-      STREAM_CACHE_STORE,
-
-    consistency:
-      "strong"
-  });
-}
-
-// ---------------------------------------------------------
-// Cache key
-// ---------------------------------------------------------
-
-function getStreamCacheKey(
-  rawConfig,
-  type,
-  imdbId,
-  season,
-  episode,
-  config
-) {
-  const configSettings =
-    JSON.stringify({
-      qualities:
-        config?.qualities ?? null,
-
-      fileSize:
-        config?.fileSize ?? null,
-
-      filters:
-        config?.filters ?? null
-    });
-
-  return [
-    rawConfig,
-    type,
-    imdbId,
-    season ?? "",
-    episode ?? "",
-    configSettings
-  ].join("|");
-}
-
-// ---------------------------------------------------------
-// Read cache
-// ---------------------------------------------------------
-
-async function getCachedStreams(
-  cacheKey
-) {
-  try {
-    const store =
-      getStreamCacheStore();
-
-    const cached =
-      await store.get(
-        cacheKey,
-        {
-          type:
-            "json",
-
-          consistency:
-            "strong"
-        }
-      );
-
-    if (
-      !cached ||
-      typeof cached !== "object"
-    ) {
-      return null;
-    }
-
-    const createdAt =
-      Number(
-        cached.createdAt
-      );
-
-    if (
-      !Number.isFinite(
-        createdAt
-      )
-    ) {
-      return null;
-    }
-
-    if (
-      Date.now() -
-        createdAt >=
-      STREAM_CACHE_TTL_MS
-    ) {
-      return null;
-    }
-
-    if (
-      !Array.isArray(
-        cached.streams
-      )
-    ) {
-      return null;
-    }
-
-    return cached.streams;
-
-  } catch {
-    return null;
-  }
-}
-
-// ---------------------------------------------------------
-// Write cache
-// ---------------------------------------------------------
-
-async function cacheStreams(
-  cacheKey,
-  streams
-) {
-  try {
-    const store =
-      getStreamCacheStore();
-
-    await store.setJSON(
-      cacheKey,
-      {
-        createdAt:
-          Date.now(),
-
-        streams
-      }
-    );
-
-  } catch {
-    // Cache failure must never
-    // break stream discovery.
-  }
-}
 
 // =========================================================
 // BASE64URL
@@ -1061,48 +906,6 @@ export default async (
       );
     }
 
-    // -----------------------------------------------------
-    // Cache lookup
-    // -----------------------------------------------------
-
-    const cacheKey =
-      getStreamCacheKey(
-        rawConfig,
-        type,
-        imdbId,
-        season,
-        episode,
-        config
-      );
-
-    const cachedStreams =
-      await getCachedStreams(
-        cacheKey
-      );
-
-    if (
-      cachedStreams
-    ) {
-      return new Response(
-        JSON.stringify({
-          streams:
-            cachedStreams
-        }),
-        {
-          status:
-            200,
-
-          headers: {
-            "Content-Type":
-              "application/json",
-
-            "Access-Control-Allow-Origin":
-              "*"
-          }
-        }
-      );
-    }
-
     // =====================================================
     // FETCH FEBBOX
     // =====================================================
@@ -1114,16 +917,7 @@ export default async (
         season,
         episode,
         token
-      }).catch(error => {
-        console.error(
-          "[STREAM] FebBox provider failed:",
-          error?.stack ||
-            error?.message ||
-            error
-        );
-
-        return [];
-      });
+      }).catch(() => []);
 
     // -----------------------------------------------------
     // Ensure array
@@ -1184,15 +978,6 @@ export default async (
     }
 
     // -----------------------------------------------------
-    // Cache final result
-    // -----------------------------------------------------
-
-    await cacheStreams(
-      cacheKey,
-      configuredStreams
-    );
-
-    // -----------------------------------------------------
     // Return Stremio response
     // -----------------------------------------------------
 
@@ -1215,14 +1000,7 @@ export default async (
       }
     );
 
-  } catch (error) {
-    console.error(
-      "[STREAM] Fatal error:",
-      error?.stack ||
-        error?.message ||
-        error
-    );
-
+  } catch {
     return new Response(
       JSON.stringify({
         streams: []
