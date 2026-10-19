@@ -1,6 +1,5 @@
 import { getConfig } from "./config-store.js";
 import { getStreams as getFebboxStreams } from "./providers/febbox.js";
-import { getStreams as getAnimeStreams } from "./providers/anime/index.js";
 import { getStore } from "@netlify/blobs";
 
 // =========================================================
@@ -19,7 +18,7 @@ function getStreamCacheKey(rawConfig, type, imdbId, season, episode, config) {
     qualities: config?.qualities ?? null,
     fileSize: config?.fileSize ?? null,
     filters: config?.filters ?? null,
-    anime_enabled: true // Busts the cache from before anime was added
+    anime_enabled: true
   });
 
   return [rawConfig, type, imdbId, season ?? "", episode ?? "", configSettings].join("|");
@@ -277,9 +276,25 @@ export default async (req, context) => {
     // FETCH ALL PROVIDERS IN PARALLEL
     // =====================================================
 
+    // Safe dynamic import so Netlify build doesn't fail
+    const getAnimeStreamsSafe = async () => {
+      try {
+        const mod = await import("./providers/anime/index.js");
+        return await mod.getStreams({ imdbId, type, season, episode });
+      } catch (err) {
+        if (err?.code === "ERR_MODULE_NOT_FOUND") return [];
+        return [{
+          name: "⚠️ Anime Error",
+          title: `⚠️ Anime Error\n${err?.message || err}`,
+          url: "https://example.com/error.mp4",
+          behaviorHints: { notWebReady: true }
+        }];
+      }
+    };
+
     const [febboxResult, animeResult] = await Promise.allSettled([
       getFebboxStreams({ imdbId, type, season, episode, token }),
-      getAnimeStreams({ imdbId, type, season, episode })
+      getAnimeStreamsSafe()
     ]);
 
     let streams = [];
