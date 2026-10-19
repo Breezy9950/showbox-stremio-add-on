@@ -8,6 +8,8 @@
 //
 // =========================================================
 
+import { getStreams as getAnikotoStreams } from "./anikoto.js";
+
 const PROVIDER_TIMEOUT_MS = 8000;
 
 // ---------------------------------------------------------
@@ -52,10 +54,9 @@ export async function getStreams({ imdbId, type, season, episode }) {
   // -------------------------------------------------------
   // Define the providers to run
   // -------------------------------------------------------
-  // We will uncomment these as we build them.
   
   const providers = [
-    // { name: "Anikoto", fn: getAnikotoStreams },
+    { name: "Anikoto", fn: getAnikotoStreams },
     // { name: "Zoko", fn: getZokoStreams },
     // { name: "Lee", fn: getLeeStreams },
   ];
