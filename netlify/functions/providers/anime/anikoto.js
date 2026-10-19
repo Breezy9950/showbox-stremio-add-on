@@ -1041,9 +1041,8 @@ async function runPipeline(target, season, episode, isMovie, settings) {
 
 /* ================= MAIN EXPORT ================= */
 
-export async function getStreams({ imdbId, type, season, episode }) {
+export async function getStreams({ tmdbId, type, season, episode }) {
   try {
-    const tmdbId = imdbId; // The addon passes TMDB IDs, treat it as such
     const s = Number(season) || 1;
     const e = Number(episode) || 1;
     const isMovie = type === "movie";
