@@ -1,0 +1,92 @@
+// =========================================================
+// ANIME ORCHESTRATOR
+// =========================================================
+//
+// This file runs all enabled anime providers in parallel.
+// To add a new provider, import it below and add it to the 
+// `providers` array in the `getStreams` function.
+//
+// =========================================================
+
+const PROVIDER_TIMEOUT_MS = 8000;
+
+// ---------------------------------------------------------
+// Helper: Wrap provider in a timeout
+// ---------------------------------------------------------
+
+async function withTimeout(name, fn, args) {
+  const started = Date.now();
+  
+  try {
+    const result = await Promise.race([
+      fn(args),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), PROVIDER_TIMEOUT_MS)
+      )
+    ]);
+    
+    const elapsed = Date.now() - started;
+    const count = Array.isArray(result) ? result.length : 0;
+    
+    if (count > 0) {
+      console.log(`[ANIME] ${name} succeeded in ${elapsed}ms (${count} streams)`);
+    } else {
+      console.log(`[ANIME] ${name} returned 0 streams in ${elapsed}ms`);
+    }
+    
+    return Array.isArray(result) ? result : [];
+  } catch (error) {
+    const elapsed = Date.now() - started;
+    console.log(`[ANIME] ${name} failed in ${elapsed}ms: ${error?.message || error}`);
+    return [];
+  }
+}
+
+// ---------------------------------------------------------
+// Main Entry Point
+// ---------------------------------------------------------
+
+export async function getStreams({ imdbId, type, season, episode }) {
+  if (!imdbId) return [];
+
+  // -------------------------------------------------------
+  // Define the providers to run
+  // -------------------------------------------------------
+  // We will uncomment these as we build them.
+  
+  const providers = [
+    // { name: "Anikoto", fn: getAnikotoStreams },
+    // { name: "Zoko", fn: getZokoStreams },
+    // { name: "Lee", fn: getLeeStreams },
+  ];
+
+  if (providers.length === 0) {
+    return [];
+  }
+
+  // -------------------------------------------------------
+  // Run all providers in parallel
+  // -------------------------------------------------------
+
+  const results = await Promise.all(
+    providers.map((p) => 
+      withTimeout(p.name, p.fn, { imdbId, type, season, episode })
+    )
+  );
+
+  // -------------------------------------------------------
+  // Flatten and dedupe
+  // -------------------------------------------------------
+
+  const flat = results.flat();
+  const seen = new Set();
+  
+  const deduped = flat.filter((stream) => {
+    if (!stream || !stream.url) return false;
+    if (seen.has(stream.url)) return false;
+    seen.add(stream.url);
+    return true;
+  });
+
+  return deduped;
+}
