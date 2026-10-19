@@ -4,7 +4,7 @@
 
 import { getStreams as getAnikotoStreams } from "./anikoto.js";
 
-const PROVIDER_TIMEOUT_MS = 8000;
+const PROVIDER_TIMEOUT_MS = 25000;
 const TMDB_API_KEY = "68e094699525b18a70bab2f86b1fa706";
 
 // ---------------------------------------------------------
@@ -40,7 +40,7 @@ function errorStream(title, description) {
   return {
     name: "⚠️ Anime Error",
     title: `⚠️ ${title}\n${description}`,
-    url: "https://example.com/error.mp4", // Fake URL so Nuvio displays it
+    url: "https://example.com/error.mp4",
     behaviorHints: { notWebReady: true }
   };
 }
@@ -72,8 +72,7 @@ async function withTimeout(name, fn, args) {
     return Array.isArray(result) ? result : [];
   } catch (error) {
     const elapsed = Date.now() - started;
-    console.log(`[ANIME] ${name} failed in ${elapsed}ms: ${error?.message || error}`);
-    // Return a visible error stream so we know it failed
+    console.error(`[ANIME FATAL] ${name} failed in ${elapsed}ms:`, error);
     return [errorStream(`${name} Failed`, error?.message || "Unknown error")];
   }
 }
@@ -90,8 +89,7 @@ export async function getStreams({ imdbId, type, season, episode }) {
   
   if (!tmdbId) {
     console.log(`[ANIME] Could not resolve TMDB ID for IMDb ${imdbId}`);
-    // Return a visible error stream
-    return [errorStream("TMDB Conversion Failed", `Could not find TMDB ID for IMDb: ${imdbId}`)];
+    return [];
   }
 
   const providers = [
