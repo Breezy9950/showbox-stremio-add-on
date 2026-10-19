@@ -1,16 +1,36 @@
 // =========================================================
 // ANIME ORCHESTRATOR
 // =========================================================
-//
-// This file runs all enabled anime providers in parallel.
-// To add a new provider, import it below and add it to the 
-// `providers` array in the `getStreams` function.
-//
-// =========================================================
 
 import { getStreams as getAnikotoStreams } from "./anikoto.js";
 
 const PROVIDER_TIMEOUT_MS = 8000;
+const TMDB_API_KEY = "68e094699525b18a70bab2f86b1fa706";
+
+// ---------------------------------------------------------
+// Helper: IMDb -> TMDB
+// ---------------------------------------------------------
+
+async function imdbToTmdb(imdbId, type) {
+  try {
+    const mediaType = type === "movie" ? "movie" : "tv";
+    const url = `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?external_source=imdb_id&api_key=${TMDB_API_KEY}`;
+    
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    
+    const data = await res.json();
+    const results = mediaType === "movie" ? data.movie_results : data.tv_results;
+    
+    if (Array.isArray(results) && results.length > 0 && results[0].id) {
+      return String(results[0].id);
+    }
+    return null;
+  } catch (error) {
+    console.error(`[ANIME] IMDb->TMDB failed for ${imdbId}:`, error?.message || error);
+    return null;
+  }
+}
 
 // ---------------------------------------------------------
 // Helper: Wrap provider in a timeout
@@ -51,10 +71,13 @@ async function withTimeout(name, fn, args) {
 export async function getStreams({ imdbId, type, season, episode }) {
   if (!imdbId) return [];
 
-  // -------------------------------------------------------
-  // Define the providers to run
-  // -------------------------------------------------------
-  
+  // Convert IMDb to TMDB before running providers
+  const tmdbId = await imdbToTmdb(imdbId, type);
+  if (!tmdbId) {
+    console.log(`[ANIME] Could not resolve TMDB ID for IMDb ${imdbId}`);
+    return [];
+  }
+
   const providers = [
     { name: "Anikoto", fn: getAnikotoStreams },
     // { name: "Zoko", fn: getZokoStreams },
@@ -65,20 +88,14 @@ export async function getStreams({ imdbId, type, season, episode }) {
     return [];
   }
 
-  // -------------------------------------------------------
-  // Run all providers in parallel
-  // -------------------------------------------------------
-
+  // Run all providers in parallel, passing the TMDB ID
   const results = await Promise.all(
     providers.map((p) => 
-      withTimeout(p.name, p.fn, { imdbId, type, season, episode })
+      withTimeout(p.name, p.fn, { tmdbId, type, season, episode })
     )
   );
 
-  // -------------------------------------------------------
   // Flatten and dedupe
-  // -------------------------------------------------------
-
   const flat = results.flat();
   const seen = new Set();
   
