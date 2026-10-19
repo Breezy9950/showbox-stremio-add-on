@@ -8,41 +8,43 @@ const PROVIDER_TIMEOUT_MS = 25000;
 const TMDB_API_KEY = "68e094699525b18a70bab2f86b1fa706";
 
 // ---------------------------------------------------------
-// Helper: IMDb -> TMDB
+// Helper: Resolve ID to TMDB
 // ---------------------------------------------------------
 
-async function imdbToTmdb(imdbId, type) {
-  try {
-    const mediaType = type === "movie" ? "movie" : "tv";
-    const url = `https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?external_source=imdb_id&api_key=${TMDB_API_KEY}`;
-    
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    
-    const data = await res.json();
-    const results = mediaType === "movie" ? data.movie_results : data.tv_results;
-    
-    if (Array.isArray(results) && results.length > 0 && results[0].id) {
-      return String(results[0].id);
-    }
-    return null;
-  } catch (error) {
-    console.error(`[ANIME] IMDb->TMDB failed for ${imdbId}:`, error?.message || error);
-    return null;
+async function resolveToTmdb(id, type) {
+  // 1. If it's already a TMDB ID (just numbers), return it directly.
+  if (/^\d+$/.test(id)) {
+    return id;
   }
-}
 
-// ---------------------------------------------------------
-// Helper: Error Stream (Visible in UI)
-// ---------------------------------------------------------
+  // 2. If it's prefixed like "tmdb:12345", strip it and return.
+  if (id.startsWith("tmdb:")) {
+    return id.replace("tmdb:", "");
+  }
 
-function errorStream(title, description) {
-  return {
-    name: "⚠️ Anime Error",
-    title: `⚠️ ${title}\n${description}`,
-    url: "https://example.com/error.mp4",
-    behaviorHints: { notWebReady: true }
-  };
+  // 3. If it's an IMDb ID (tt12345), convert it.
+  if (id.startsWith("tt")) {
+    try {
+      const mediaType = type === "movie" ? "movie" : "tv";
+      const url = `https://api.themoviedb.org/3/find/${encodeURIComponent(id)}?external_source=imdb_id&api_key=${TMDB_API_KEY}`;
+      
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      
+      const data = await res.json();
+      const results = mediaType === "movie" ? data.movie_results : data.tv_results;
+      
+      if (Array.isArray(results) && results.length > 0 && results[0].id) {
+        return String(results[0].id);
+      }
+      return null;
+    } catch (error) {
+      console.error(`[ANIME] IMDb->TMDB failed for ${id}:`, error?.message || error);
+      return null;
+    }
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------
@@ -73,7 +75,7 @@ async function withTimeout(name, fn, args) {
   } catch (error) {
     const elapsed = Date.now() - started;
     console.error(`[ANIME FATAL] ${name} failed in ${elapsed}ms:`, error);
-    return [errorStream(`${name} Failed`, error?.message || "Unknown error")];
+    return [];
   }
 }
 
@@ -84,11 +86,11 @@ async function withTimeout(name, fn, args) {
 export async function getStreams({ imdbId, type, season, episode }) {
   if (!imdbId) return [];
 
-  // Convert IMDb to TMDB before running providers
-  const tmdbId = await imdbToTmdb(imdbId, type);
+  // Convert whatever ID we got into a TMDB ID
+  const tmdbId = await resolveToTmdb(imdbId, type);
   
   if (!tmdbId) {
-    console.log(`[ANIME] Could not resolve TMDB ID for IMDb ${imdbId}`);
+    console.log(`[ANIME] Could not resolve TMDB ID for ${imdbId}`);
     return [];
   }
 
