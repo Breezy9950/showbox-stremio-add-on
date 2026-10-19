@@ -3,3 +3,9 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/anime/stream/*"
+  to = "/.netlify/functions/anime-stream"
+  status = 200
+  force = true
