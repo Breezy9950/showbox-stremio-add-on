@@ -33,6 +33,19 @@ async function imdbToTmdb(imdbId, type) {
 }
 
 // ---------------------------------------------------------
+// Helper: Error Stream (Visible in UI)
+// ---------------------------------------------------------
+
+function errorStream(title, description) {
+  return {
+    name: "⚠️ Anime Error",
+    title: `⚠️ ${title}\n${description}`,
+    url: "https://example.com/error.mp4", // Fake URL so Nuvio displays it
+    behaviorHints: { notWebReady: true }
+  };
+}
+
+// ---------------------------------------------------------
 // Helper: Wrap provider in a timeout
 // ---------------------------------------------------------
 
@@ -60,7 +73,8 @@ async function withTimeout(name, fn, args) {
   } catch (error) {
     const elapsed = Date.now() - started;
     console.log(`[ANIME] ${name} failed in ${elapsed}ms: ${error?.message || error}`);
-    return [];
+    // Return a visible error stream so we know it failed
+    return [errorStream(`${name} Failed`, error?.message || "Unknown error")];
   }
 }
 
@@ -73,15 +87,15 @@ export async function getStreams({ imdbId, type, season, episode }) {
 
   // Convert IMDb to TMDB before running providers
   const tmdbId = await imdbToTmdb(imdbId, type);
+  
   if (!tmdbId) {
     console.log(`[ANIME] Could not resolve TMDB ID for IMDb ${imdbId}`);
-    return [];
+    // Return a visible error stream
+    return [errorStream("TMDB Conversion Failed", `Could not find TMDB ID for IMDb: ${imdbId}`)];
   }
 
   const providers = [
     { name: "Anikoto", fn: getAnikotoStreams },
-    // { name: "Zoko", fn: getZokoStreams },
-    // { name: "Lee", fn: getLeeStreams },
   ];
 
   if (providers.length === 0) {
